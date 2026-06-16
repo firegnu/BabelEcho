@@ -104,13 +104,15 @@ def test_openai_compatible_client_reads_api_key_file(tmp_path, monkeypatch):
     assert request.get_header("Authorization") == "Bearer file-backed-key"
 
 
-def test_openai_compatible_client_reports_missing_api_key_file():
+def test_openai_compatible_client_reports_missing_api_key_file(tmp_path):
+    missing_api_key_file = tmp_path / "missing-deepseek.env"
+
     with pytest.raises(ValueError, match="api_key_file"):
         build_llm_client(
             {
                 "provider": "openai_compatible",
                 "base_url": "https://api.deepseek.com",
                 "model": "deepseek-v4-pro",
-                "api_key_file": "workspace/config/deepseek.env",
+                "api_key_file": str(missing_api_key_file),
             }
         )
