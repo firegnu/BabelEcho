@@ -25,6 +25,7 @@ env/
 .DS_Store
 .idea/
 .vscode/
+.worktrees/
 
 # BabelEcho local runtime state
 workspace/runs/
