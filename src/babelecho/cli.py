@@ -2,6 +2,7 @@ import argparse
 from pathlib import Path
 
 from .adapt import adapt_to_chinese
+from .audio import assemble_audio
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
 from .paths import create_run
@@ -41,6 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
     synthesize.add_argument("--run-id", required=True)
     synthesize.add_argument("--local-config", required=True)
 
+    assemble = subparsers.add_parser("assemble", help="Assemble final episode audio.")
+    assemble.add_argument("--workspace", required=True)
+    assemble.add_argument("--run-id", required=True)
+
     return parser
 
 
@@ -64,6 +69,12 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "normalize":
         run_paths = create_run(args.workspace, args.run_id)
         output = normalize_transcript(run_paths, Path(args.raw_transcript))
+        print(output)
+        return 0
+
+    if args.command == "assemble":
+        run_paths = create_run(args.workspace, args.run_id)
+        output = assemble_audio(run_paths)
         print(output)
         return 0
 
