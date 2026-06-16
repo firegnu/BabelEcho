@@ -15,7 +15,7 @@ def assemble_audio(run_paths: RunPaths, audio_config: dict | None = None) -> str
     concat_path = run_paths.output_dir / "concat.txt"
     lines = []
     for segment in manifest["segments"]:
-        audio_path = run_paths.run_dir / segment["audio_path"]
+        audio_path = (run_paths.run_dir / segment["audio_path"]).resolve()
         lines.append(_ffmpeg_concat_line(audio_path))
     concat_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
