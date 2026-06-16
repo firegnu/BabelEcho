@@ -11,7 +11,7 @@
 - 已实现分阶段 Python CLI：
   - `ingest`：读取 transcript URL 或本地 transcript 文件。
   - `normalize`：解析 `.vtt`、`.srt`、`.txt` 到统一 JSON。
-  - `adapt`：当前已支持 fixture LLM 和本地 OpenAI-compatible vLLM；下一步要补 DeepSeek/OpenAI-compatible provider。
+  - `adapt`：当前已支持 fixture LLM、本地 OpenAI-compatible vLLM，以及 DeepSeek/OpenAI-compatible provider。
   - `synthesize`：fixture 静音 WAV 或本地 TTS CLI wrapper。
   - `assemble`：调用 `ffmpeg` 拼接 WAV 到 MP3。
   - `publish`：生成静态 episode 目录和 RSS `feed.xml`。
@@ -42,7 +42,15 @@
   - `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
   - `workspace/config/deepseek.env.example` 提供可提交的 env 文件模板，真实 `workspace/config/deepseek.env` 被 ignore。
   - `tests/test_llm.py` 覆盖 auth header、`extra_body` 合并、env 文件读取和缺 key 错误。
-- 本机全量测试通过：`16 passed`。
+- 本机全量测试通过：`18 passed`。
+- 已在 5090D 上完成 DeepSeek adapt 验证：
+  - 远端已拉到 `e004674 feat: load deepseek key from ignored env file`。
+  - 远端测试通过：`18 passed`。
+  - `workspace/config/deepseek.env` 已由用户填写，且被 `.gitignore` 忽略。
+  - `workspace/config/local-deepseek.yaml` 使用 `api_key_file`。
+  - DeepSeek `/models` 返回 `deepseek-v4-flash` 和 `deepseek-v4-pro`。
+  - `babelecho adapt --workspace workspace --run-id fixture-smoke --local-config workspace/config/local-deepseek.yaml` 成功。
+  - `workspace/runs/fixture-smoke/script/zh.json` 输出自然中文：`欢迎收听本期节目。`
 - 最新代码修复提交：
   - `91ff555 fix: use absolute paths for ffmpeg concat`
 
@@ -52,14 +60,8 @@
   - `adapt(fixture)` 没有真实翻译，只是给英文片段加 `中文口播：` 前缀。
   - `synthesize(fixture)` 没有真实 TTS，只生成静音 WAV。
   - 来源仍是手写 YAML 指向 transcript 文件，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
-- 下一步应在 5090D 上验证 DeepSeek API 并只运行 `adapt`，不要同时接真实来源和真实 TTS。
-- 需要准备本地未提交配置 `workspace/config/local-deepseek.yaml`，配置：
-  - `llm.provider: openai_compatible`
-  - `llm.base_url: "https://api.deepseek.com"`
-  - `llm.model: "deepseek-v4-pro"`
-  - `llm.api_key_file: "workspace/config/deepseek.env"`
-  - `tts.provider: fixture`
-- DeepSeek adapt 跑通且质量可接受后，再进入本地中文 TTS 接入。
+- 下一步应进入本地中文 TTS 接入，不要同时接真实来源、ASR、voice clone 或 App。
+- DeepSeek adapt 基线已经跑通；后续只在 prompt 质量明显不满足时再回到 LLM adapt。
 
 ## 4. 关键决策
 
@@ -68,7 +70,7 @@
 - 先验证 transcript 到中文口播脚本的质量，再投入 TTS 和 voice clone。
 - `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
-- 5090D 执行代码方式：MacBook 修改并 push，5090D `git pull` 后运行；暂不使用 SSH 远程执行。
+- 5090D 执行代码方式：MacBook 修改并 push；必要时通过 `ssh my-5090d-host` 在远端运行验证命令，但不在 5090D 上安装或运行 Codex agent。
 - Python 环境使用项目内 conda env：`.conda/babelecho-dev`，不要使用 base env。
 
 ## 5. 重要文件
@@ -91,66 +93,15 @@
 
 ## 6. 下一步建议
 
-1. 在 5090D 上拉取最新代码：
-
-   ```bash
-   cd /home/th5090d/Develop/personal_project/BabelEcho
-   git pull
-   ```
-
-2. 在 5090D 上准备 ignored DeepSeek key 文件：
-
-   ```bash
-   cp workspace/config/deepseek.env.example workspace/config/deepseek.env
-   chmod 600 workspace/config/deepseek.env
-   ${EDITOR:-nano} workspace/config/deepseek.env
-   ```
-
-3. 在 5090D 上验证 DeepSeek API：
-
-   ```bash
-   KEY="$(sed -n 's/^DEEPSEEK_API_KEY=//p' workspace/config/deepseek.env)"
-   curl -sS https://api.deepseek.com/models \
-     -H "Authorization: Bearer $KEY"
-   unset KEY
-   ```
-
-4. 新建本地配置，不提交：
-
-   ```yaml
-   llm:
-     provider: openai_compatible
-     base_url: "https://api.deepseek.com"
-     model: "deepseek-v4-pro"
-     api_key_file: "workspace/config/deepseek.env"
-     temperature: 0.3
-     max_tokens: 4096
-     extra_body:
-       thinking:
-         type: disabled
-   tts:
-     provider: fixture
-   publish:
-     base_url: "https://example.com/babelecho"
-   ```
-
-5. 只跑 DeepSeek LLM 的 `adapt`：
-
-   ```bash
-   export PYTHON=.conda/babelecho-dev/bin/python
-   export WORKSPACE=workspace
-   export RUN_ID=fixture-smoke
-   $PYTHON -m babelecho adapt --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config workspace/config/local-deepseek.yaml
-   sed -n '1,160p' workspace/runs/fixture-smoke/script/zh.json
-   ```
-
-6. 如果 `script/zh.json` 质量可接受，进入本地中文 TTS 接入；真实 transcript 来源继续后置。
+1. 进入本地中文 TTS 接入计划。
+2. 先在 5090D 上手动选型并验证一个中文 TTS CLI wrapper 能把一句中文生成 wav。
+3. 保持 `adapt` 已验证配置不变；不要同时接真实 transcript 来源。
 
 ## 当前 Git 状态
 
 - 分支：`main`
-- 本轮代码修改前最近提交：
+- 本轮文档更新前最近提交：
+  - `e004674 feat: load deepseek key from ignored env file`
+  - `dc962af feat: add openai compatible llm provider`
   - `b58eb73 docs: switch mvp0 llm plan to deepseek baseline`
-  - `114577b docs: add resume prompt for new sessions`
-  - `0644741 docs: add numbered plan for local llm adapt`
-- 本轮代码修改需要完成隐私扫描、提交和推送后，5090D 再 `git pull`。
+- 本轮文档修改需要完成隐私扫描、提交和推送后，5090D 再 `git pull`。

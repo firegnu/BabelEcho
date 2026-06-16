@@ -1,6 +1,6 @@
 # 01.01 DeepSeek LLM Adapt 基线接入计划
 
-状态：`ready`
+状态：`done`
 
 日期：2026-06-16
 
@@ -260,3 +260,14 @@ sed -n '1,200p' workspace/runs/fixture-smoke/script/zh.json
 - `01.03` 本地中文 TTS 接入。
 
 真实 transcript 来源接入推迟到中文脚本和本地 TTS 都可听之后。
+
+## 完成记录
+
+2026-06-16 已在 5090D 上完成验证：
+
+- `workspace/config/deepseek.env` 已由用户在远端填写，文件被 `.gitignore` 忽略。
+- `workspace/config/local-deepseek.yaml` 使用 `api_key_file: "workspace/config/deepseek.env"`。
+- `https://api.deepseek.com/models` 可访问，返回 `deepseek-v4-flash` 和 `deepseek-v4-pro`。
+- `babelecho adapt --workspace workspace --run-id fixture-smoke --local-config workspace/config/local-deepseek.yaml` 成功运行。
+- `workspace/runs/fixture-smoke/script/zh.json` 由 DeepSeek 生成，样例输出为自然中文：`欢迎收听本期节目。`
+- 输出不再是 fixture 的 `中文口播：原英文` 形式。
