@@ -14,6 +14,7 @@ dist/
 *.egg-info/
 
 # Virtual environments
+.conda/
 .venv/
 venv/
 env/
