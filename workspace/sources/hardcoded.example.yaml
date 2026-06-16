@@ -1,0 +1,5 @@
+source:
+  type: transcript_url
+  transcript_url: "https://example.com/episode.vtt"
+  title: "Example Episode"
+  original_url: "https://example.com/episode"

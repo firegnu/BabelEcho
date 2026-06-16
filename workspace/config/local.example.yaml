@@ -1,0 +1,15 @@
+llm:
+  provider: local_vllm
+  base_url: "http://127.0.0.1:8000/v1"
+  model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+  temperature: 0.3
+  max_tokens: 4096
+
+tts:
+  provider: local_cli
+  command: "tts-wrapper"
+  voice: "default-zh"
+  output_format: "wav"
+
+publish:
+  base_url: "https://example.com/babelecho"
