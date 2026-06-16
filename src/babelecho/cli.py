@@ -1,6 +1,7 @@
 import argparse
 from pathlib import Path
 
+from .adapt import adapt_to_chinese
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
 from .paths import create_run
@@ -29,6 +30,11 @@ def build_parser() -> argparse.ArgumentParser:
     normalize.add_argument("--run-id", required=True)
     normalize.add_argument("--raw-transcript", required=True)
 
+    adapt = subparsers.add_parser("adapt", help="Adapt transcript to Chinese script.")
+    adapt.add_argument("--workspace", required=True)
+    adapt.add_argument("--run-id", required=True)
+    adapt.add_argument("--local-config", required=True)
+
     return parser
 
 
@@ -52,6 +58,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "normalize":
         run_paths = create_run(args.workspace, args.run_id)
         output = normalize_transcript(run_paths, Path(args.raw_transcript))
+        print(output)
+        return 0
+
+    if args.command == "adapt":
+        config = load_yaml(Path(args.local_config))
+        require_keys(config, ["llm"])
+        run_paths = create_run(args.workspace, args.run_id)
+        output = adapt_to_chinese(run_paths, config["llm"])
         print(output)
         return 0
 
