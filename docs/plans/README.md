@@ -4,6 +4,8 @@
 
 `docs/plans/` 用来保存可执行计划。它和架构、调研、runbook 文档分开：架构文档回答“系统应该长什么样”，计划文档回答“下一步按什么顺序做”。
 
+产品阶段和长期优先级见：[BabelEcho Roadmap](../roadmap.md)。
+
 ## 编号规则
 
 采用两级编号：
@@ -49,3 +51,7 @@ docs/plans/
 
 - [01.01 DeepSeek LLM Adapt 基线接入](./01-backend-mvp0/01-local-llm-adapt.md) - `done`
 - [01.03 本地中文 TTS 接入](./01-backend-mvp0/03-local-tts.md) - `done`
+
+### Roadmap
+
+- [BabelEcho Roadmap](../roadmap.md) - `active`

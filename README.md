@@ -74,6 +74,7 @@ The real 5090D run expects:
 ## Important Docs
 
 - [Architecture](docs/architecture.md)
+- [Roadmap](docs/roadmap.md)
 - [Source ingestion research](docs/source-ingestion-research.md)
 - [Backend MVP-0 design](docs/backend-mvp.md)
 - [Backend MVP-0 tech stack](docs/backend-mvp0-tech-stack.md)
