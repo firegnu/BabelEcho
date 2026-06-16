@@ -91,4 +91,5 @@ script/zh.json -> segments/*.wav -> output/audio.mp3
 下一步不要同时接 ASR 或 App。优先做两件事：
 
 - 用更长的真实 transcript 片段评估中文播客听感和分段策略。
-- 如需多说话人播客，再在 `speaker -> voice` 映射层扩展，不把它混入当前单声线 MVP 验证。
+- 真实 transcript 里的 `Host:` / `Nick Hague:` 这类 speaker label 当前会被当作正文进入中文脚本，DeepSeek 有时会保留成“尼克·黑格：”。后续必须补 speaker-label 解析或清洗层，把说话人写入 `speaker` 字段，避免 TTS 读出标签。
+- 当前 CosyVoice2 验证是单固定中文声音。真实两人或多人播客不能长期由同一个声音读完整集；后续必须增加 `speaker -> voice` 映射，至少支持主持人和嘉宾使用不同固定中文音色。不把它混入当前单声线 MVP 验证。
