@@ -58,6 +58,7 @@
 ## 5. 重要文件
 
 - `README.md`
+- `resume-prompt.md`
 - `AGENTS.md`
 - `CLAUDE.md`
 - `docs/backend-mvp0-runbook.md`
