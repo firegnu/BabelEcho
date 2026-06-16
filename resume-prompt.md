@@ -37,11 +37,15 @@ docs/plans/01-backend-mvp0/01-local-llm-adapt.md
   - `curl -sS http://127.0.0.1:8000/v1/models` 返回 `{"detail":"Not Found"}`，说明 8000 端口不是当前需要的 OpenAI-compatible LLM endpoint。
 - 已决策：不继续优先部署本地 LLM；先使用 DeepSeek API 做 LLM adaptation，5090D 后续专注本地 TTS。
 
-下一步应在 MacBook 上实现：
+MacBook 已实现：
 
-- 在 `src/babelecho/llm.py` 增加 `openai_compatible` provider。
+- `src/babelecho/llm.py` 增加 `openai_compatible` provider。
 - 支持 `api_key_env`、Authorization header、可选 `extra_body`。
-- 补测试后，再让 5090D 创建 ignored `workspace/config/local-deepseek.yaml` 并运行 `adapt`。
+- `tests/test_llm.py` 覆盖 DeepSeek provider 行为。
+- `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
+- 本机全量测试：`16 passed`。
+
+下一步应让 5090D 创建 ignored `workspace/config/local-deepseek.yaml` 并运行 `adapt`。
 
 ## 必读文件
 
@@ -51,7 +55,8 @@ docs/plans/01-backend-mvp0/01-local-llm-adapt.md
 2. `docs/plans/README.md`
 3. `docs/plans/01-backend-mvp0/01-local-llm-adapt.md`
 4. `src/babelecho/llm.py`
-5. `workspace/config/local.example.yaml`
+5. `tests/test_llm.py`
+6. `workspace/config/local.example.yaml`
 
 ## 当前项目事实
 
@@ -68,6 +73,7 @@ docs/plans/01-backend-mvp0/01-local-llm-adapt.md
 - `synthesize(fixture)` 只是生成静音 WAV，不是真实 TTS。
 - `assemble` 真实调用 `ffmpeg`，此前相对路径 bug 已修复。
 - `publish` 真实生成 `feed.xml` 和 episode 静态目录。
+- `openai_compatible` LLM provider 已实现，但还没有在 5090D 上用真实 DeepSeek API key 跑过 `adapt`。
 
 ## 下一个目标
 

@@ -34,6 +34,14 @@
   - `9be15d8 docs: refresh handoff after fixture smoke`
 - 已确认 `http://127.0.0.1:8000/v1/models` 返回 `{"detail":"Not Found"}`，说明 8000 上有服务但不是当前需要的 OpenAI-compatible LLM endpoint。
 - 已决定不继续把 24GB 5090D 优先用于本地 LLM serving；先用 DeepSeek API 建立中文口播稿质量基线，把 5090D 留给本地 TTS。
+- 已在 MacBook 实现 DeepSeek/OpenAI-compatible provider：
+  - `src/babelecho/llm.py` 新增 `openai_compatible` provider。
+  - 支持 `api_key_env` 从环境变量读取 API key。
+  - 请求会带 `Authorization: Bearer ...` header。
+  - 支持 `extra_body`，用于 DeepSeek `thinking.type: disabled`。
+  - `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
+  - `tests/test_llm.py` 覆盖 auth header、`extra_body` 合并和缺 key 错误。
+- 本机全量测试通过：`16 passed`。
 - 最新代码修复提交：
   - `91ff555 fix: use absolute paths for ffmpeg concat`
 
@@ -43,11 +51,7 @@
   - `adapt(fixture)` 没有真实翻译，只是给英文片段加 `中文口播：` 前缀。
   - `synthesize(fixture)` 没有真实 TTS，只生成静音 WAV。
   - 来源仍是手写 YAML 指向 transcript 文件，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
-- 下一步应先替换 `adapt` 为 DeepSeek API 调用，不要同时接真实来源和真实 TTS。
-- 需要在 `src/babelecho/llm.py` 增加 `openai_compatible` provider：
-  - 支持 `Authorization: Bearer <api key>` header。
-  - 通过 `api_key_env` 从环境变量读取 key。
-  - 支持可选 `extra_body`，用于 DeepSeek `thinking.type: disabled`。
+- 下一步应在 5090D 上验证 DeepSeek API 并只运行 `adapt`，不要同时接真实来源和真实 TTS。
 - 需要准备本地未提交配置 `workspace/config/local-deepseek.yaml`，配置：
   - `llm.provider: openai_compatible`
   - `llm.base_url: "https://api.deepseek.com"`
@@ -82,14 +86,16 @@
 - `src/babelecho/llm.py`
 - `src/babelecho/audio.py`
 - `tests/test_audio.py`
+- `tests/test_llm.py`
 
 ## 6. 下一步建议
 
-1. 在 MacBook 上实现 DeepSeek/OpenAI-compatible provider：
+1. 在 5090D 上拉取最新代码：
 
-   - 保留 `fixture` 和 `local_vllm` provider 行为不变。
-   - 新增 `openai_compatible` provider。
-   - 补测试覆盖 API key env、Authorization header、`extra_body` 合并和缺 key 错误。
+   ```bash
+   cd /home/th5090d/Develop/personal_project/BabelEcho
+   git pull
+   ```
 
 2. 在 5090D 上验证 DeepSeek API：
 
@@ -118,7 +124,7 @@
      base_url: "https://example.com/babelecho"
    ```
 
-4. 只跑真实 LLM 的 `adapt`：
+4. 只跑 DeepSeek LLM 的 `adapt`：
 
    ```bash
    export PYTHON=.conda/babelecho-dev/bin/python
@@ -134,8 +140,8 @@
 ## 当前 Git 状态
 
 - 分支：`main`
-- 本轮文档更新前最近提交：
+- 本轮代码修改前最近提交：
+  - `b58eb73 docs: switch mvp0 llm plan to deepseek baseline`
   - `114577b docs: add resume prompt for new sessions`
   - `0644741 docs: add numbered plan for local llm adapt`
-  - `9be15d8 docs: refresh handoff after fixture smoke`
-- 本轮文档修改需要完成验证、隐私扫描、提交和推送后，5090D 再 `git pull`。
+- 本轮代码修改需要完成隐私扫描、提交和推送后，5090D 再 `git pull`。
