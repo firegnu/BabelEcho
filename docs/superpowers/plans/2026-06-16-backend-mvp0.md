@@ -2,11 +2,13 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build a local-only, transcript-first backend pipeline that turns one configured English transcript into a Chinese podcast audio artifact and a minimal RSS feed.
+**Goal:** Build a transcript-first backend pipeline that turns one configured English transcript into a Chinese podcast audio artifact and a minimal RSS feed.
 
 **Architecture:** The implementation is a Python package with stage-oriented CLI commands. Each stage reads and writes files under `workspace/runs/<run-id>/`, so stages can be inspected and rerun independently. Local model integrations are behind thin adapters: vLLM HTTP for LLM adaptation, TTS CLI for speech generation, and `ffmpeg` CLI for final audio assembly.
 
 **Tech Stack:** Python 3.11+, stdlib `argparse` CLI, `PyYAML`, `pytest`, local vLLM OpenAI-compatible API, local TTS wrapper command, `ffmpeg`.
+
+**Current update:** The first real LLM adaptation validation now uses DeepSeek API as a temporary quality baseline, while keeping TTS on the 5090D locally. The final direction remains local-first; use `docs/plans/01-backend-mvp0/01-local-llm-adapt.md` as the active plan.
 
 ---
 

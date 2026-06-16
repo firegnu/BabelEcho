@@ -6,25 +6,27 @@
 
 本文档落地 MVP-0 的技术选型。
 
-MVP-0 已在 [backend-mvp.md](./backend-mvp.md) 中定义为 transcript-only、本地推理、分阶段脚本流程。本文只回答“用什么技术把这个流程跑起来”，不扩展 MVP 范围。
+MVP-0 已在 [backend-mvp.md](./backend-mvp.md) 中定义为 transcript-only、分阶段脚本流程。本文只回答“用什么技术把这个流程跑起来”，不扩展 MVP 范围。
 
 ## 总体原则
 
-- 全程本地推理，不使用云 API。
+- 最终目标保持 local-first；当前验证阶段允许 DeepSeek API 作为 LLM adaptation 的临时质量基线。
 - 优先跑通端到端链路，不先做服务化平台。
 - 每一步都用文件衔接，便于调试、缓存和单阶段重跑。
 - 模型调用和业务 pipeline 分离，避免模型依赖污染业务脚本环境。
 - TTS 先 CLI-first，确认质量和稳定性后再考虑服务化。
+- API key、真实地址和本地配置只放环境变量或 ignored config，不进入 git。
 
 ## 运行角色
 
 5090D Ubuntu 机器：
 
 - 运行 pipeline。
-- 运行本地 LLM。
 - 运行本地 TTS。
 - 运行 `ffmpeg` 音频处理。
 - 生成发布产物。
+- 当前混合验证阶段通过 DeepSeek API 调用 LLM。
+- 后续全本地阶段再运行本地 LLM。
 
 M4 Max MacBook Pro：
 
@@ -63,12 +65,12 @@ babelecho-pipeline
 - YAML 配置解析。
 - RSS / XML / HTML / transcript 解析。
 - JSON schema 校验。
-- HTTP client，用于调用本地 LLM。
+- HTTP client，用于调用 OpenAI-compatible LLM API。
 - 调用 `ffmpeg` 的薄封装。
 
 不要把 LLM 或 TTS 模型依赖直接装进 pipeline 环境。
 
-## 本地 LLM
+## LLM Adapt
 
 用途：
 
@@ -76,32 +78,56 @@ babelecho-pipeline
 - 输入 `transcript/normalized.json`
 - 输出 `script/zh.json`
 
-推荐选型：
+当前验证选型：
 
-- vLLM 作为本地 LLM serving。
-- Qwen Instruct 系列作为第一候选模型。
-- pipeline 通过 OpenAI-compatible `/v1/chat/completions` 调用本地 vLLM。
+- DeepSeek API 作为临时 LLM 质量基线。
+- 首选 `deepseek-v4-pro`，必要时用 `deepseek-v4-flash` 控制成本和延迟。
+- pipeline 通过 OpenAI-compatible `/chat/completions` 调用 DeepSeek。
+- 显式关闭 thinking，避免输出解释、推理字段或不可控参数行为。
 
 选择理由：
 
-- vLLM 提供 OpenAI-compatible HTTP API，业务脚本不绑定具体模型加载方式。
-- Qwen Instruct 系列适合中英双语、翻译和中文改写。
-- 5090D 适合承担本地大模型推理。
+- DeepSeek 适合作为英文 transcript 到中文口播稿的质量标尺。
+- 24GB 5090D 可以先专注本地 TTS，避免 LLM 和 TTS 同时争抢显存。
+- OpenAI-compatible 形态便于后续把 provider 切回本地 vLLM。
 - 后续替换模型时，尽量只改配置，不改 pipeline 阶段接口。
 
 MVP-0 建议：
 
-- 先使用非 thinking / instruct 模型，追求稳定、直接的中文口播稿输出。
-- 不在业务脚本内直接加载 transformers 模型。
-- 不把 vLLM 暴露到公网，只允许本机或内网访问。
+- 先使用 DeepSeek 跑通真实中文稿，不同时接真实 LLM 本地部署和真实 TTS。
+- 对 DeepSeek 请求使用 `DEEPSEEK_API_KEY` 环境变量，不把 key 写进 YAML。
+- 只把 DeepSeek 当成当前验证路径，不把它写成最终生产依赖。
 
 配置草案：
 
 ```yaml
 llm:
+  provider: openai_compatible
+  base_url: "https://api.deepseek.com"
+  model: "deepseek-v4-pro"
+  api_key_env: "DEEPSEEK_API_KEY"
+  temperature: 0.3
+  max_tokens: 4096
+  extra_body:
+    thinking:
+      type: disabled
+```
+
+后续全本地选型：
+
+- vLLM 作为本地 LLM serving。
+- 24GB 5090D 优先选择 8B/14B instruct 模型，不以 30B+ 作为第一版目标。
+- pipeline 通过 OpenAI-compatible `/v1/chat/completions` 调用本地 vLLM。
+- 不在业务脚本内直接加载 transformers 模型。
+- 不把 vLLM 暴露到公网，只允许本机或内网访问。
+
+全本地配置草案：
+
+```yaml
+llm:
   provider: local_vllm
   base_url: "http://127.0.0.1:8000/v1"
-  model: "Qwen/Qwen3-30B-A3B-Instruct-2507"
+  model: "Qwen/Qwen3-14B"
   temperature: 0.3
   max_tokens: 4096
 ```
@@ -244,8 +270,8 @@ workspace/
 
 MVP-0 实现前需要手动确认：
 
-1. vLLM 本地接口可访问。
-2. 选定 Qwen 模型可以完成一次短文本中文改写。
+1. DeepSeek API 可以用 `DEEPSEEK_API_KEY` 完成一次短文本中文改写。
+2. 如果切回全本地路径，vLLM 本地接口可访问，且选定模型可以完成一次短文本中文改写。
 3. TTS wrapper 可以把一句中文生成 wav。
 4. `ffmpeg` 可以把两个 wav 拼成一个 mp3 或 m4a。
 5. 静态发布目录可以通过 HTTP 访问。

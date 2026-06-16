@@ -2,13 +2,16 @@
 
 ## Purpose
 
-Run one transcript-first episode through the local MVP-0 pipeline on the 5090D Ubuntu machine.
+Run one transcript-first episode through the MVP-0 pipeline on the 5090D Ubuntu machine.
+
+Current validation track: DeepSeek API handles LLM adaptation, and the 5090D handles local TTS, assembly, and publishing. This is a temporary hybrid track; the later all-local track replaces DeepSeek with a local vLLM endpoint.
 
 ## Preconditions
 
 - A project conda environment exists. Do not install into `base`.
 - `babelecho` is installed into that project environment with `pip install -e . --no-build-isolation`.
-- vLLM is running locally and serving the configured Qwen Instruct model.
+- For the current hybrid track, `DEEPSEEK_API_KEY` is set in the shell and the local config points LLM adaptation at DeepSeek.
+- For the later all-local track, vLLM is running locally and serving the configured instruct model.
 - TTS wrapper command from `workspace/config/local.yaml` is available in `PATH`.
 - `ffmpeg` is installed.
 - Source config points to a complete transcript.
@@ -28,6 +31,7 @@ export WORKSPACE=/path/to/babelecho-workspace
 export RUN_ID=first-episode
 export SOURCE_CONFIG=$WORKSPACE/sources/hardcoded.yaml
 export LOCAL_CONFIG=$WORKSPACE/config/local.yaml
+export DEEPSEEK_API_KEY='<set in shell only>'
 
 $PYTHON -m babelecho ingest --workspace "$WORKSPACE" --run-id "$RUN_ID" --source-config "$SOURCE_CONFIG"
 $PYTHON -m babelecho normalize --workspace "$WORKSPACE" --run-id "$RUN_ID" --raw-transcript "$WORKSPACE/runs/$RUN_ID/transcript/raw.vtt"

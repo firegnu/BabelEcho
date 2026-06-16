@@ -47,5 +47,4 @@ docs/plans/
 
 ### 01 Backend MVP-0
 
-- [01.01 本地 LLM Adapt 接入](./01-backend-mvp0/01-local-llm-adapt.md) - `ready`
-
+- [01.01 DeepSeek LLM Adapt 基线接入](./01-backend-mvp0/01-local-llm-adapt.md) - `ready`

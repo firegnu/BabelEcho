@@ -2,14 +2,16 @@
 
 ## Project Goal
 
-BabelEcho converts English podcast transcripts into Chinese podcast audio through a local-first backend pipeline. The current milestone is MVP-0: complete transcript input, local LLM adaptation, local TTS synthesis, audio assembly, and static RSS publishing.
+BabelEcho converts English podcast transcripts into Chinese podcast audio through a local-first backend pipeline. The current milestone is MVP-0: complete transcript input, Chinese script adaptation, local TTS synthesis, audio assembly, and static RSS publishing.
+
+Current decision: use DeepSeek API for the MVP-0 LLM adaptation baseline, while keeping TTS on the 5090D locally. This is a temporary hybrid validation track; the final production direction remains local-first and should later replace the cloud LLM with a local model.
 
 ## Scope Rules
 
 - Keep MVP-0 transcript-first. Do not add ASR unless explicitly requested.
 - Do not add original host voice cloning unless explicitly requested.
 - Do not add Web UI, job queue, subscription scanning, or macOS App code while working on MVP-0 backend tasks.
-- Do not use cloud APIs for MVP-0. The target production machine is a 5090D Ubuntu host with local inference.
+- Do not use cloud APIs for MVP-0 unless the user explicitly selects a temporary hybrid validation track. If a cloud LLM is used, keep API keys in environment variables or ignored local config only, treat the output as a quality baseline, and do not make the final production path depend on cloud inference.
 - Keep the macOS App concept thin: it consumes already-published Chinese podcast artifacts.
 
 ## Development Workflow

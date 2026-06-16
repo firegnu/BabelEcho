@@ -4,12 +4,14 @@ BabelEcho is a local-first pipeline for converting English podcast transcripts i
 
 The current focus is MVP-0: take one complete English transcript, adapt it into a natural Chinese spoken script, synthesize Chinese audio locally, assemble the final audio file, and publish a minimal podcast feed.
 
+Current validation track: use DeepSeek API for the LLM adaptation baseline, then use the 5090D for local Chinese TTS. This is a temporary hybrid path to validate script quality and audio synthesis before replacing the cloud LLM with a local model.
+
 ## Current Scope
 
 MVP-0 supports:
 
 - Transcript-first input only.
-- Local inference only, with no cloud API dependency.
+- Local-first execution, with a temporary DeepSeek API exception for the LLM adaptation baseline.
 - Stage-by-stage Python CLI commands.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.
 - Fixture tests for the full pure pipeline.
@@ -65,7 +67,7 @@ See [docs/backend-mvp0-runbook.md](docs/backend-mvp0-runbook.md).
 The real 5090D run expects:
 
 - A complete transcript source.
-- A local vLLM endpoint configured in `workspace/config/local.yaml`.
+- Either DeepSeek API LLM config with `DEEPSEEK_API_KEY` in the environment, or a local vLLM endpoint for the later all-local path.
 - A local TTS CLI wrapper configured in `workspace/config/local.yaml`.
 - `ffmpeg` available on `PATH`.
 
