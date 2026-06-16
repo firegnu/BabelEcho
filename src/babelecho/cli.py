@@ -4,6 +4,7 @@ from pathlib import Path
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
 from .paths import create_run
+from .transcript import normalize_transcript
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -23,6 +24,11 @@ def build_parser() -> argparse.ArgumentParser:
     ingest.add_argument("--run-id", required=True)
     ingest.add_argument("--source-config", required=True)
 
+    normalize = subparsers.add_parser("normalize", help="Normalize raw transcript.")
+    normalize.add_argument("--workspace", required=True)
+    normalize.add_argument("--run-id", required=True)
+    normalize.add_argument("--raw-transcript", required=True)
+
     return parser
 
 
@@ -41,6 +47,12 @@ def main(argv: list[str] | None = None) -> int:
         run_paths = create_run(args.workspace, args.run_id)
         raw_path = ingest_transcript_source(config["source"], run_paths)
         print(raw_path)
+        return 0
+
+    if args.command == "normalize":
+        run_paths = create_run(args.workspace, args.run_id)
+        output = normalize_transcript(run_paths, Path(args.raw_transcript))
+        print(output)
         return 0
 
     parser.print_help()
