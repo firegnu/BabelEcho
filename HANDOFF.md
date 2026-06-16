@@ -2,7 +2,7 @@
 
 ## 1. 会话摘要
 
-本次会话围绕 BabelEcho 的 MVP-0 后端骨架推进：确认当前代码只是工程链路冒烟测试，不等于真实翻译、真实 TTS 或 voice clone 已完成。已在 5090D Ubuntu 机器上跑通 fixture 全链路，并修复了 `ffmpeg concat` 在相对 `workspace` 路径下拼错音频片段路径的问题。当前新决策是先采用混合验证路径：LLM adaptation 使用 DeepSeek API，TTS 后续仍在 5090D 本地运行。
+本次会话围绕 BabelEcho 的 MVP-0 后端骨架推进：确认当前代码只是工程链路冒烟测试，不等于完整产品。已在 5090D Ubuntu 机器上跑通 fixture 全链路，修复了 `ffmpeg concat` 相对路径问题，并完成当前混合验证路径：LLM adaptation 使用 DeepSeek API，TTS 使用 5090D 本地 CosyVoice2。
 
 ## 2. 完成的工作
 
@@ -51,16 +51,27 @@
   - DeepSeek `/models` 返回 `deepseek-v4-flash` 和 `deepseek-v4-pro`。
   - `babelecho adapt --workspace workspace --run-id fixture-smoke --local-config workspace/config/local-deepseek.yaml` 成功。
   - `workspace/runs/fixture-smoke/script/zh.json` 输出自然中文：`欢迎收听本期节目。`
+- 已在 5090D 上完成本地中文 TTS 验证：
+  - 新建专用 conda env：`/home/th5090d/miniforge3/envs/babelecho-tts`。
+  - 保持 5090D 可用 GPU 栈：`torch 2.11.0+cu130`、`torchaudio 2.11.0+cu130`、`torchcodec 0.14.0+cu130`。
+  - CosyVoice 代码目录：`/home/th5090d/Develop/ai_tools/CosyVoice`。
+  - 模型目录：`/home/th5090d/Develop/ai_tools/CosyVoice/pretrained_models/CosyVoice2-0.5B`。
+  - 新增 repo wrapper：`tools/cosyvoice_tts_wrapper.py`。
+  - 远端 runtime launcher：`/home/th5090d/miniforge3/envs/babelecho-tts/bin/tts-wrapper`。
+  - `tts-wrapper` 单句测试生成 `/tmp/babelecho-wrapper-test.wav`，`24000 Hz`、mono、`6.160000s`。
+  - `babelecho synthesize --workspace workspace --run-id fixture-smoke --local-config workspace/config/local-cosyvoice.yaml` 成功，生成真实 `segments/0001.wav`。
+  - `workspace/runs/fixture-smoke/segments/0001.wav` 为 `24000 Hz`、mono、`3.080000s`。
+  - `babelecho assemble --workspace workspace --run-id fixture-smoke` 成功，生成 `output/audio.mp3`，`24000 Hz`、mono、`3.144000s`。
 - 最新代码修复提交：
   - `91ff555 fix: use absolute paths for ffmpeg concat`
 
 ## 3. 待完成的工作
 
-- 当前真实能力仍然只是 MVP-0 冒烟链路：
-  - `adapt(fixture)` 没有真实翻译，只是给英文片段加 `中文口播：` 前缀。
-  - `synthesize(fixture)` 没有真实 TTS，只生成静音 WAV。
+- 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源仍是手写 YAML 指向 transcript 文件，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
-- 下一步应进入本地中文 TTS 接入，不要同时接真实来源、ASR、voice clone 或 App。
+  - 当前 TTS 是单固定声音，不做原主播 voice clone。
+  - 还没有多说话人 `speaker -> voice` 映射。
+- 下一步应使用更长 transcript 做听感和分段验证，不要同时接 ASR、voice clone 或 App。
 - DeepSeek adapt 基线已经跑通；后续只在 prompt 质量明显不满足时再回到 LLM adapt。
 
 ## 4. 关键决策
@@ -71,7 +82,8 @@
 - `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
 - 5090D 执行代码方式：MacBook 修改并 push；必要时通过 `ssh my-5090d-host` 在远端运行验证命令，但不在 5090D 上安装或运行 Codex agent。
-- Python 环境使用项目内 conda env：`.conda/babelecho-dev`，不要使用 base env。
+- Python pipeline 环境使用项目内 conda env：`.conda/babelecho-dev`，不要使用 base env。
+- TTS 模型环境使用 5090D 专用 conda env：`babelecho-tts`，不要把 CosyVoice 的完整 `requirements.txt` 直接装进 pipeline 环境。
 
 ## 5. 重要文件
 
@@ -83,25 +95,28 @@
 - `docs/backend-mvp.md`
 - `docs/backend-mvp0-tech-stack.md`
 - `docs/source-ingestion-research.md`
+- `docs/plans/01-backend-mvp0/03-local-tts.md`
 - `workspace/config/local.example.yaml`
 - `workspace/sources/hardcoded.example.yaml`
 - `src/babelecho/cli.py`
 - `src/babelecho/llm.py`
 - `src/babelecho/audio.py`
+- `tools/cosyvoice_tts_wrapper.py`
 - `tests/test_audio.py`
 - `tests/test_llm.py`
+- `tests/test_cosyvoice_wrapper.py`
 
 ## 6. 下一步建议
 
-1. 进入本地中文 TTS 接入计划。
-2. 先在 5090D 上手动选型并验证一个中文 TTS CLI wrapper 能把一句中文生成 wav。
-3. 保持 `adapt` 已验证配置不变；不要同时接真实 transcript 来源。
+1. 用更长的 transcript 样例跑 DeepSeek adapt + CosyVoice synthesize，听感评估中文播客效果。
+2. 调整分段策略、语速和固定声音；暂时不做原主播 voice clone。
+3. 如果要支持两人播客，再增加 `speaker -> voice` 映射，不要先做 App 或 ASR。
 
 ## 当前 Git 状态
 
 - 分支：`main`
 - 本轮文档更新前最近提交：
+  - `e3e36ad test: isolate missing deepseek key file check`
+  - `3417af6 docs: record deepseek adapt verification`
   - `e004674 feat: load deepseek key from ignored env file`
-  - `dc962af feat: add openai compatible llm provider`
-  - `b58eb73 docs: switch mvp0 llm plan to deepseek baseline`
 - 本轮文档修改需要完成隐私扫描、提交和推送后，5090D 再 `git pull`。

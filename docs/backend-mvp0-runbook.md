@@ -12,7 +12,7 @@ Current validation track: DeepSeek API handles LLM adaptation, and the 5090D han
 - `babelecho` is installed into that project environment with `pip install -e . --no-build-isolation`.
 - For the current hybrid track, `workspace/config/deepseek.env` exists locally, is ignored by git, and contains the DeepSeek API key.
 - For the later all-local track, vLLM is running locally and serving the configured instruct model.
-- TTS wrapper command from `workspace/config/local.yaml` is available in `PATH`.
+- For local TTS on the 5090D, the `babelecho-tts` conda env exists and the TTS wrapper command from `workspace/config/local.yaml` is available.
 - `ffmpeg` is installed.
 - Source config points to a complete transcript.
 
@@ -21,6 +21,40 @@ Current validation track: DeepSeek API handles LLM adaptation, and the 5090D han
 ```bash
 conda create -p ./.conda/babelecho-dev python=3.12 pip setuptools wheel pytest pyyaml -y
 .conda/babelecho-dev/bin/python -m pip install -e . --no-build-isolation
+```
+
+## 5090D Local TTS Setup
+
+The verified 5090D setup uses a dedicated conda env:
+
+```text
+/home/th5090d/miniforge3/envs/babelecho-tts
+```
+
+Keep its GPU stack on the validated CUDA 13 path:
+
+```text
+torch 2.11.0+cu130
+torchaudio 2.11.0+cu130
+torchcodec 0.14.0+cu130
+```
+
+Do not install CosyVoice's full `requirements.txt` directly, because it pins `torch==2.3.1` and `cu121`.
+
+The runtime wrapper command is:
+
+```text
+/home/th5090d/miniforge3/envs/babelecho-tts/bin/tts-wrapper
+```
+
+An ignored local config can point at it:
+
+```yaml
+tts:
+  provider: local_cli
+  command: "/home/th5090d/miniforge3/envs/babelecho-tts/bin/tts-wrapper"
+  voice: "default-zh"
+  output_format: "wav"
 ```
 
 ## Commands
