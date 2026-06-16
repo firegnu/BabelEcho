@@ -5,7 +5,7 @@
 ## 给新 session 的第一条指令
 
 ```text
-你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 engineering core 基本完成，但 acceptance 还差 speaker label 清洗和真实 publish 验证。
+你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 engineering core 基本完成，但 acceptance 还差 speaker label 清洗和真实 publish 验证。
 
 重要约束：
 - 当前 MVP-0 是 transcript-first 工程链路；核心路径已基本跑通，但还没有正式收口。
@@ -13,6 +13,7 @@
 - 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 CosyVoice2 生成真实 wav/MP3 的真实 TTS 基线，但还没有 voice clone、ASR 或真实播客来源接入。
 - 自制长样本和 NASA 真实 podcast transcript 都已经生成可听中文 MP3；下一步不要再做泛泛听感实验，应收口 MVP-0 acceptance。
 - MVP-0 收口顺序：先补 speaker label 解析/清洗，再用 NASA 样本回归 `normalize -> adapt`，然后跑真实样本 `publish`，最后更新 docs 标记 MVP-0 完成。
+- `docs/roadmap.md` 已记录从 MVP-0 Acceptance 到 MVP-0.5 Self-use、MVP-1 Real Podcasts、MVP-2 Automation 的产品路线。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 后续仍在 5090D 本地运行；最终方向仍是 local-first。
 - Python 环境必须使用项目内 .conda/babelecho-dev，不要使用 base env。
 - 真实 runtime config、workspace/runs、生成音频、模型缓存、本地配置和 API key 不要提交。
@@ -41,6 +42,7 @@ docs/plans/01-backend-mvp0/03-local-tts.md
 - 01.01 已在 5090D 上完成验收。
 - 01.03 已在 5090D 上完成本地 TTS 验收。
 - 真实 NASA transcript 样本已跑通 `normalize -> adapt -> synthesize -> assemble`，但还未跑 `publish`。
+- 产品路线已整理到 `docs/roadmap.md`，下一步应先完成 MVP-0 Acceptance，不要跳到 MVP-0.5 或 MVP-1。
 
 MacBook 已实现：
 
@@ -58,18 +60,22 @@ MacBook 已实现：
 按顺序读：
 
 1. `HANDOFF.md`
-2. `docs/plans/README.md`
-3. `docs/plans/01-backend-mvp0/01-local-llm-adapt.md`
-4. `docs/plans/01-backend-mvp0/03-local-tts.md`
-5. `src/babelecho/llm.py`
-6. `tests/test_llm.py`
-7. `tools/cosyvoice_tts_wrapper.py`
-8. `workspace/config/local.example.yaml`
+2. `docs/roadmap.md`
+3. `docs/plans/README.md`
+4. `docs/plans/01-backend-mvp0/01-local-llm-adapt.md`
+5. `docs/plans/01-backend-mvp0/03-local-tts.md`
+6. `src/babelecho/transcript.py`
+7. `tests/test_transcript.py`
+8. `src/babelecho/llm.py`
+9. `tests/test_llm.py`
+10. `tools/cosyvoice_tts_wrapper.py`
+11. `workspace/config/local.example.yaml`
 
 ## 当前项目事实
 
 - 仓库：`/Users/firegnu/Developer/personal_projs/BabelEcho`，远端 5090D 路径是 `/home/th5090d/Develop/personal_project/BabelEcho`。
 - 当前协作方式：本机改代码并 push，必要时通过 `ssh my-5090d-host` 在 5090D 上远程执行验证命令；不在 5090D 上安装或运行 Codex agent。
+- 本机当前最新提交应为 `90d815a docs: add product roadmap` 或更新；如果需要在 5090D 上跑验证，先远程 `git pull`。
 - 已有 CLI 阶段：
   - `ingest`
   - `normalize`

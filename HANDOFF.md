@@ -28,10 +28,7 @@
   - 全量测试：`14 passed`
   - 本机真实 fixture pipeline 跑到 `publish/feed.xml`
   - 对 git 跟踪文件运行 `gitleaks` 和 `trufflehog`，未发现泄露。
-- 已确认 5090D 仓库代码更新到最新：
-  - `114577b docs: add resume prompt for new sessions`
-  - `0644741 docs: add numbered plan for local llm adapt`
-  - `9be15d8 docs: refresh handoff after fixture smoke`
+- 5090D 仓库此前已可通过 `ssh my-5090d-host` 远程执行验证；本机后续又推送了新文档提交。下次如果要在 5090D 上跑验证，先在远端项目目录执行 `git pull`。
 - 已确认 `http://127.0.0.1:8000/v1/models` 返回 `{"detail":"Not Found"}`，说明 8000 上有服务但不是当前需要的 OpenAI-compatible LLM endpoint。
 - 已决定不继续把 24GB 5090D 优先用于本地 LLM serving；先用 DeepSeek API 建立中文口播稿质量基线，把 5090D 留给本地 TTS。
 - 已在 MacBook 实现 DeepSeek/OpenAI-compatible provider：
@@ -102,6 +99,7 @@
 - `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
 - 5090D 执行代码方式：MacBook 修改并 push；必要时通过 `ssh my-5090d-host` 在远端运行验证命令，但不在 5090D 上安装或运行 Codex agent。
+- `docs/roadmap.md` 是产品路线入口；`docs/plans/` 放具体执行计划。
 - Python pipeline 环境使用项目内 conda env：`.conda/babelecho-dev`，不要使用 base env。
 - TTS 模型环境使用 5090D 专用 conda env：`babelecho-tts`，不要把 CosyVoice 的完整 `requirements.txt` 直接装进 pipeline 环境。
 
