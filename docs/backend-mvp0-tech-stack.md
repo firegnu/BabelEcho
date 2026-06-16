@@ -95,7 +95,7 @@ babelecho-pipeline
 MVP-0 建议：
 
 - 先使用 DeepSeek 跑通真实中文稿，不同时接真实 LLM 本地部署和真实 TTS。
-- 对 DeepSeek 请求使用 `DEEPSEEK_API_KEY` 环境变量，不把 key 写进 YAML。
+- 对 DeepSeek 请求优先使用 ignored `workspace/config/deepseek.env` 文件，不把 key 写进 YAML 或 shell 命令。
 - 只把 DeepSeek 当成当前验证路径，不把它写成最终生产依赖。
 
 配置草案：
@@ -105,7 +105,7 @@ llm:
   provider: openai_compatible
   base_url: "https://api.deepseek.com"
   model: "deepseek-v4-pro"
-  api_key_env: "DEEPSEEK_API_KEY"
+  api_key_file: "workspace/config/deepseek.env"
   temperature: 0.3
   max_tokens: 4096
   extra_body:
@@ -270,7 +270,7 @@ workspace/
 
 MVP-0 实现前需要手动确认：
 
-1. DeepSeek API 可以用 `DEEPSEEK_API_KEY` 完成一次短文本中文改写。
+1. DeepSeek API 可以用 ignored `workspace/config/deepseek.env` 完成一次短文本中文改写。
 2. 如果切回全本地路径，vLLM 本地接口可访问，且选定模型可以完成一次短文本中文改写。
 3. TTS wrapper 可以把一句中文生成 wav。
 4. `ffmpeg` 可以把两个 wav 拼成一个 mp3 或 m4a。

@@ -36,11 +36,12 @@
 - 已决定不继续把 24GB 5090D 优先用于本地 LLM serving；先用 DeepSeek API 建立中文口播稿质量基线，把 5090D 留给本地 TTS。
 - 已在 MacBook 实现 DeepSeek/OpenAI-compatible provider：
   - `src/babelecho/llm.py` 新增 `openai_compatible` provider。
-  - 支持 `api_key_env` 从环境变量读取 API key。
+  - 支持 `api_key_file` 从 ignored env 文件读取 API key，也保留 `api_key_env` 备用。
   - 请求会带 `Authorization: Bearer ...` header。
   - 支持 `extra_body`，用于 DeepSeek `thinking.type: disabled`。
   - `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
-  - `tests/test_llm.py` 覆盖 auth header、`extra_body` 合并和缺 key 错误。
+  - `workspace/config/deepseek.env.example` 提供可提交的 env 文件模板，真实 `workspace/config/deepseek.env` 被 ignore。
+  - `tests/test_llm.py` 覆盖 auth header、`extra_body` 合并、env 文件读取和缺 key 错误。
 - 本机全量测试通过：`16 passed`。
 - 最新代码修复提交：
   - `91ff555 fix: use absolute paths for ffmpeg concat`
@@ -56,7 +57,7 @@
   - `llm.provider: openai_compatible`
   - `llm.base_url: "https://api.deepseek.com"`
   - `llm.model: "deepseek-v4-pro"`
-  - `llm.api_key_env: "DEEPSEEK_API_KEY"`
+  - `llm.api_key_file: "workspace/config/deepseek.env"`
   - `tts.provider: fixture`
 - DeepSeek adapt 跑通且质量可接受后，再进入本地中文 TTS 接入。
 
@@ -65,7 +66,7 @@
 - MVP-0 采用 CLI-first、文件产物驱动，不先做 Web 后台、队列、数据库或常驻服务。
 - 最终方向仍是 local-first，但当前阶段明确接受 DeepSeek API 作为 LLM adaptation 的临时质量基线。
 - 先验证 transcript 到中文口播脚本的质量，再投入 TTS 和 voice clone。
-- `DEEPSEEK_API_KEY` 只能放在环境变量或 ignored local config 引用中，不能写入 tracked 文件。
+- `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
 - 5090D 执行代码方式：MacBook 修改并 push，5090D `git pull` 后运行；暂不使用 SSH 远程执行。
 - Python 环境使用项目内 conda env：`.conda/babelecho-dev`，不要使用 base env。
@@ -97,22 +98,31 @@
    git pull
    ```
 
-2. 在 5090D 上验证 DeepSeek API：
+2. 在 5090D 上准备 ignored DeepSeek key 文件：
 
    ```bash
-   export DEEPSEEK_API_KEY='<set in shell only>'
-   curl -sS https://api.deepseek.com/models \
-     -H "Authorization: Bearer $DEEPSEEK_API_KEY"
+   cp workspace/config/deepseek.env.example workspace/config/deepseek.env
+   chmod 600 workspace/config/deepseek.env
+   ${EDITOR:-nano} workspace/config/deepseek.env
    ```
 
-3. 新建本地配置，不提交：
+3. 在 5090D 上验证 DeepSeek API：
+
+   ```bash
+   KEY="$(sed -n 's/^DEEPSEEK_API_KEY=//p' workspace/config/deepseek.env)"
+   curl -sS https://api.deepseek.com/models \
+     -H "Authorization: Bearer $KEY"
+   unset KEY
+   ```
+
+4. 新建本地配置，不提交：
 
    ```yaml
    llm:
      provider: openai_compatible
      base_url: "https://api.deepseek.com"
      model: "deepseek-v4-pro"
-     api_key_env: "DEEPSEEK_API_KEY"
+     api_key_file: "workspace/config/deepseek.env"
      temperature: 0.3
      max_tokens: 4096
      extra_body:
@@ -124,18 +134,17 @@
      base_url: "https://example.com/babelecho"
    ```
 
-4. 只跑 DeepSeek LLM 的 `adapt`：
+5. 只跑 DeepSeek LLM 的 `adapt`：
 
    ```bash
    export PYTHON=.conda/babelecho-dev/bin/python
    export WORKSPACE=workspace
    export RUN_ID=fixture-smoke
-   export DEEPSEEK_API_KEY='<set in shell only>'
    $PYTHON -m babelecho adapt --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config workspace/config/local-deepseek.yaml
    sed -n '1,160p' workspace/runs/fixture-smoke/script/zh.json
    ```
 
-5. 如果 `script/zh.json` 质量可接受，进入本地中文 TTS 接入；真实 transcript 来源继续后置。
+6. 如果 `script/zh.json` 质量可接受，进入本地中文 TTS 接入；真实 transcript 来源继续后置。
 
 ## 当前 Git 状态
 

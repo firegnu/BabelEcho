@@ -67,7 +67,7 @@ See [docs/backend-mvp0-runbook.md](docs/backend-mvp0-runbook.md).
 The real 5090D run expects:
 
 - A complete transcript source.
-- Either DeepSeek API LLM config with `DEEPSEEK_API_KEY` in the environment, or a local vLLM endpoint for the later all-local path.
+- Either DeepSeek API LLM config with an ignored `workspace/config/deepseek.env` key file, or a local vLLM endpoint for the later all-local path.
 - A local TTS CLI wrapper configured in `workspace/config/local.yaml`.
 - `ffmpeg` available on `PATH`.
 

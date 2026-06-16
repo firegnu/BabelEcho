@@ -72,3 +72,45 @@ def test_openai_compatible_client_requires_configured_api_key(monkeypatch):
                 "api_key_env": "DEEPSEEK_API_KEY",
             }
         )
+
+
+def test_openai_compatible_client_reads_api_key_file(tmp_path, monkeypatch):
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return FakeResponse()
+
+    api_key_file = tmp_path / "deepseek.env"
+    api_key_file.write_text(
+        "\n# Local DeepSeek credential\nDEEPSEEK_API_KEY=file-backed-key\n",
+        encoding="utf-8",
+    )
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    monkeypatch.setattr(llm, "urlopen", fake_urlopen)
+
+    client = build_llm_client(
+        {
+            "provider": "openai_compatible",
+            "base_url": "https://api.deepseek.com",
+            "model": "deepseek-v4-pro",
+            "api_key_file": str(api_key_file),
+        }
+    )
+
+    client.adapt_segment("A short transcript segment.")
+
+    request, _ = requests[0]
+    assert request.get_header("Authorization") == "Bearer file-backed-key"
+
+
+def test_openai_compatible_client_reports_missing_api_key_file():
+    with pytest.raises(ValueError, match="api_key_file"):
+        build_llm_client(
+            {
+                "provider": "openai_compatible",
+                "base_url": "https://api.deepseek.com",
+                "model": "deepseek-v4-pro",
+                "api_key_file": "workspace/config/deepseek.env",
+            }
+        )

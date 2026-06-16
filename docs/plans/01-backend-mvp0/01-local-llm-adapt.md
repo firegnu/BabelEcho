@@ -29,7 +29,7 @@ ingest -> normalize -> adapt(fixture) -> synthesize(fixture) -> assemble -> publ
 In:
 
 - 增加 DeepSeek/OpenAI-compatible LLM provider 支持。
-- 配置 `llm.provider: openai_compatible`，通过 `DEEPSEEK_API_KEY` 读取密钥。
+- 配置 `llm.provider: openai_compatible`，通过 ignored `workspace/config/deepseek.env` 读取密钥。
 - 只运行 `babelecho adapt`。
 - 检查 `workspace/runs/fixture-smoke/script/zh.json` 的中文口播质量。
 - 必要时调整 `src/babelecho/llm.py` 的接口兼容、DeepSeek 参数和 prompt。
@@ -59,7 +59,7 @@ Out:
   ```
 
 - 有可用的 DeepSeek API key。
-- `DEEPSEEK_API_KEY` 通过 shell 环境变量提供，不写入 tracked 文件。
+- `workspace/config/deepseek.env` 由 `workspace/config/deepseek.env.example` 复制而来，手动填写真实 key，且不进入 git。
 
 ## 执行步骤
 
@@ -83,11 +83,21 @@ git log --oneline -3
 
 先不跑 BabelEcho，直接验证 DeepSeek API 和 key 可用：
 
-```bash
-export DEEPSEEK_API_KEY='只在当前 shell 设置，不写入仓库'
+先手动创建 ignored key 文件：
 
+```bash
+cp workspace/config/deepseek.env.example workspace/config/deepseek.env
+chmod 600 workspace/config/deepseek.env
+${EDITOR:-nano} workspace/config/deepseek.env
+```
+
+再从文件读取 key 验证模型列表：
+
+```bash
+KEY="$(sed -n 's/^DEEPSEEK_API_KEY=//p' workspace/config/deepseek.env)"
 curl -sS https://api.deepseek.com/models \
-  -H "Authorization: Bearer $DEEPSEEK_API_KEY"
+  -H "Authorization: Bearer $KEY"
+unset KEY
 ```
 
 确认返回模型列表中包含：
@@ -100,9 +110,10 @@ deepseek-v4-flash
 再用一次最小 chat completion 验证模型能返回中文口播风格：
 
 ```bash
+KEY="$(sed -n 's/^DEEPSEEK_API_KEY=//p' workspace/config/deepseek.env)"
 curl -sS https://api.deepseek.com/chat/completions \
   -H 'Content-Type: application/json' \
-  -H "Authorization: Bearer $DEEPSEEK_API_KEY" \
+  -H "Authorization: Bearer $KEY" \
   -d '{
     "model": "deepseek-v4-pro",
     "messages": [
@@ -116,9 +127,10 @@ curl -sS https://api.deepseek.com/chat/completions \
     "max_tokens": 512,
     "stream": false
   }'
+unset KEY
 ```
 
-如果这一步失败，不进入 BabelEcho，先解决 DeepSeek key、网络或账号问题。
+如果这一步失败，不进入 BabelEcho，先解决 DeepSeek key 文件、网络或账号问题。
 
 ### 01.01.03 增加 OpenAI-compatible provider 支持
 
@@ -126,6 +138,7 @@ curl -sS https://api.deepseek.com/chat/completions \
 
 - `Authorization: Bearer <api key>` header。
 - 从环境变量读取 API key。
+- 从 ignored env 文件读取 API key。
 - DeepSeek 的 extra body，例如关闭 thinking。
 - DeepSeek `base_url` 不带 `/v1` 的路径形态。
 
@@ -133,7 +146,8 @@ curl -sS https://api.deepseek.com/chat/completions \
 
 - 新增 `openai_compatible` provider。
 - 保留 `fixture` 和 `local_vllm` 行为不变。
-- `api_key_env` 只引用环境变量名，不把密钥写入 config。
+- `api_key_file` 只引用 ignored 文件路径，不把密钥写入 YAML。
+- `api_key_env` 仍作为可选备用方式保留。
 - 支持可选 `extra_body`，用于传入：
 
   ```yaml
@@ -143,7 +157,8 @@ curl -sS https://api.deepseek.com/chat/completions \
   ```
 
 - 补测试覆盖：
-  - provider 构造时读取 `api_key_env`。
+  - provider 构造时读取 `api_key_file`。
+  - provider 继续支持 `api_key_env`。
   - 请求包含 `Authorization` header。
   - 请求 body 合并 `extra_body`。
   - 缺少 API key 时给出明确错误。
@@ -157,7 +172,7 @@ llm:
   provider: openai_compatible
   base_url: "https://api.deepseek.com"
   model: "deepseek-v4-pro"
-  api_key_env: "DEEPSEEK_API_KEY"
+  api_key_file: "workspace/config/deepseek.env"
   temperature: 0.3
   max_tokens: 4096
   extra_body:
@@ -180,7 +195,6 @@ export PYTHON=.conda/babelecho-dev/bin/python
 export WORKSPACE=workspace
 export RUN_ID=fixture-smoke
 export LOCAL_CONFIG=workspace/config/local-deepseek.yaml
-export DEEPSEEK_API_KEY='只在当前 shell 设置，不写入仓库'
 
 $PYTHON -m babelecho adapt \
   --workspace "$WORKSPACE" \
@@ -227,14 +241,14 @@ sed -n '1,200p' workspace/runs/fixture-smoke/script/zh.json
 - `workspace/runs/fixture-smoke/script/zh.json` 由 DeepSeek 生成。
 - 输出不再是 `中文口播：原英文` 的 fixture 形式。
 - 输出内容基本符合中文播客口播要求。
-- `DEEPSEEK_API_KEY` 未写入 tracked 文件、日志或示例配置。
+- 真实 `DEEPSEEK_API_KEY` 只存在于 ignored `workspace/config/deepseek.env`，未写入 tracked 文件、日志或示例配置。
 - 如改代码，本地测试通过并完成提交、推送、隐私扫描。
 
 ## 风险和处理
 
 - DeepSeek API 不可用：先用 `curl /models` 和 `curl /chat/completions` 定位 key、网络、余额和账号状态。
 - 模型名不匹配：以 `/models` 返回值为准更新 `workspace/config/local-deepseek.yaml`。
-- key 泄漏风险：key 只放环境变量，不放 YAML、README、HANDOFF、命令历史片段或提交内容。
+- key 泄漏风险：key 只放 ignored `workspace/config/deepseek.env`，不放 YAML、README、HANDOFF、命令历史片段或提交内容。
 - 输出过长或截断：调整 `max_tokens`，必要时缩短单段输入。
 - 输出带解释或格式污染：收紧 prompt，要求只输出中文正文。
 - 单段调用太慢或成本过高：先记录耗时和 token 用量，不急着做并发；MVP-0 优先质量和可调试性。

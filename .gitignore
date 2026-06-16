@@ -33,6 +33,8 @@ workspace/runs/
 workspace/published/
 workspace/config/*.yaml
 !workspace/config/*.example.yaml
+workspace/config/*.env
+!workspace/config/*.env.example
 workspace/sources/*.yaml
 !workspace/sources/*.example.yaml
 

@@ -40,12 +40,13 @@ docs/plans/01-backend-mvp0/01-local-llm-adapt.md
 MacBook 已实现：
 
 - `src/babelecho/llm.py` 增加 `openai_compatible` provider。
-- 支持 `api_key_env`、Authorization header、可选 `extra_body`。
+- 支持 `api_key_file`、`api_key_env`、Authorization header、可选 `extra_body`。
 - `tests/test_llm.py` 覆盖 DeepSeek provider 行为。
 - `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
+- `workspace/config/deepseek.env.example` 已添加，真实 `workspace/config/deepseek.env` 被 ignore。
 - 本机全量测试：`16 passed`。
 
-下一步应让 5090D 创建 ignored `workspace/config/local-deepseek.yaml` 并运行 `adapt`。
+下一步应让 5090D 填写 ignored `workspace/config/deepseek.env`，创建 ignored `workspace/config/local-deepseek.yaml` 并运行 `adapt`。
 
 ## 必读文件
 
@@ -98,12 +99,13 @@ MacBook 已实现：
 本阶段完成时应满足：
 
 - 5090D 上 DeepSeek API key 可用。
+- `workspace/config/deepseek.env` 存在但未提交，且只在远端本地保存真实 key。
 - `workspace/config/local-deepseek.yaml` 存在但未提交。
 - `babelecho adapt` 使用 `llm.provider: openai_compatible` 成功运行。
 - `workspace/runs/fixture-smoke/script/zh.json` 由 DeepSeek 生成。
 - 输出不再是 fixture 的 `中文口播：原英文`。
 - 中文内容基本自然，适合口播，且没有明显英文残留、Markdown 或模型解释。
-- `DEEPSEEK_API_KEY` 未写入 tracked 文件、日志或示例配置。
+- `DEEPSEEK_API_KEY` 未写入 tracked 文件、日志或示例配置；真实 key 只放 ignored `workspace/config/deepseek.env`。
 
 ## 如果发生分支情况
 

@@ -1,5 +1,7 @@
 import json
 import os
+import shlex
+from pathlib import Path
 from typing import Any, Protocol
 from urllib.request import Request, urlopen
 
@@ -62,6 +64,41 @@ class VLLMClient(OpenAICompatibleClient):
     pass
 
 
+def read_env_file_value(path: str, key: str) -> str:
+    source = Path(path)
+    if not source.exists():
+        raise ValueError(f"Configured api_key_file does not exist: {source}")
+    for raw_line in source.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line.removeprefix("export ").strip()
+        name, separator, value = line.partition("=")
+        if separator and name.strip() == key:
+            parsed = shlex.split(value, comments=False, posix=True)
+            return parsed[0] if parsed else ""
+    raise ValueError(f"Configured api_key_file does not define {key}: {source}")
+
+
+def resolve_api_key(config: dict) -> str | None:
+    api_key_env = config.get("api_key_env")
+    api_key_file = config.get("api_key_file")
+    if api_key_env and api_key_file:
+        raise ValueError("Configure only one of api_key_env or api_key_file")
+    if api_key_env:
+        api_key = os.environ.get(api_key_env)
+        if not api_key:
+            raise ValueError(f"Missing required environment variable: {api_key_env}")
+        return api_key
+    if api_key_file:
+        api_key = read_env_file_value(api_key_file, "DEEPSEEK_API_KEY")
+        if not api_key:
+            raise ValueError(f"Configured api_key_file contains an empty DEEPSEEK_API_KEY: {api_key_file}")
+        return api_key
+    return None
+
+
 def build_llm_client(config: dict) -> LLMClient:
     provider = config.get("provider")
     if provider == "fixture":
@@ -74,18 +111,12 @@ def build_llm_client(config: dict) -> LLMClient:
             max_tokens=int(config.get("max_tokens", 4096)),
         )
     if provider == "openai_compatible":
-        api_key = None
-        api_key_env = config.get("api_key_env")
-        if api_key_env:
-            api_key = os.environ.get(api_key_env)
-            if not api_key:
-                raise ValueError(f"Missing required environment variable: {api_key_env}")
         return OpenAICompatibleClient(
             base_url=config["base_url"],
             model=config["model"],
             temperature=float(config.get("temperature", 0.3)),
             max_tokens=int(config.get("max_tokens", 4096)),
-            api_key=api_key,
+            api_key=resolve_api_key(config),
             extra_body=config.get("extra_body"),
         )
     raise ValueError(f"Unsupported llm.provider: {provider}")
