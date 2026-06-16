@@ -6,6 +6,7 @@ from .audio import assemble_audio
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
 from .paths import create_run
+from .publish import publish_episode
 from .synthesize import synthesize_segments
 from .transcript import normalize_transcript
 
@@ -46,6 +47,11 @@ def build_parser() -> argparse.ArgumentParser:
     assemble.add_argument("--workspace", required=True)
     assemble.add_argument("--run-id", required=True)
 
+    publish = subparsers.add_parser("publish", help="Publish static podcast artifacts.")
+    publish.add_argument("--workspace", required=True)
+    publish.add_argument("--run-id", required=True)
+    publish.add_argument("--local-config", required=True)
+
     return parser
 
 
@@ -69,6 +75,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "normalize":
         run_paths = create_run(args.workspace, args.run_id)
         output = normalize_transcript(run_paths, Path(args.raw_transcript))
+        print(output)
+        return 0
+
+    if args.command == "publish":
+        config = load_yaml(Path(args.local_config))
+        require_keys(config, ["publish"])
+        run_paths = create_run(args.workspace, args.run_id)
+        output = publish_episode(run_paths, config["publish"])
         print(output)
         return 0
 
