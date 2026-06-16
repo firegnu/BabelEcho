@@ -5,6 +5,7 @@ from .adapt import adapt_to_chinese
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
 from .paths import create_run
+from .synthesize import synthesize_segments
 from .transcript import normalize_transcript
 
 
@@ -35,6 +36,11 @@ def build_parser() -> argparse.ArgumentParser:
     adapt.add_argument("--run-id", required=True)
     adapt.add_argument("--local-config", required=True)
 
+    synthesize = subparsers.add_parser("synthesize", help="Generate audio segments.")
+    synthesize.add_argument("--workspace", required=True)
+    synthesize.add_argument("--run-id", required=True)
+    synthesize.add_argument("--local-config", required=True)
+
     return parser
 
 
@@ -58,6 +64,14 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "normalize":
         run_paths = create_run(args.workspace, args.run_id)
         output = normalize_transcript(run_paths, Path(args.raw_transcript))
+        print(output)
+        return 0
+
+    if args.command == "synthesize":
+        config = load_yaml(Path(args.local_config))
+        require_keys(config, ["tts"])
+        run_paths = create_run(args.workspace, args.run_id)
+        output = synthesize_segments(run_paths, config["tts"])
         print(output)
         return 0
 
