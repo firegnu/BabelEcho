@@ -16,7 +16,7 @@ Run one transcript-first episode through the local MVP-0 pipeline on the 5090D U
 ## One-Time Environment Setup
 
 ```bash
-conda create -p ./.conda/babelecho-dev python=3.12 pytest pyyaml -y
+conda create -p ./.conda/babelecho-dev python=3.12 pip setuptools wheel pytest pyyaml -y
 .conda/babelecho-dev/bin/python -m pip install -e . --no-build-isolation
 ```
 

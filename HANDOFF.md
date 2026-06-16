@@ -66,7 +66,7 @@
 
    ```bash
    git pull
-   conda create -p ./.conda/babelecho-dev python=3.12 pytest pyyaml -y
+   conda create -p ./.conda/babelecho-dev python=3.12 pip setuptools wheel pytest pyyaml -y
    .conda/babelecho-dev/bin/python -m pip install -e . --no-build-isolation
    .conda/babelecho-dev/bin/python -m pytest -v
    ```
