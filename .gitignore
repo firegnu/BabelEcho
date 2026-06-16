@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Local editor and OS files
+.DS_Store
+.idea/
+.vscode/
+
+# BabelEcho local runtime state
+workspace/runs/
+workspace/published/
+workspace/config/*.yaml
+!workspace/config/*.example.yaml
+workspace/sources/*.yaml
+!workspace/sources/*.example.yaml
+
+# Generated media and transcripts
+*.mp3
+*.m4a
+*.wav
+*.flac
+*.aac
+*.vtt
+*.srt
+!tests/fixtures/*.mp3
+!tests/fixtures/*.wav
+!tests/fixtures/*.vtt
+!tests/fixtures/*.srt
+
+# Local model/data caches
+models/
+pretrained_models/
+checkpoints/
+data/
+cache/
+.cache/
+
+# Logs and temporary files
+*.log
+*.tmp
+tmp/
+temp/
