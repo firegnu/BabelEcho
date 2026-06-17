@@ -2,7 +2,7 @@
 
 ## 1. 会话摘要
 
-本次会话围绕 BabelEcho 的 MVP-0 后端骨架推进：已确认核心工程链路基本跑通，但 MVP-0 acceptance 还未正式收口。当前混合验证路径是 LLM adaptation 使用 DeepSeek API，TTS 使用 5090D 本地 CosyVoice2；自制长样本和真实 NASA podcast transcript 都已生成可听中文 MP3。
+本次会话围绕 BabelEcho 的 MVP-0 后端骨架和 acceptance 收口推进：当前混合验证路径是 LLM adaptation 使用 DeepSeek API，TTS 使用 5090D 本地 CosyVoice2；自制长样本和真实 NASA podcast transcript 都已生成可听中文 MP3，且 MVP-0 acceptance 已完成。
 
 ## 2. 完成的工作
 
@@ -71,30 +71,42 @@
     - `workspace/runs/nasa-crew9-real-smoke/output/audio.mp3`
     - `workspace/runs/nasa-crew9-real-smoke/script/zh.json`
     - `workspace/runs/nasa-crew9-real-smoke/transcript/normalized.json`
-  - 验证结果：source/script/audio segments 均为 5 段，MP3 为 `24000 Hz`、mono、约 `367.6s`。
-  - 暴露两个必须后续解决的问题：speaker label 会进入正文；多人播客现在仍是单一中文声音。
-- 最新代码修复提交：
-  - `2c8f915 feat: add cosyvoice tts wrapper`
+  - 首轮验证结果：source/script/audio segments 均为 5 段，MP3 为 `24000 Hz`、mono、约 `367.6s`。
+  - 首轮暴露两个问题：speaker label 会进入正文；多人播客现在仍是单一中文声音。
+- 已完成 MVP-0 acceptance 收口：
+  - `src/babelecho/transcript.py` 已解析 speaker label，把 `Host:`、`Nick Hague:`、`Host (Dane Turner):` 等标签写入 `segment["speaker"]`，并从 `segment["text"]` 中移除。
+  - `tests/test_transcript.py` 覆盖段首 label、段内多轮 speaker turn 和普通冒号不误判。
+  - 本机全量测试：`21 passed`。
+  - 5090D 分支验证：`21 passed`。
+  - 5090D NASA 回归：`normalize -> adapt -> synthesize -> assemble -> publish` 已完成。
+  - `nasa-crew9-real-smoke` 最终 normalized/script/manifest 均为 9 段；英文 segment text 无 `Host:` / `Nick Hague:` 标签残留；中文脚本无 `主持人：` / `尼克·黑格：` 朗读式标签残留。
+  - 最终 MP3：`mp3`、`24000 Hz`、mono、约 `361.1s`。
+  - 已验证 publish artifacts：`publish/feed.xml`、episode MP3、`transcript.en.json`、`transcript.zh.json`、`metadata.json`。
 
 ## 3. 待完成的工作
 
-- MVP-0 engineering core 基本完成：完整 transcript 到中文 MP3 的真实路径已经跑通。
-- MVP-0 acceptance 还未正式完成，收口前至少要补两件事：
-  1. speaker label 解析/清洗：`Host:` / `Nick Hague:` 等标签不能继续被当作正文朗读。
-  2. 用真实样本跑 `publish`，验证 `publish/feed.xml` 和 episode 静态目录。
+- MVP-0 acceptance 已完成：完整 transcript 到中文 MP3，再到静态 RSS/episode artifacts 的真实路径已经跑通。
+- 下一阶段是 MVP-0.5 Self-use，目标是让手动导入 transcript 后可以稳定生成一个私有中文 podcast feed，并能在播客客户端里听。
+- MVP-0.5 优先任务：
+  1. 增加一条完整 pipeline 命令，例如 `babelecho run --workspace ... --run-id ... --source-config ... --local-config ...`。
+  2. 支持手动导入 transcript 文件作为一等入口。
+  3. 明确每次 run 的状态、输入、输出路径和失败阶段。
+  4. 支持从失败阶段继续执行，避免每次从头跑。
+  5. 增加基础质量检查和 TTS 前中文脚本人工编辑入口。
+  6. 增加专有名词和发音 override 的简单配置。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源仍是手写 YAML 指向 transcript 文件，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
-  - 真实 transcript 中的 `Host:` / `Nick Hague:` 等 speaker label 当前会被当作正文处理，后续必须解析或清洗到 `speaker` 字段，避免中文 TTS 读出标签。
+  - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
   - 当前 TTS 是单固定声音，不做原主播 voice clone。
   - 还没有多说话人 `speaker -> voice` 映射；真实两人或多人播客不能长期用一个中文声音读完整集，后续必须支持至少主持人/嘉宾不同固定音色。
-- 多人多音色建议作为 MVP-0.5 或 MVP-1，不卡住 MVP-0 收口，但必须保留在后续计划中。
+- 多人多音色建议作为 MVP-1 或专项计划，不卡住 MVP-0.5 的一条命令自用流程，但必须保留在后续计划中。
 - DeepSeek adapt 基线已经跑通；后续只在 prompt 质量明显不满足时再回到 LLM adapt。
 
 ## 4. 关键决策
 
 - MVP-0 采用 CLI-first、文件产物驱动，不先做 Web 后台、队列、数据库或常驻服务。
 - 最终方向仍是 local-first，但当前阶段明确接受 DeepSeek API 作为 LLM adaptation 的临时质量基线。
-- 先把 transcript 到中文口播音频的 MVP-0 acceptance 收口，再投入 voice clone、ASR、App 或后台服务。
+- 先把 transcript 到中文口播音频的 MVP-0.5 自用流程做稳，再投入 voice clone、ASR、App 或后台服务。
 - MVP-0 可以接受单固定中文声音；真实多人播客体验需要 `speaker -> voice` 映射，单独进入下一阶段。
 - `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
@@ -131,29 +143,28 @@
 
 ## 6. 下一步建议
 
-1. 先实现 speaker label 解析/清洗：
-   - 在 `tests/test_transcript.py` 添加 TDD 用例，覆盖 `Host:`、`Nick Hague:` 和无 label 段落。
-   - 更新 `src/babelecho/transcript.py`，把 label 写入 `segment["speaker"]`，从 `segment["text"]` 中移除。
-   - 确认 `adapt` 保留 speaker 到 `script/zh.json`。
-2. 用 NASA 样本重新跑 `normalize -> adapt`：
-   - 检查中文脚本不再出现会被朗读的“尼克·黑格：”式标签。
-   - 必要时再跑 `synthesize -> assemble` 做短听感回归。
-3. 跑真实样本 `publish`：
-   - 针对 `nasa-crew9-real-smoke` 生成 `publish/feed.xml` 和 episode 静态目录。
-   - 验证 MP3、`transcript.en.json`、`transcript.zh.json` 都被复制到 publish 目录。
-4. 更新 docs，把 MVP-0 标记为 acceptance complete；另开 MVP-0.5/MVP-1 计划处理多说话人 `speaker -> voice` 映射。
+1. 为 MVP-0.5 写一个小计划，重点是一条命令自用流程，而不是扩展真实来源或 App。
+2. 实现 `babelecho run` 或等价编排命令：
+   - 串起 `ingest -> normalize -> adapt -> synthesize -> assemble -> publish`。
+   - 支持从指定阶段继续执行。
+   - 清楚输出 run 状态和 artifact 路径。
+3. 增加基础质量检查：
+   - 中文脚本为空时失败。
+   - 单段文本过长时提醒或失败。
+   - TTS 输出 wav 为空时失败。
+   - 最终 MP3 时长、采样率、声道可检查。
+4. 增加 TTS 前人工编辑入口，至少允许用户手动改 `script/zh.json` 后继续跑。
 5. 不要在下一步同时推进 ASR、voice clone、App、后台服务或真实来源发现。
 
 ## 当前 Git 状态
 
-- 分支：`main`
-- 最近提交：
-  - `2c8f915 feat: add cosyvoice tts wrapper`
-  - `e3e36ad test: isolate missing deepseek key file check`
-  - `3417af6 docs: record deepseek adapt verification`
-- 当前存在未提交文档变更：
-  - `HANDOFF.md`
-  - `docs/backend-mvp.md`
-  - `docs/plans/01-backend-mvp0/03-local-tts.md`
-  - `resume-prompt.md`
-- 本轮文档修改如需提交，先完成隐私扫描；提交并 push 后，5090D 再 `git pull`。
+- MVP-0 acceptance 代码验证提交：`9444363 fix: parse transcript speaker labels`。
+- 本轮最终提交后，新 session 先运行：
+
+  ```bash
+  git status --short --branch
+  git --no-pager log --oneline -3
+  ```
+
+- 如果需要在 5090D 上继续验证，先在远端 `/home/th5090d/Develop/personal_project/BabelEcho` 执行 `git pull`。
+- 提交前继续执行隐私扫描：`gitleaks`、`trufflehog`、简单 grep。

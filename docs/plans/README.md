@@ -51,6 +51,7 @@ docs/plans/
 
 - [01.01 DeepSeek LLM Adapt 基线接入](./01-backend-mvp0/01-local-llm-adapt.md) - `done`
 - [01.03 本地中文 TTS 接入](./01-backend-mvp0/03-local-tts.md) - `done`
+- MVP-0 Acceptance closeout - `done`，完成记录见 [BabelEcho Roadmap](../roadmap.md)
 
 ### Roadmap
 

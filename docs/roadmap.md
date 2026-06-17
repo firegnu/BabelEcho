@@ -1,6 +1,6 @@
 # BabelEcho Roadmap
 
-日期：2026-06-16
+日期：2026-06-17
 
 ## 目的
 
@@ -20,8 +20,8 @@
 
 | 阶段 | 目标 | 状态 |
 | --- | --- | --- |
-| MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | next |
-| MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | planned |
+| MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | done |
+| MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | next |
 | MVP-1 Real Podcasts | 支持真实 podcast 来源、多说话人和多 episode feed | planned |
 | MVP-2 Automation | 自动扫描、批处理、状态记录和远程运维 | later |
 | Later | ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
@@ -30,20 +30,15 @@
 
 目标：确认当前核心工程链路真正收口，而不只是能生成一次音频。
 
-当前已经跑通：
+完成记录：
 
 - Fixture 全链路：`ingest -> normalize -> adapt -> synthesize -> assemble -> publish`。
 - DeepSeek API 生成自然中文口播稿。
 - 5090D 本地 CosyVoice2 生成真实中文 wav/MP3。
-- NASA 真实 transcript 样本跑通 `normalize -> adapt -> synthesize -> assemble`。
-
-还需要完成：
-
-- 解析或清洗真实 transcript 中的 speaker label，例如 `Host:`、`Nick Hague:`。
-- 把 speaker label 写入 `segment["speaker"]`，不要留在 `segment["text"]` 中被 TTS 朗读。
-- 用 NASA 样本重新跑 `normalize -> adapt`，确认中文脚本不再读出 speaker label。
-- 对 NASA 样本跑 `publish`，验证 `publish/feed.xml`、episode MP3、`transcript.en.json`、`transcript.zh.json`。
-- 更新文档，把 MVP-0 标记为 acceptance complete。
+- Transcript parser 已解析并清洗真实 speaker label，例如 `Host:`、`Nick Hague:`；label 写入 `segment["speaker"]`，不再留在 `segment["text"]` 中被 TTS 朗读。
+- NASA 真实 transcript 样本已在 5090D 上重新跑通 `normalize -> adapt -> synthesize -> assemble -> publish`。
+- `nasa-crew9-real-smoke` 验证结果：normalized/script/manifest 都是 9 段；中文脚本 label 扫描无 `主持人：` / `尼克·黑格：` 朗读式标签；最终 MP3 为 `24000 Hz`、mono、约 `361.1s`。
+- `publish/feed.xml`、episode MP3、`transcript.en.json`、`transcript.zh.json`、`metadata.json` 已生成并验证存在。
 
 不进入 MVP-0：
 
@@ -139,8 +134,8 @@
 
 ## 当前最高优先级
 
-1. 收口 MVP-0 speaker label 清洗。
-2. 用 NASA 样本回归 `normalize -> adapt`。
-3. 对 NASA 样本跑 `publish`。
-4. 标记 MVP-0 acceptance complete。
-5. 开始 MVP-0.5 的一条命令自用流程。
+1. 开始 MVP-0.5 的一条命令自用流程。
+2. 支持手动导入 transcript 作为稳定入口。
+3. 明确 run 状态、失败阶段和恢复执行方式。
+4. 增加基础质量检查和 TTS 前中文脚本人工编辑入口。
+5. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。
