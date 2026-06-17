@@ -72,4 +72,4 @@ workspace/runs/mvp1-real-rss-monetize-20260617/
 
 - 当前能力已经可以把一个有公开 `podcast:transcript` 的 RSS episode 处理成中文 MP3 和 feed。
 - 这次仍是单固定中文音色，不做原主播 voice clone，也没有 `speaker -> voice` 映射。
-- 现有 TTS wrapper 每段独立启动 CosyVoice，75 段真实节目耗时明显；后续进入批处理或多 episode 前，需要优化模型加载复用或 segment batching。
+- 该 run 暴露了 TTS wrapper 每段独立启动 CosyVoice 的性能问题；后续已通过 `local_cli` batch wrapper 修复，`synthesize` 现在一次启动 wrapper 并循环生成 segment wav。

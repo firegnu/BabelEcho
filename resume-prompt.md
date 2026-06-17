@@ -23,6 +23,7 @@
 - 不再继续围绕 CosyVoice 内置两个 wav 反复微调。后续如需新固定音色，准备本地授权的男声/中性参考 wav，再用同一条 `cross_lingual` 路线替换 `prompt_wav` 做对比；该项已按 voice clone 类似方式放入 deferred voice work，但它不是原主播 voice clone。
 - MVP-1 真实来源第一版已完成：新增 `source.type=podcast_rss` 和 `babelecho run --podcast-feed ...`，只支持 RSS item 内的 `podcast:transcript`，找不到 transcript 时明确失败，不做 ASR。公开 RSS smoke 使用 `https://feeds.transistor.fm/podcasting-advice` 跑到 `adapt`，fixture script 共 74 段，未调用 DeepSeek。
 - MVP-1 公开 RSS 端到端 Real Run 已完成：`mvp1-real-rss-monetize-20260617` 使用 `https://feeds.transistor.fm/podcasts-for-profit-with-morgan-franklin` 的 `#030: When Should You Monetize Your Podcast?`，经 RSS transcript -> DeepSeek -> 5090D CosyVoice cross_lingual 默认音色 -> MP3 -> feed 全链路成功；script/manifest 75 段，MP3 `24000 Hz` mono，约 `840.8s`，产物在 ignored `workspace/runs/mvp1-real-rss-monetize-20260617/`。
+- MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 只加载一次 CosyVoice 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - MVP-0 收口已完成：speaker label 解析/清洗、NASA 样本 `normalize -> adapt -> synthesize -> assemble -> publish` 回归、docs 标记完成。
 - `docs/roadmap.md` 已记录从 MVP-0 Acceptance 到 MVP-0.5 Self-use、MVP-1 Real Podcasts、MVP-2 Automation 的产品路线；当前下一阶段是 MVP-1。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
@@ -208,9 +209,9 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 
 下一步继续 MVP-1 Real Podcasts：
 
-1. 优化真实节目 TTS 执行效率，避免每个 segment 都重新启动 CosyVoice。
-2. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
-3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+1. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
+2. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+3. 支持多 episode feed，跳过已处理 episode。
 
 不要进入：
 
@@ -245,7 +246,7 @@ MVP-0.5 acceptance 已满足：
 - 固定中文音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 第一轮和第二轮音色校准样本已在 5090D 生成并拷回本机 ignored `workspace/runs/`；这些音频不进入 git。
 - 用户已反馈 D 最满意；MVP-1 默认固定中文音色基线采用 `cross_lingual_prompt.wav + speed=1.0`。
-- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；后续重点转向 TTS 执行效率、更多 transcript 发现形态和 `speaker -> voice` 映射。授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
+- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；TTS batch wrapper 已解决每段重复加载 CosyVoice 的主要性能问题。后续重点转向更多 transcript 发现形态、`speaker -> voice` 映射和多 episode feed。授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
 
 ## 如果发生分支情况
 

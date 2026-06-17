@@ -64,6 +64,11 @@ For MVP-1 voice calibration, `mode: cross_lingual` uses a local reference wav
 without cloning an original podcast host. Tune `prompt_wav` and `speed` in the
 ignored local config, then rerun from `synthesize` to avoid another LLM call.
 
+For `local_cli` synthesis, BabelEcho writes a `segments/tts-batch.json` file and
+starts the wrapper once per `synthesize` stage. The wrapper loads CosyVoice once,
+then loops over the segment text files to write `segments/<id>.wav`. The older
+single-segment wrapper form still works for direct smoke tests.
+
 ## Commands
 
 Preferred MVP-0.5 self-use entry:
@@ -147,7 +152,7 @@ $PYTHON -m babelecho run \
 It also runs basic checks after generated artifacts are available:
 
 - after `adapt`: `script/zh.json` exists, has segments, and every segment has nonempty text below the configured length limit.
-- after `synthesize`: `segments/manifest.json` exists and every listed wav file exists and is nonempty.
+- after `synthesize`: `segments/tts-batch.json` may exist for `local_cli`; `segments/manifest.json` exists and every listed wav file exists and is nonempty.
 - after `assemble`: `output/audio.mp3` exists and `ffprobe` can read codec, duration, sample rate, and channel count.
 - after `publish`: run-local publish artifacts are copied to the stable private feed directory under `$WORKSPACE/published/`.
 
