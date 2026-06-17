@@ -240,6 +240,67 @@ publish:
     ]
 
 
+def test_run_command_stops_at_requested_stage(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    transcript = Path("tests/fixtures/sample.vtt").resolve()
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "preview-demo",
+            "--transcript-file",
+            str(transcript),
+            "--title",
+            "Preview Episode",
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "adapt",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    run_dir = workspace / "runs" / "preview-demo"
+    assert result.returncode == 0, result.stderr
+    assert "adapt:" in result.stdout
+    assert "synthesize:" not in result.stdout
+    assert (run_dir / "script" / "zh.json").exists()
+    assert not (run_dir / "output" / "audio.mp3").exists()
+
+    status = read_json(run_dir / "run.json")
+    assert status["status"] == "succeeded"
+    assert status["from_stage"] == "ingest"
+    assert status["to_stage"] == "adapt"
+    assert [stage["status"] for stage in status["stages"]] == [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "skipped",
+        "skipped",
+        "skipped",
+    ]
+
+
 def test_run_command_records_failed_stage_in_status(tmp_path: Path):
     workspace = tmp_path / "workspace"
     local_config = tmp_path / "local.yaml"

@@ -98,6 +98,28 @@ ingest -> normalize -> adapt -> synthesize -> assemble -> publish
 
 If `overrides.path` is configured, `run` applies script overrides between `adapt` and `synthesize`.
 
+For preview-first self-use, stop after `adapt`, inspect the Chinese script, then resume from `synthesize`:
+
+```bash
+$PYTHON -m babelecho run \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --transcript-file "$TRANSCRIPT" \
+  --title "Episode Title" \
+  --local-config "$LOCAL_CONFIG" \
+  --to-stage adapt
+
+$PYTHON -m babelecho script --workspace "$WORKSPACE" --run-id "$RUN_ID"
+
+$PYTHON -m babelecho run \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --transcript-file "$TRANSCRIPT" \
+  --title "Episode Title" \
+  --local-config "$LOCAL_CONFIG" \
+  --from-stage synthesize
+```
+
 It also runs basic checks after generated artifacts are available:
 
 - after `adapt`: `script/zh.json` exists, has segments, and every segment has nonempty text below the configured length limit.
@@ -111,7 +133,7 @@ Each `run` writes status to:
 $WORKSPACE/runs/$RUN_ID/run.json
 ```
 
-The file records the input, `from_stage`, each stage status, failed stage, error string, and known output paths. Use it first when a run fails.
+The file records the input, `from_stage`, `to_stage`, each stage status, failed stage, error string, and known output paths. Use it first when a run fails.
 
 To preview the Chinese script before TTS:
 
@@ -154,7 +176,7 @@ $PYTHON -m babelecho run \
   --from-stage synthesize
 ```
 
-Supported values are `ingest`, `normalize`, `adapt`, `synthesize`, `assemble`, and `publish`. For example, `--from-stage synthesize` reuses the existing `script/zh.json`, which is useful after manually editing the Chinese script or avoiding another paid LLM call.
+Supported `--from-stage` and `--to-stage` values are `ingest`, `normalize`, `adapt`, `synthesize`, `assemble`, and `publish`. For example, `--to-stage adapt` stops before TTS for script review, and `--from-stage synthesize` reuses the existing `script/zh.json`, which is useful after manually editing the Chinese script or avoiding another paid LLM call.
 
 Individual stage commands remain useful for debugging:
 

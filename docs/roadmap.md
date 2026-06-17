@@ -21,8 +21,8 @@
 | 阶段 | 目标 | 状态 |
 | --- | --- | --- |
 | MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | done |
-| MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | in progress |
-| MVP-1 Real Podcasts | 支持真实 podcast 来源、多说话人和多 episode feed | planned |
+| MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | done |
+| MVP-1 Real Podcasts | 支持真实 podcast 来源、多说话人和多 episode feed | next |
 | MVP-2 Automation | 自动扫描、批处理、状态记录和远程运维 | later |
 | Later | ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
 
@@ -61,6 +61,7 @@
 - 已增加基础质量检查命令：`babelecho check --workspace ... --run-id ...`。
 - `babelecho run` 已在 `adapt`、`synthesize`、`assemble` 后自动检查关键产物。
 - 已增加 TTS 前中文脚本预览入口：`babelecho script --workspace ... --run-id ...`。
+- 已支持 `babelecho run --to-stage adapt`，可在 TTS 前停下预览中文脚本，再用 `--from-stage synthesize` 续跑。
 - 已固定私有静态发布目录和稳定 `workspace/published/feed.xml` 路径。
 - 基础质量检查已覆盖：
   - 中文脚本为空时失败。
@@ -68,6 +69,8 @@
   - TTS 输出 wav 为空时失败。
   - 最终 MP3 时长、采样率、声道可检查。
 - 已增加专有名词和发音 override 的简单配置：`overrides.path` 加 `babelecho overrides`，在 TTS 前对中文脚本做本地精确替换。
+- 已完成真实自用回归：`mvp05-selfuse-nasa` 使用 NASA Crew-9 transcript，经 DeepSeek adapt、`babelecho script` 预览、override、5090D CosyVoice2 TTS、assemble 和 publish 跑通。
+- `mvp05-selfuse-nasa` 验证结果：script/manifest 均为 9 段；override 命中 10 次；最终 MP3 为 `24000 Hz`、mono、约 `355.5s`；`workspace/published/feed.xml` 已生成。
 
 验收标准：
 
@@ -136,5 +139,5 @@
 
 ## 当前最高优先级
 
-1. 用一个真实 transcript 做一次 MVP-0.5 自用流程回归，确认 `run`、脚本预览、override、续跑和发布产物的实际手感。
-2. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。
+1. 进入 MVP-1 Real Podcasts：先支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+2. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。

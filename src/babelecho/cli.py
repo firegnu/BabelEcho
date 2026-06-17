@@ -91,6 +91,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="ingest",
         help="Resume from this stage.",
     )
+    run.add_argument(
+        "--to-stage",
+        choices=PIPELINE_STAGES,
+        default="publish",
+        help="Stop after this stage.",
+    )
 
     check = subparsers.add_parser("check", help="Validate generated run artifacts.")
     check.add_argument("--workspace", required=True)
@@ -168,6 +174,7 @@ def run_pipeline(
     source_config_path: str | None,
     local_config_path: str,
     from_stage: str,
+    to_stage: str,
     transcript_file: str | None = None,
     title: str | None = None,
     original_url: str | None = None,
@@ -182,17 +189,21 @@ def run_pipeline(
     require_keys(local_config, ["llm", "tts", "publish"])
 
     run_paths = create_run(workspace, run_id)
+    stage_index = PIPELINE_STAGES.index(from_stage)
+    stop_index = PIPELINE_STAGES.index(to_stage)
+    if stop_index < stage_index:
+        raise ValueError("--to-stage must be the same as or after --from-stage")
     status = init_run_status(
         run_paths,
         from_stage=from_stage,
+        to_stage=to_stage,
         input_info=input_info,
         stages=PIPELINE_STAGES,
     )
-    stage_index = PIPELINE_STAGES.index(from_stage)
     raw_path: Path | None = None
     outputs: list[str] = []
 
-    if stage_index <= PIPELINE_STAGES.index("ingest"):
+    if stage_index <= PIPELINE_STAGES.index("ingest") <= stop_index:
         raw_path = _run_stage(
             status,
             run_paths,
@@ -201,7 +212,7 @@ def run_pipeline(
         )
         outputs.append(f"ingest: {raw_path}")
 
-    if stage_index <= PIPELINE_STAGES.index("normalize"):
+    if stage_index <= PIPELINE_STAGES.index("normalize") <= stop_index:
         def normalize_stage() -> Path:
             nonlocal raw_path
             if raw_path is None:
@@ -211,7 +222,7 @@ def run_pipeline(
         normalized_path = _run_stage(status, run_paths, "normalize", normalize_stage)
         outputs.append(f"normalize: {normalized_path}")
 
-    if stage_index <= PIPELINE_STAGES.index("adapt"):
+    if stage_index <= PIPELINE_STAGES.index("adapt") <= stop_index:
         def adapt_stage() -> tuple[str, dict]:
             script_path = adapt_to_chinese(run_paths, local_config["llm"])
             script_check = check_run_artifacts(run_paths, checks=("script",))
@@ -221,7 +232,7 @@ def run_pipeline(
         outputs.append(f"adapt: {script_path}")
         outputs.append(f"check script: {script_check['script_segments']} segments")
 
-    if stage_index <= PIPELINE_STAGES.index("synthesize"):
+    if stage_index <= PIPELINE_STAGES.index("synthesize") <= stop_index:
         def synthesize_stage() -> tuple[dict, str, dict]:
             override_result = apply_script_overrides(run_paths, local_config.get("overrides"))
             manifest_path = synthesize_segments(run_paths, local_config["tts"])
@@ -243,7 +254,7 @@ def run_pipeline(
         outputs.append(f"synthesize: {manifest_path}")
         outputs.append(f"check segments: {segment_check['audio_segments']} files")
 
-    if stage_index <= PIPELINE_STAGES.index("assemble"):
+    if stage_index <= PIPELINE_STAGES.index("assemble") <= stop_index:
         def assemble_stage() -> tuple[str, dict]:
             audio_path = assemble_audio(run_paths)
             output_check = check_run_artifacts(run_paths, checks=("output",))
@@ -258,7 +269,7 @@ def run_pipeline(
             f"{output_check['output_channels']} ch"
         )
 
-    if stage_index <= PIPELINE_STAGES.index("publish"):
+    if stage_index <= PIPELINE_STAGES.index("publish") <= stop_index:
         feed_path = _run_stage(
             status,
             run_paths,
@@ -268,9 +279,13 @@ def run_pipeline(
         outputs.append(f"publish: {feed_path}")
 
     mark_run_succeeded(status, run_paths)
-    outputs.append(f"audio: {run_paths.output_audio}")
-    outputs.append(f"feed: {run_paths.publish_dir / 'feed.xml'}")
-    outputs.append(f"stable feed: {run_paths.stable_feed}")
+    if run_paths.output_audio.exists():
+        outputs.append(f"audio: {run_paths.output_audio}")
+    feed_path = run_paths.publish_dir / "feed.xml"
+    if feed_path.exists():
+        outputs.append(f"feed: {feed_path}")
+    if run_paths.stable_feed.exists():
+        outputs.append(f"stable feed: {run_paths.stable_feed}")
     return "\n".join(outputs)
 
 
@@ -357,6 +372,7 @@ def main(argv: list[str] | None = None) -> int:
                 args.source_config,
                 args.local_config,
                 args.from_stage,
+                args.to_stage,
                 args.transcript_file,
                 args.title,
                 args.original_url,

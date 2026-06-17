@@ -45,14 +45,17 @@ def init_run_status(
     run_paths: RunPaths,
     *,
     from_stage: str,
+    to_stage: str,
     input_info: dict[str, Any],
     stages: tuple[str, ...],
 ) -> dict[str, Any]:
     start_index = stages.index(from_stage)
+    stop_index = stages.index(to_stage)
     status = {
         "run_id": run_paths.run_id,
         "status": "running",
         "from_stage": from_stage,
+        "to_stage": to_stage,
         "input": input_info,
         "current_stage": None,
         "failed_stage": None,
@@ -62,7 +65,10 @@ def init_run_status(
         "updated_at": _now(),
         "completed_at": None,
         "stages": [
-            {"name": stage, "status": "skipped" if index < start_index else "pending"}
+            {
+                "name": stage,
+                "status": "skipped" if index < start_index or index > stop_index else "pending",
+            }
             for index, stage in enumerate(stages)
         ],
     }
