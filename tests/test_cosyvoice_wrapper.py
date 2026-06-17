@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -146,3 +147,94 @@ def test_synthesize_uses_cross_lingual_mode(monkeypatch, tmp_path: Path):
 
     assert calls == [("中文口播：欢迎。", str(tmp_path / "cross_lingual_prompt.wav"), False, 0.92)]
     assert saved == [(str(output), saved[0][1], 24_000)]
+
+
+def test_synthesize_batch_reuses_model_for_multiple_outputs(monkeypatch, tmp_path: Path):
+    wrapper = load_wrapper()
+    first_text = tmp_path / "0001.txt"
+    second_text = tmp_path / "0002.txt"
+    first_output = tmp_path / "0001.wav"
+    second_output = tmp_path / "0002.wav"
+    batch_file = tmp_path / "tts-batch.json"
+    first_text.write_text("第一段中文。", encoding="utf-8")
+    second_text.write_text("第二段中文。", encoding="utf-8")
+    batch_file.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {"text_file": str(first_text), "output": str(first_output)},
+                    {"text_file": str(second_text), "output": str(second_output)},
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    init_count = 0
+    calls = []
+
+    class FakeModel:
+        sample_rate = 24_000
+
+        def __init__(self, model_dir):
+            nonlocal init_count
+            init_count += 1
+            self.model_dir = model_dir
+
+        def inference_cross_lingual(self, text, prompt_wav, stream, speed):
+            calls.append((text, prompt_wav, stream, speed))
+            return [{"tts_speech": FakeTensor()}]
+
+    class FakeTensor:
+        def cpu(self):
+            return self
+
+    fake_torch = type(
+        "FakeTorch",
+        (),
+        {"cat": staticmethod(lambda chunks, dim: chunks[0])},
+    )
+
+    saved = []
+    fake_torchaudio = type(
+        "FakeTorchaudio",
+        (),
+        {"save": staticmethod(lambda path, audio, sample_rate: saved.append((path, audio, sample_rate)))},
+    )
+
+    monkeypatch.setenv("COSYVOICE_REPO", str(tmp_path / "CosyVoice"))
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", str(tmp_path / "model"))
+    monkeypatch.setitem(__import__("sys").modules, "torch", fake_torch)
+    monkeypatch.setitem(__import__("sys").modules, "torchaudio", fake_torchaudio)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "cosyvoice.cli.cosyvoice",
+        type("FakeCosyVoiceModule", (), {"AutoModel": FakeModel}),
+    )
+
+    args = wrapper.parse_args(
+        [
+            "--batch-file",
+            str(batch_file),
+            "--voice",
+            "default-zh",
+            "--mode",
+            "cross_lingual",
+            "--prompt-wav",
+            str(tmp_path / "cross_lingual_prompt.wav"),
+            "--speed",
+            "1.0",
+        ]
+    )
+    config = wrapper.resolve_config(args)
+
+    wrapper.synthesize(config)
+
+    assert init_count == 1
+    assert calls == [
+        ("第一段中文。", str(tmp_path / "cross_lingual_prompt.wav"), False, 1.0),
+        ("第二段中文。", str(tmp_path / "cross_lingual_prompt.wav"), False, 1.0),
+    ]
+    assert saved == [
+        (str(first_output), saved[0][1], 24_000),
+        (str(second_output), saved[1][1], 24_000),
+    ]

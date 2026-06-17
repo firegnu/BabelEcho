@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import argparse
+import json
 import os
 import sys
 from dataclasses import dataclass
@@ -11,8 +12,6 @@ DEFAULT_PROMPT_TEXT = "希望你以后能够做的比我还好呦。"
 
 @dataclass(frozen=True)
 class WrapperConfig:
-    text_file: Path
-    output: Path
     voice: str
     cosyvoice_repo: Path
     model_dir: Path
@@ -20,12 +19,16 @@ class WrapperConfig:
     prompt_wav: Path
     mode: str
     speed: float
+    text_file: Path | None = None
+    output: Path | None = None
+    batch_file: Path | None = None
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate a wav with CosyVoice.")
-    parser.add_argument("--text-file", required=True)
-    parser.add_argument("--output", required=True)
+    parser.add_argument("--text-file")
+    parser.add_argument("--output")
+    parser.add_argument("--batch-file")
     parser.add_argument("--voice", default="default-zh")
     parser.add_argument("--cosyvoice-repo")
     parser.add_argument("--model-dir")
@@ -45,6 +48,10 @@ def _required_path(name: str, value: str | None) -> Path:
 def resolve_config(args: argparse.Namespace) -> WrapperConfig:
     if args.voice != "default-zh":
         raise ValueError(f"Unsupported voice: {args.voice}")
+    if args.batch_file and (args.text_file or args.output):
+        raise ValueError("Configure either --batch-file or --text-file with --output")
+    if not args.batch_file and (not args.text_file or not args.output):
+        raise ValueError("--text-file and --output are required unless --batch-file is used")
 
     cosyvoice_repo = _required_path(
         "COSYVOICE_REPO or --cosyvoice-repo",
@@ -74,8 +81,6 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
         or default_prompt_wav
     )
     return WrapperConfig(
-        text_file=Path(args.text_file),
-        output=Path(args.output),
         voice=args.voice,
         cosyvoice_repo=cosyvoice_repo,
         model_dir=model_dir,
@@ -83,23 +88,18 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
         prompt_wav=prompt_wav,
         mode=mode,
         speed=speed,
+        text_file=Path(args.text_file) if args.text_file else None,
+        output=Path(args.output) if args.output else None,
+        batch_file=Path(args.batch_file) if args.batch_file else None,
     )
 
 
-def synthesize(config: WrapperConfig) -> None:
-    config.output.parent.mkdir(parents=True, exist_ok=True)
-    text = config.text_file.read_text(encoding="utf-8").strip()
+def _synthesize_one(config: WrapperConfig, model, torch, torchaudio, text_file: Path, output: Path) -> None:
+    output.parent.mkdir(parents=True, exist_ok=True)
+    text = text_file.read_text(encoding="utf-8").strip()
     if not text:
-        raise ValueError(f"Text file is empty: {config.text_file}")
+        raise ValueError(f"Text file is empty: {text_file}")
 
-    sys.path.insert(0, str(config.cosyvoice_repo))
-    sys.path.append(str(config.cosyvoice_repo / "third_party" / "Matcha-TTS"))
-
-    import torch
-    import torchaudio
-    from cosyvoice.cli.cosyvoice import AutoModel
-
-    model = AutoModel(model_dir=str(config.model_dir))
     if config.mode == "zero_shot":
         outputs = model.inference_zero_shot(
             text,
@@ -122,7 +122,35 @@ def synthesize(config: WrapperConfig) -> None:
     if not chunks:
         raise RuntimeError("CosyVoice generated no audio chunks")
     audio = torch.cat(chunks, dim=-1)
-    torchaudio.save(str(config.output), audio.cpu(), model.sample_rate)
+    torchaudio.save(str(output), audio.cpu(), model.sample_rate)
+
+
+def _synthesis_items(config: WrapperConfig) -> list[tuple[Path, Path]]:
+    if config.batch_file:
+        payload = json.loads(config.batch_file.read_text(encoding="utf-8"))
+        items = [
+            (Path(item["text_file"]), Path(item["output"]))
+            for item in payload.get("items", [])
+        ]
+        if not items:
+            raise ValueError(f"Batch file contains no items: {config.batch_file}")
+        return items
+    assert config.text_file is not None
+    assert config.output is not None
+    return [(config.text_file, config.output)]
+
+
+def synthesize(config: WrapperConfig) -> None:
+    sys.path.insert(0, str(config.cosyvoice_repo))
+    sys.path.append(str(config.cosyvoice_repo / "third_party" / "Matcha-TTS"))
+
+    import torch
+    import torchaudio
+    from cosyvoice.cli.cosyvoice import AutoModel
+
+    model = AutoModel(model_dir=str(config.model_dir))
+    for text_file, output in _synthesis_items(config):
+        _synthesize_one(config, model, torch, torchaudio, text_file, output)
 
 
 def main(argv: list[str] | None = None) -> int:

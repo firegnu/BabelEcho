@@ -3,6 +3,8 @@ import subprocess
 import wave
 from pathlib import Path
 
+from .jsonio import write_json
+
 
 def write_silent_wav(
     path: Path,
@@ -33,6 +35,51 @@ def synthesize_text_to_wav(text: str, output_path: Path, tts_config: dict) -> No
             str(text_file),
             "--output",
             str(output_path),
+            "--voice",
+            tts_config.get("voice", "default-zh"),
+        ]
+        for config_key, flag in [
+            ("mode", "--mode"),
+            ("prompt_text", "--prompt-text"),
+            ("prompt_wav", "--prompt-wav"),
+            ("speed", "--speed"),
+        ]:
+            value = tts_config.get(config_key)
+            if value is not None:
+                command.extend([flag, str(value)])
+        subprocess.run(command, check=True)
+        return
+    raise ValueError(f"Unsupported tts.provider: {provider}")
+
+
+def synthesize_many_to_wav(
+    items: list[tuple[str, Path]],
+    batch_path: Path,
+    tts_config: dict,
+) -> None:
+    provider = tts_config.get("provider")
+    if provider == "fixture":
+        for text, output_path in items:
+            seconds = max(0.2, min(1.0, math.ceil(len(text) / 20) * 0.2))
+            write_silent_wav(output_path, seconds)
+        return
+    if provider == "local_cli":
+        batch_items = []
+        for text, output_path in items:
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            text_file = output_path.with_suffix(".txt")
+            text_file.write_text(text, encoding="utf-8")
+            batch_items.append(
+                {
+                    "text_file": str(text_file),
+                    "output": str(output_path),
+                }
+            )
+        write_json(batch_path, {"items": batch_items})
+        command = [
+            tts_config["command"],
+            "--batch-file",
+            str(batch_path),
             "--voice",
             tts_config.get("voice", "default-zh"),
         ]
