@@ -13,6 +13,9 @@ tts:
   provider: local_cli
   command: "tts-wrapper"
   voice: "default-zh"
+  mode: "cross_lingual"
+  prompt_wav: "/path/to/CosyVoice/asset/cross_lingual_prompt.wav"
+  speed: 1.0
   output_format: "wav"
 
 # Optional. Copy workspace/config/overrides.example.yaml to an ignored

@@ -36,6 +36,15 @@ def synthesize_text_to_wav(text: str, output_path: Path, tts_config: dict) -> No
             "--voice",
             tts_config.get("voice", "default-zh"),
         ]
+        for config_key, flag in [
+            ("mode", "--mode"),
+            ("prompt_text", "--prompt-text"),
+            ("prompt_wav", "--prompt-wav"),
+            ("speed", "--speed"),
+        ]:
+            value = tts_config.get(config_key)
+            if value is not None:
+                command.extend([flag, str(value)])
         subprocess.run(command, check=True)
         return
     raise ValueError(f"Unsupported tts.provider: {provider}")

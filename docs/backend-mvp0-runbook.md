@@ -54,8 +54,15 @@ tts:
   provider: local_cli
   command: "/home/th5090d/miniforge3/envs/babelecho-tts/bin/tts-wrapper"
   voice: "default-zh"
+  mode: "cross_lingual"
+  prompt_wav: "/home/th5090d/Develop/ai_tools/CosyVoice/asset/cross_lingual_prompt.wav"
+  speed: 1.0
   output_format: "wav"
 ```
+
+For MVP-1 voice calibration, `mode: cross_lingual` uses a local reference wav
+without cloning an original podcast host. Tune `prompt_wav` and `speed` in the
+ignored local config, then rerun from `synthesize` to avoid another LLM call.
 
 ## Commands
 

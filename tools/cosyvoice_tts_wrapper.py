@@ -18,6 +18,8 @@ class WrapperConfig:
     model_dir: Path
     prompt_text: str
     prompt_wav: Path
+    mode: str
+    speed: float
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -29,6 +31,8 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--model-dir")
     parser.add_argument("--prompt-text")
     parser.add_argument("--prompt-wav")
+    parser.add_argument("--mode", choices=["zero_shot", "cross_lingual"])
+    parser.add_argument("--speed", type=float)
     return parser.parse_args(argv)
 
 
@@ -55,10 +59,19 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
         or os.environ.get("COSYVOICE_PROMPT_TEXT")
         or DEFAULT_PROMPT_TEXT
     )
+    mode = args.mode or os.environ.get("COSYVOICE_MODE") or "zero_shot"
+    speed = args.speed
+    if speed is None:
+        speed = float(os.environ.get("COSYVOICE_SPEED", "1.0"))
+    if speed <= 0:
+        raise ValueError("speed must be greater than 0")
+    default_prompt_wav = cosyvoice_repo / "asset" / (
+        "cross_lingual_prompt.wav" if mode == "cross_lingual" else "zero_shot_prompt.wav"
+    )
     prompt_wav = Path(
         args.prompt_wav
         or os.environ.get("COSYVOICE_PROMPT_WAV")
-        or cosyvoice_repo / "asset" / "zero_shot_prompt.wav"
+        or default_prompt_wav
     )
     return WrapperConfig(
         text_file=Path(args.text_file),
@@ -68,6 +81,8 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
         model_dir=model_dir,
         prompt_text=prompt_text,
         prompt_wav=prompt_wav,
+        mode=mode,
+        speed=speed,
     )
 
 
@@ -85,15 +100,25 @@ def synthesize(config: WrapperConfig) -> None:
     from cosyvoice.cli.cosyvoice import AutoModel
 
     model = AutoModel(model_dir=str(config.model_dir))
-    chunks = [
-        item["tts_speech"]
-        for item in model.inference_zero_shot(
+    if config.mode == "zero_shot":
+        outputs = model.inference_zero_shot(
             text,
             config.prompt_text,
             str(config.prompt_wav),
             stream=False,
+            speed=config.speed,
         )
-    ]
+    elif config.mode == "cross_lingual":
+        outputs = model.inference_cross_lingual(
+            text,
+            str(config.prompt_wav),
+            stream=False,
+            speed=config.speed,
+        )
+    else:
+        raise ValueError(f"Unsupported mode: {config.mode}")
+
+    chunks = [item["tts_speech"] for item in outputs]
     if not chunks:
         raise RuntimeError("CosyVoice generated no audio chunks")
     audio = torch.cat(chunks, dim=-1)
