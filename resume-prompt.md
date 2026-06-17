@@ -1,11 +1,22 @@
 # Resume Prompt
 
-这个文件用于新 session 快速接回 BabelEcho 当前上下文。新 session 只需要先读本文件，再按其中引用的文档继续。
+这个文件是 BabelEcho 新 session 的唯一必读入口。用户下次只需要让 agent 读取本文件；agent 读完后再根据具体任务，自行打开本文件引用的其他文档。
+
+## 下次新 session 最短指令
+
+```text
+你现在在 BabelEcho 项目中工作。请先只阅读 resume-prompt.md。
+读完后执行 git status --short --branch 和 git log --oneline -3，
+然后用中文简要汇报：当前状态、当前 TTS 规则、下一步建议、是否有未提交变更。
+不要一上来改代码。
+```
 
 ## 给新 session 的第一条指令
 
 ```text
-你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 和 MVP-0.5 Self-use 均已完成。
+你现在在 BabelEcho 项目中工作。请先只阅读 resume-prompt.md；本文件是唯一必读入口。读完后先执行 git status --short --branch 和 git log --oneline -3，再用中文简要汇报当前状态、当前 TTS 规则、下一步建议和是否有未提交变更。不要一上来改代码。
+
+01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 和 MVP-0.5 Self-use 均已完成。
 
 重要约束：
 - 当前 MVP-0 是 transcript-first 工程链路；核心路径和 acceptance 已正式收口。
@@ -143,9 +154,9 @@ MVP-0.5 self-use acceptance 已在 5090D 上完成：
 - `run.json` 输出 `status=succeeded`、`from_stage=synthesize`；`workspace/published/feed.xml` 已生成。
 - 产物已从 5090D 拷回本机 ignored 路径：`workspace/runs/mvp05-selfuse-nasa/output/audio.mp3`、`script/zh.json`、`segments/manifest.json`、`publish/feed.xml`。
 
-## 必读文件
+## 按需打开的文件
 
-按顺序读：
+新 session 不需要一开始按顺序读完下面所有文件。先读本文件即可；如果任务涉及对应方向，再打开相关文件：
 
 1. `HANDOFF.md`
 2. `docs/roadmap.md`
