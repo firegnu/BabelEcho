@@ -62,7 +62,7 @@ docs/plans/
 - Fixed Chinese voice baseline - `done`: selected `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`.
 - [02.01 Real Podcast Transcript Source Input](./02-real-podcasts/01-real-podcast-transcript-source.md) - `done`
 - [02.02 Public RSS End-to-End Real Run](./02-real-podcasts/02-public-rss-real-run.md) - `done`
-- `speaker -> voice` mapping for common interview shows - `later`.
+- [02.03 SFT Built-in 4-role Voice Profile](./02-real-podcasts/03-sft-builtin-4role-voice-profile.md) - `done`
 
 ### Deferred Voice Work
 

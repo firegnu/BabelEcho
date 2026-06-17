@@ -2,7 +2,7 @@
 
 BabelEcho is a local-first pipeline for converting English podcast transcripts into Chinese podcast audio.
 
-MVP-0 and MVP-0.5 are complete. MVP-1 has selected the default fixed Chinese podcast voice baseline: `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
+MVP-0 and MVP-0.5 are complete. MVP-1 has selected the fixed voice rule: 0/1 speaker uses the original `CosyVoice2-0.5B` cross-lingual baseline, and 2+ speakers automatically use `sft_builtin_4role` with `CosyVoice-300M-SFT` built-in speakers. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
 
 Current validation track: use DeepSeek API for the LLM adaptation baseline, then use the 5090D for local Chinese TTS. This is a temporary hybrid path to validate script quality and audio synthesis before replacing the cloud LLM with a local model.
 
@@ -18,6 +18,7 @@ The current pipeline supports:
 - Partial pipeline execution with `babelecho run --to-stage ...` and resume with `--from-stage ...`.
 - Chinese script preview with `babelecho script` before TTS.
 - Local terminology and pronunciation overrides before TTS with exact replacements.
+- Automatic TTS model selection: 0/1 speaker stays on the original fixed voice; 2+ speakers use stable `speaker -> voice_role` mapping with `sft_builtin_4role`.
 - Basic artifact checks with `babelecho check`.
 - Run status tracking in `workspace/runs/<run-id>/run.json`.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.

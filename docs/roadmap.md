@@ -92,18 +92,20 @@
 - 已支持 RSS item 内的 `podcast:transcript`。
 - 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D CosyVoice cross-lingual 默认音色生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
+- 已选定 MVP-1 固定音色选择规则：0/1 个 distinct speaker 使用原默认 `CosyVoice2-0.5B` cross-lingual 基线；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
+- `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，也不依赖额外参考 wav。
+- 已支持 `speaker -> voice_role` 稳定映射：同一 run 中按 speaker 首次出现顺序分配 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
 - 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
 - 支持 speaker label 解析、人工 speaker 修正文件和缺失 speaker 的回退策略。
-- 支持 `speaker -> voice` 映射。
 - 支持每个 podcast 的 source config 和每个 speaker 的 voice config。
 
 验收标准：
 
 - 已选出一个比当前默认女声更克制的中文默认音色：`cross_lingual_prompt.wav + speed=1.0`。
 - 一个有公开 `podcast:transcript` 的 RSS feed 可以被处理成中文 feed。
-- 两人访谈的主持人和嘉宾可以用不同固定中文音色输出。
+- 两人访谈的主持人和嘉宾可以用不同固定中文音色输出；三到四人节目可以用 `sft_builtin_4role` 输出可区分的固定角色。
 - 已处理 episode 不重复生成。
 
 ## MVP-2 Automation
@@ -147,5 +149,5 @@
 ## 当前最高优先级
 
 1. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
-2. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+2. 在真实 RSS run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
 3. 支持多 episode feed，跳过已处理 episode。

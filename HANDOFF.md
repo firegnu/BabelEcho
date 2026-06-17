@@ -73,7 +73,7 @@
     - `workspace/runs/nasa-crew9-real-smoke/script/zh.json`
     - `workspace/runs/nasa-crew9-real-smoke/transcript/normalized.json`
   - 首轮验证结果：source/script/audio segments 均为 5 段，MP3 为 `24000 Hz`、mono、约 `367.6s`。
-  - 首轮暴露两个问题：speaker label 会进入正文；多人播客现在仍是单一中文声音。
+  - 首轮当时暴露两个问题：speaker label 会进入正文；多人播客仍是单一中文声音。前者已在 MVP-0 收口，后者已在 MVP-1 通过 `sft_builtin_4role` profile 给出固定四角色基线。
 - 已完成 MVP-0 acceptance 收口：
   - `src/babelecho/transcript.py` 已解析 speaker label，把 `Host:`、`Nick Hague:`、`Host (Dane Turner):` 等标签写入 `segment["speaker"]`，并从 `segment["text"]` 中移除。
   - `tests/test_transcript.py` 覆盖段首 label、段内多轮 speaker turn 和普通冒号不误判。
@@ -130,16 +130,17 @@
 - 下一阶段是 MVP-1 Real Podcasts，目标是开始处理真实 podcast 来源和常见访谈节目。
 - MVP-1 后续优先任务：
   1. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
-  2. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+  2. 在真实 RSS run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
   3. 支持多 episode feed，跳过已处理 episode。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源已新增第一版 RSS feed 输入：`source.type=podcast_rss` 和 `babelecho run --podcast-feed ...`，只支持 RSS item 内的 `podcast:transcript`；公开 RSS smoke 使用 `https://feeds.transistor.fm/podcasting-advice` 跑到 `adapt`，fixture script 共 74 段，未调用 DeepSeek。还没有接 Apple Podcasts、Spotify、YouTube 页面解析。
   - 公开 RSS 端到端 Real Run 已完成：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 `#030: When Should You Monetize Your Podcast?`，经 RSS transcript -> DeepSeek -> 5090D CosyVoice cross_lingual 默认音色 -> assemble -> publish 成功；script/manifest 75 段，最终 MP3 为 `24000 Hz`、mono、约 `840.8s`，产物已拷回本机 ignored `workspace/runs/mvp1-real-rss-monetize-20260617/`。
   - TTS 执行效率优化已完成：`local_cli` synthesis 会写 `segments/tts-batch.json` 并一次启动 wrapper，wrapper 只加载一次 CosyVoice 后循环生成 wav；旧单段 `--text-file --output` wrapper 调用仍保留。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
-  - 当前 TTS 是单固定声音，不做原主播 voice clone。
-  - 还没有多说话人 `speaker -> voice` 映射；真实两人或多人播客不能长期用一个中文声音读完整集，后续必须支持至少主持人/嘉宾不同固定音色。
-- 多人多音色进入 MVP-1 或专项计划；不要把它回填到 MVP-0.5。
+  - MVP-1 固定音色规则已实现：`script/zh.json` 中 0/1 个 distinct speaker 继续使用原默认 `CosyVoice2-0.5B + cross_lingual_prompt.wav + speed=1.0`；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
+  - `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；按 speaker 首次出现顺序映射到 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
+  - `sft_builtin_4role` 不做原主播 voice clone，不依赖额外参考 wav；本机测试 `50 passed`，5090D 临时 wrapper smoke 已验证四角色真实 wav 输出为 `22050 Hz` mono。
+- 多人多音色已作为 MVP-1 固定 profile 落地；不要把它回填到 MVP-0.5。
 - DeepSeek adapt 基线已经跑通；后续只在 prompt 质量明显不满足时再回到 LLM adapt。
 - MVP-1 固定中文音色校准已开始：
   - 本轮未调用 DeepSeek API，直接使用已有 `mvp05-selfuse-nasa/script/zh.json` 中文稿片段做 TTS。
@@ -166,8 +167,8 @@
 
 - MVP-0 采用 CLI-first、文件产物驱动，不先做 Web 后台、队列、数据库或常驻服务。
 - 最终方向仍是 local-first，但当前阶段明确接受 DeepSeek API 作为 LLM adaptation 的临时质量基线。
-- MVP-0.5 自用流程已收口；下一阶段先投入固定中文音色校准，再做真实 podcast 来源和多说话人固定音色，不进入 voice clone、ASR、App 或后台服务。
-- MVP-0 可以接受单固定中文声音；真实多人播客体验需要 `speaker -> voice` 映射，单独进入下一阶段。
+- MVP-0.5 自用流程已收口；MVP-1 已完成默认固定中文音色和四角色多 speaker profile，后续继续真实 podcast 来源、真实多 speaker 回归和多 episode feed，不进入 voice clone、ASR、App 或后台服务。
+- MVP-0 可以接受单固定中文声音；MVP-1 当前规则是 0/1 speaker 用原 CosyVoice2 cross-lingual，2+ speakers 用 `sft_builtin_4role`。
 - `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
 - 5090D 执行代码方式：MacBook 修改并 push；必要时通过 `ssh my-5090d-host` 在远端运行验证命令，但不在 5090D 上安装或运行 Codex agent。
@@ -208,7 +209,7 @@
 ## 6. 下一步建议
 
 1. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
-2. 设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+2. 在真实 RSS run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
 3. 支持多 episode feed，跳过已处理 episode。
 4. 仍不要同时推进 ASR、voice clone、App 或后台服务。
 

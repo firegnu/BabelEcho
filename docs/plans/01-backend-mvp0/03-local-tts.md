@@ -96,4 +96,6 @@ script/zh.json -> segments/*.wav -> output/audio.mp3
 
 下一步不要同时接 ASR 或 App。优先进入 MVP-0.5 Self-use，补一条命令自用流程、失败恢复、质量检查和 TTS 前人工脚本编辑入口。
 
-当前 CosyVoice2 验证仍是单固定中文声音。真实两人或多人播客不能长期由同一个声音读完整集；后续必须增加 `speaker -> voice` 映射，至少支持主持人和嘉宾使用不同固定中文音色。不把它混入当前单声线 MVP 验证。
+当时的 CosyVoice2 验证仍是单固定中文声音。真实两人或多人播客不能长期由同一个声音读完整集；后续必须增加 `speaker -> voice` 映射，至少支持主持人和嘉宾使用不同固定中文音色。不把它混入当前单声线 MVP 验证。
+
+更新：该 MVP-0 约束保持不变；MVP-1 已在 `02.03 SFT Built-in 4-role Voice Profile` 中新增 `sft_builtin_4role` 固定四角色基线。

@@ -64,6 +64,30 @@ For MVP-1 voice calibration, `mode: cross_lingual` uses a local reference wav
 without cloning an original podcast host. Tune `prompt_wav` and `speed` in the
 ignored local config, then rerun from `synthesize` to avoid another LLM call.
 
+For MVP-1, TTS model selection is automatic:
+
+- 0/1 distinct speaker in `script/zh.json`: use the original CosyVoice2
+  `cross_lingual` fixed voice.
+- 2+ distinct speakers: use the SFT built-in four-role profile.
+
+The multi-speaker profile is equivalent to this effective config:
+
+```yaml
+tts:
+  provider: local_cli
+  command: "/home/th5090d/miniforge3/envs/babelecho-tts/bin/tts-wrapper"
+  voice: "sft_builtin_4role"
+  cosyvoice_repo: "/home/th5090d/Develop/ai_tools/CosyVoice"
+  speed: 1.0
+  output_format: "wav"
+```
+
+This profile maps script speakers by first appearance to `female_a`, `male_a`,
+`female_b`, and `male_b`, backed by `中文女`, `中文男`, `英文女`, and `英文男`.
+It is fixed-speaker synthesis, not original-host voice cloning.
+If `model_dir` is not set, the wrapper defaults to
+`<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for this profile.
+
 For `local_cli` synthesis, BabelEcho writes a `segments/tts-batch.json` file and
 starts the wrapper once per `synthesize` stage. The wrapper loads CosyVoice once,
 then loops over the segment text files to write `segments/<id>.wav`. The older

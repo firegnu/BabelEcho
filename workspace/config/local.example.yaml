@@ -18,6 +18,14 @@ tts:
   speed: 1.0
   output_format: "wav"
 
+# MVP-1 TTS selection is automatic:
+# - 0/1 distinct speaker in script/zh.json: use the default-zh cross_lingual voice above.
+# - 2+ distinct speakers: synthesize switches to voice=sft_builtin_4role.
+# The SFT profile maps speakers by first appearance to:
+# female_a=中文女, male_a=中文男, female_b=英文女, male_b=英文男.
+# If COSYVOICE_REPO is not available in the wrapper environment, set:
+# cosyvoice_repo: "/home/th5090d/Develop/ai_tools/CosyVoice"
+
 # Optional. Copy workspace/config/overrides.example.yaml to an ignored
 # workspace/config/overrides.yaml, then enable this path.
 # overrides:

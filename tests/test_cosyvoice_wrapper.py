@@ -89,6 +89,43 @@ def test_resolve_config_rejects_unsupported_voice(monkeypatch, tmp_path: Path):
         wrapper.resolve_config(args)
 
 
+def test_resolve_config_accepts_sft_builtin_4role_voice(monkeypatch, tmp_path: Path):
+    wrapper = load_wrapper()
+    monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", "/models/CosyVoice-300M-SFT")
+    args = wrapper.parse_args(
+        [
+            "--batch-file",
+            str(tmp_path / "tts-batch.json"),
+            "--voice",
+            "sft_builtin_4role",
+        ]
+    )
+
+    config = wrapper.resolve_config(args)
+
+    assert config.voice == "sft_builtin_4role"
+    assert config.model_dir == Path("/models/CosyVoice-300M-SFT")
+
+
+def test_resolve_config_defaults_sft_model_dir_from_repo(monkeypatch, tmp_path: Path):
+    wrapper = load_wrapper()
+    monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
+    monkeypatch.delenv("COSYVOICE_MODEL_DIR", raising=False)
+    args = wrapper.parse_args(
+        [
+            "--batch-file",
+            str(tmp_path / "tts-batch.json"),
+            "--voice",
+            "sft_builtin_4role",
+        ]
+    )
+
+    config = wrapper.resolve_config(args)
+
+    assert config.model_dir == Path("/opt/CosyVoice/pretrained_models/CosyVoice-300M-SFT")
+
+
 def test_synthesize_uses_cross_lingual_mode(monkeypatch, tmp_path: Path):
     wrapper = load_wrapper()
     text_file = tmp_path / "segment.txt"
@@ -238,3 +275,105 @@ def test_synthesize_batch_reuses_model_for_multiple_outputs(monkeypatch, tmp_pat
         (str(first_output), saved[0][1], 24_000),
         (str(second_output), saved[1][1], 24_000),
     ]
+
+
+def test_synthesize_sft_builtin_4role_uses_item_voice_roles(monkeypatch, tmp_path: Path):
+    wrapper = load_wrapper()
+    text_file = tmp_path / "0001.txt"
+    output = tmp_path / "0001.wav"
+    batch_file = tmp_path / "tts-batch.json"
+    text_file.write_text("第一段中文。", encoding="utf-8")
+    batch_file.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "text_file": str(text_file),
+                        "output": str(output),
+                        "voice_role": "male_a",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    sft_calls = []
+
+    class FakeAutoModel:
+        def __init__(self, model_dir):
+            raise AssertionError("AutoModel should not be used for sft_builtin_4role")
+
+    class FakeCosyVoice:
+        sample_rate = 22_050
+
+        def __init__(self, model_dir):
+            self.model_dir = model_dir
+
+        def inference_sft(self, text, speaker, stream, speed):
+            sft_calls.append((text, speaker, stream, speed))
+            return [{"tts_speech": FakeTensor()}]
+
+    class FakeTensor:
+        def cpu(self):
+            return self
+
+    fake_torch = type(
+        "FakeTorch",
+        (),
+        {"cat": staticmethod(lambda chunks, dim: chunks[0])},
+    )
+
+    saved = []
+    fake_torchaudio = type(
+        "FakeTorchaudio",
+        (),
+        {"save": staticmethod(lambda path, audio, sample_rate: saved.append((path, audio, sample_rate)))},
+    )
+    ffmpeg_calls = []
+
+    def fake_run(command, check):
+        ffmpeg_calls.append((command, check))
+
+    monkeypatch.setenv("COSYVOICE_REPO", str(tmp_path / "CosyVoice"))
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", str(tmp_path / "CosyVoice-300M-SFT"))
+    monkeypatch.setitem(__import__("sys").modules, "torch", fake_torch)
+    monkeypatch.setitem(__import__("sys").modules, "torchaudio", fake_torchaudio)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "cosyvoice.cli.cosyvoice",
+        type(
+            "FakeCosyVoiceModule",
+            (),
+            {"AutoModel": FakeAutoModel, "CosyVoice": FakeCosyVoice},
+        ),
+    )
+    monkeypatch.setattr(wrapper.subprocess, "run", fake_run)
+
+    config = wrapper.resolve_config(
+        wrapper.parse_args(
+            [
+                "--batch-file",
+                str(batch_file),
+                "--voice",
+                "sft_builtin_4role",
+                "--speed",
+                "1.0",
+            ]
+        )
+    )
+
+    wrapper.synthesize(config)
+
+    assert sft_calls == [("第一段中文。", "中文男", False, 1.0)]
+    assert saved == [(str(tmp_path / "0001.raw.wav"), saved[0][1], 22_050)]
+    assert ffmpeg_calls
+    assert ffmpeg_calls[0][0][:6] == [
+        "ffmpeg",
+        "-hide_banner",
+        "-loglevel",
+        "error",
+        "-y",
+        "-i",
+    ]
+    assert str(tmp_path / "0001.raw.wav") in ffmpeg_calls[0][0]
+    assert str(output) == ffmpeg_calls[0][0][-1]

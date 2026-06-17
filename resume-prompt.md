@@ -24,6 +24,9 @@
 - MVP-1 真实来源第一版已完成：新增 `source.type=podcast_rss` 和 `babelecho run --podcast-feed ...`，只支持 RSS item 内的 `podcast:transcript`，找不到 transcript 时明确失败，不做 ASR。公开 RSS smoke 使用 `https://feeds.transistor.fm/podcasting-advice` 跑到 `adapt`，fixture script 共 74 段，未调用 DeepSeek。
 - MVP-1 公开 RSS 端到端 Real Run 已完成：`mvp1-real-rss-monetize-20260617` 使用 `https://feeds.transistor.fm/podcasts-for-profit-with-morgan-franklin` 的 `#030: When Should You Monetize Your Podcast?`，经 RSS transcript -> DeepSeek -> 5090D CosyVoice cross_lingual 默认音色 -> MP3 -> feed 全链路成功；script/manifest 75 段，MP3 `24000 Hz` mono，约 `840.8s`，产物在 ignored `workspace/runs/mvp1-real-rss-monetize-20260617/`。
 - MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 只加载一次 CosyVoice 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
+- MVP-1 固定音色规则已选定并实现：`script/zh.json` 中 0/1 个 distinct speaker 继续使用原默认 `CosyVoice2-0.5B + cross_lingual_prompt.wav + speed=1.0`；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
+- `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；按 speaker 首次出现顺序映射到 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。不做原主播 voice clone，不依赖额外参考 wav。
+- 本机测试 `50 passed`；5090D 临时 wrapper smoke 已验证四角色真实 SFT wav 输出均为 `22050 Hz` mono。计划记录见 `docs/plans/02-real-podcasts/03-sft-builtin-4role-voice-profile.md`。
 - MVP-0 收口已完成：speaker label 解析/清洗、NASA 样本 `normalize -> adapt -> synthesize -> assemble -> publish` 回归、docs 标记完成。
 - `docs/roadmap.md` 已记录从 MVP-0 Acceptance 到 MVP-0.5 Self-use、MVP-1 Real Podcasts、MVP-2 Automation 的产品路线；当前下一阶段是 MVP-1。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
@@ -210,7 +213,7 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 下一步继续 MVP-1 Real Podcasts：
 
 1. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
-2. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+2. 在真实 RSS run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
 3. 支持多 episode feed，跳过已处理 episode。
 
 不要进入：
@@ -241,12 +244,12 @@ MVP-0.5 acceptance 已满足：
 
 仍然保留到后续阶段：
 
-- 真实两人或多人播客不能长期使用单一中文声音；后续必须做 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定音色。
-- 真实 podcast 来源、多 episode feed 和不同 speaker 固定音色进入 MVP-1。
+- 真实 RSS episode 上的多 speaker profile 仍需回归；人工 speaker 修正文件和每个 podcast 的 voice config 还没做。
+- 真实 podcast 来源扩展和多 episode feed 仍在 MVP-1 后续。
 - 固定中文音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 第一轮和第二轮音色校准样本已在 5090D 生成并拷回本机 ignored `workspace/runs/`；这些音频不进入 git。
 - 用户已反馈 D 最满意；MVP-1 默认固定中文音色基线采用 `cross_lingual_prompt.wav + speed=1.0`。
-- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；TTS batch wrapper 已解决每段重复加载 CosyVoice 的主要性能问题。后续重点转向更多 transcript 发现形态、`speaker -> voice` 映射和多 episode feed。授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
+- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；TTS batch wrapper 已解决每段重复加载 CosyVoice 的主要性能问题；`sft_builtin_4role` 已提供 MVP-1 多 speaker 基线。后续重点转向真实 RSS 多 speaker 回归、更多 transcript 发现形态和多 episode feed。授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
 
 ## 如果发生分支情况
 
