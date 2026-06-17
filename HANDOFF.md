@@ -158,9 +158,9 @@
 
 ## 当前 Git 状态
 
-- 当前 `main` / `origin/main` 最新提交：`815c296 docs: mark mvp0 acceptance complete`。
+- MVP-0 acceptance 收口基线提交：`815c296 docs: mark mvp0 acceptance complete`；当前 `main` / `origin/main` 可能包含后续 handoff 文档刷新提交，新 session 以 `git log --oneline -3` 为准。
 - MVP-0 acceptance 代码验证提交：`9444363 fix: parse transcript speaker labels`。
-- 5090D `/home/th5090d/Develop/personal_project/BabelEcho` 已切回 `main` 并 fast-forward 到 `815c296`。
+- 5090D `/home/th5090d/Develop/personal_project/BabelEcho` 已切回 `main` 并完成过 `815c296` 验证；如需读取最新 handoff 文档，先 `git pull`。
 - 本轮最终提交后，新 session 先运行：
 
   ```bash

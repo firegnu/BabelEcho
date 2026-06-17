@@ -78,7 +78,7 @@ MacBook 已实现：
 
 - 仓库：`/Users/firegnu/Developer/personal_projs/BabelEcho`，远端 5090D 路径是 `/home/th5090d/Develop/personal_project/BabelEcho`。
 - 当前协作方式：本机改代码并 push，必要时通过 `ssh my-5090d-host` 在 5090D 上远程执行验证命令；不在 5090D 上安装或运行 Codex agent。
-- 本机和 5090D 当前最新提交应为 `815c296 docs: mark mvp0 acceptance complete` 或更新；如果需要在 5090D 上跑验证，先远程确认 `git status --short --branch` 为 `## main...origin/main`。
+- MVP-0 acceptance 收口基线提交是 `815c296 docs: mark mvp0 acceptance complete`；当前 `origin/main` 可能包含后续 handoff 文档刷新提交。新 session 以 `git log --oneline -3` 为准；如果需要在 5090D 上跑验证，先在远端 `git pull`。
 - 已有 CLI 阶段：
   - `ingest`
   - `normalize`
