@@ -139,6 +139,15 @@
   - 还没有多说话人 `speaker -> voice` 映射；真实两人或多人播客不能长期用一个中文声音读完整集，后续必须支持至少主持人/嘉宾不同固定音色。
 - 多人多音色进入 MVP-1 或专项计划；不要把它回填到 MVP-0.5。
 - DeepSeek adapt 基线已经跑通；后续只在 prompt 质量明显不满足时再回到 LLM adapt。
+- MVP-1 固定中文音色校准已开始：
+  - 本轮未调用 DeepSeek API，直接使用已有 `mvp05-selfuse-nasa/script/zh.json` 中文稿片段做 TTS。
+  - 5090D 当前 CosyVoice 目录只有 `asset/zero_shot_prompt.wav` 和 `asset/cross_lingual_prompt.wav` 两个内置参考音频；`CosyVoice2-0.5B` 没有内置 SFT speaker 列表。
+  - 已生成三条第一轮候选样本，并拷回本机 ignored 路径 `workspace/runs/voice-calibration-20260617/`：
+    - `a-current-zero-shot-female.mp3`：当前默认 zero-shot 女声 baseline，约 `27.5s`。
+    - `b-neutral-instruct2-female.mp3`：同一参考音频，使用 `inference_instruct2` 尝试压情绪到自然平静，约 `23.6s`。
+    - `c-cross-lingual-reference.mp3`：使用 `cross_lingual_prompt.wav` 的参考音色，约 `24.3s`。
+  - 三条样本均为 `24000 Hz`、mono；真实 wav/MP3 和 manifest 不进入 git。
+  - 等用户试听反馈后再决定：选 B/C 继续微调，或准备新的本地男声/中性参考 wav 做下一轮。
 
 ## 4. 关键决策
 
