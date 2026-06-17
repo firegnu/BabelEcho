@@ -147,7 +147,8 @@
     - `b-neutral-instruct2-female.mp3`：同一参考音频，使用 `inference_instruct2` 尝试压情绪到自然平静，约 `23.6s`。
     - `c-cross-lingual-reference.mp3`：使用 `cross_lingual_prompt.wav` 的参考音色，约 `24.3s`。
   - 三条样本均为 `24000 Hz`、mono；真实 wav/MP3 和 manifest 不进入 git。
-  - 等用户试听反馈后再决定：选 B/C 继续微调，或准备新的本地男声/中性参考 wav 做下一轮。
+  - 用户当前反馈：C 最好。下一轮优先沿 cross-lingual/reference-audio 路线继续微调，而不是继续围绕默认 zero-shot 女声。
+  - 后续建议：准备或寻找更克制的本地男声/中性参考 wav；同时把 wrapper 的 TTS mode、prompt wav 和 speed 暴露成可配置项，便于继续做 A/B。
 
 ## 4. 关键决策
 
