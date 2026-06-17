@@ -149,6 +149,115 @@ publish:
     assert "output_duration_seconds=" in check_result.stdout
 
 
+def test_run_command_accepts_transcript_file_and_writes_status(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    transcript = Path("tests/fixtures/sample.vtt").resolve()
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "manual-demo",
+            "--transcript-file",
+            str(transcript),
+            "--title",
+            "Manual Episode",
+            "--local-config",
+            str(local_config),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    run_dir = workspace / "runs" / "manual-demo"
+    assert result.returncode == 0, result.stderr
+    assert (run_dir / "output" / "audio.mp3").exists()
+    assert (run_dir / "publish" / "feed.xml").exists()
+
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "transcript_file"
+    assert source["title"] == "Manual Episode"
+    assert source["transcript_file"] == str(transcript)
+
+    status = read_json(run_dir / "run.json")
+    assert status["status"] == "succeeded"
+    assert status["from_stage"] == "ingest"
+    assert status["input"]["transcript_file"] == str(transcript)
+    assert status["outputs"]["audio"] == "output/audio.mp3"
+    assert status["outputs"]["feed"] == "publish/feed.xml"
+    assert [stage["status"] for stage in status["stages"]] == [
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+        "succeeded",
+    ]
+
+
+def test_run_command_records_failed_stage_in_status(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    missing_transcript = tmp_path / "missing.vtt"
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "failed-demo",
+            "--transcript-file",
+            str(missing_transcript),
+            "--local-config",
+            str(local_config),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    status = read_json(workspace / "runs" / "failed-demo" / "run.json")
+    assert result.returncode == 1
+    assert status["status"] == "failed"
+    assert status["failed_stage"] == "ingest"
+    assert "missing.vtt" in status["error"]
+    assert status["stages"][0]["status"] == "failed"
+    assert status["stages"][1]["status"] == "pending"
+
+
 def test_run_command_resumes_from_synthesize(tmp_path: Path):
     workspace = tmp_path / "workspace"
     run_dir = workspace / "runs" / "resume-demo"

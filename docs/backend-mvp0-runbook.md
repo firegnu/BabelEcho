@@ -65,8 +65,23 @@ Preferred MVP-0.5 self-use entry:
 export PYTHON=.conda/babelecho-dev/bin/python
 export WORKSPACE=/path/to/babelecho-workspace
 export RUN_ID=first-episode
-export SOURCE_CONFIG=$WORKSPACE/sources/hardcoded.yaml
+export TRANSCRIPT=/path/to/episode.vtt
 export LOCAL_CONFIG=$WORKSPACE/config/local.yaml
+
+$PYTHON -m babelecho run \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --transcript-file "$TRANSCRIPT" \
+  --title "Episode Title" \
+  --local-config "$LOCAL_CONFIG"
+```
+
+`--transcript-file` accepts local `.txt`, `.vtt`, and `.srt` transcript files. It is the preferred manual self-use entry because it does not require writing a source YAML file.
+
+The older source config entry remains supported:
+
+```bash
+export SOURCE_CONFIG=$WORKSPACE/sources/hardcoded.yaml
 
 $PYTHON -m babelecho run \
   --workspace "$WORKSPACE" \
@@ -87,13 +102,21 @@ It also runs basic checks after generated artifacts are available:
 - after `synthesize`: `segments/manifest.json` exists and every listed wav file exists and is nonempty.
 - after `assemble`: `output/audio.mp3` exists and `ffprobe` can read codec, duration, sample rate, and channel count.
 
+Each `run` writes status to:
+
+```text
+$WORKSPACE/runs/$RUN_ID/run.json
+```
+
+The file records the input, `from_stage`, each stage status, failed stage, error string, and known output paths. Use it first when a run fails.
+
 To resume after editing or preserving earlier artifacts, use `--from-stage`:
 
 ```bash
 $PYTHON -m babelecho run \
   --workspace "$WORKSPACE" \
   --run-id "$RUN_ID" \
-  --source-config "$SOURCE_CONFIG" \
+  --transcript-file "$TRANSCRIPT" \
   --local-config "$LOCAL_CONFIG" \
   --from-stage synthesize
 ```
@@ -141,6 +164,7 @@ $PYTHON -m babelecho check \
 - `$WORKSPACE/runs/$RUN_ID/output/audio.mp3`
 - `$WORKSPACE/runs/$RUN_ID/publish/feed.xml`
 - `$WORKSPACE/runs/$RUN_ID/publish/episodes/$RUN_ID/audio.mp3`
+- `$WORKSPACE/runs/$RUN_ID/run.json`
 
 ## Local Fixture Test
 

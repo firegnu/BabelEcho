@@ -14,7 +14,9 @@ The current pipeline supports:
 - Local-first execution, with a temporary DeepSeek API exception for the LLM adaptation baseline.
 - Stage-by-stage Python CLI commands.
 - One-command pipeline orchestration with `babelecho run`.
+- Manual transcript input with `babelecho run --transcript-file`.
 - Basic artifact checks with `babelecho check`.
+- Run status tracking in `workspace/runs/<run-id>/run.json`.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.
 - Fixture tests for the full pure pipeline.
 - Static podcast output: `feed.xml` plus generated audio artifacts.
@@ -46,6 +48,7 @@ src/babelecho/
   synthesize.py
   audio.py
   publish.py
+  status.py
 tests/
 workspace/
   config/local.example.yaml

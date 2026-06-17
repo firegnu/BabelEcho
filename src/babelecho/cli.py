@@ -10,6 +10,13 @@ from .ingest import ingest_transcript_source
 from .jsonio import read_json
 from .paths import create_run
 from .publish import publish_episode
+from .status import (
+    init_run_status,
+    mark_run_succeeded,
+    mark_stage_failed,
+    mark_stage_running,
+    mark_stage_succeeded,
+)
 from .synthesize import synthesize_segments
 from .transcript import normalize_transcript
 
@@ -61,7 +68,11 @@ def build_parser() -> argparse.ArgumentParser:
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
     run.add_argument("--run-id", required=True)
-    run.add_argument("--source-config", required=True)
+    run_input = run.add_mutually_exclusive_group(required=True)
+    run_input.add_argument("--source-config")
+    run_input.add_argument("--transcript-file")
+    run.add_argument("--title")
+    run.add_argument("--original-url")
     run.add_argument("--local-config", required=True)
     run.add_argument(
         "--from-stage",
@@ -98,49 +109,130 @@ def _raw_transcript_path(run_paths) -> Path:
     return run_paths.run_dir / raw_transcript
 
 
+def _source_config_and_input(
+    source_config_path: str | None,
+    transcript_file: str | None,
+    title: str | None,
+    original_url: str | None,
+) -> tuple[dict, dict]:
+    if source_config_path:
+        source_config = load_yaml(Path(source_config_path))
+        require_keys(source_config, ["source"])
+        return source_config, {"source_config": str(Path(source_config_path))}
+
+    if not transcript_file:
+        raise ValueError("Either source_config_path or transcript_file is required")
+
+    transcript_path = Path(transcript_file)
+    episode_title = title or transcript_path.stem
+    source = {
+        "type": "transcript_file",
+        "transcript_file": str(transcript_path),
+        "title": episode_title,
+    }
+    input_info = {
+        "transcript_file": str(transcript_path),
+        "title": episode_title,
+    }
+    if original_url:
+        source["original_url"] = original_url
+        input_info["original_url"] = original_url
+    return {"source": source}, input_info
+
+
+def _run_stage(status: dict, run_paths, stage_name: str, action):
+    mark_stage_running(status, run_paths, stage_name)
+    try:
+        result = action()
+    except Exception as error:
+        mark_stage_failed(status, run_paths, stage_name, error)
+        raise
+    mark_stage_succeeded(status, run_paths, stage_name)
+    return result
+
+
 def run_pipeline(
     workspace: str,
     run_id: str,
-    source_config_path: str,
+    source_config_path: str | None,
     local_config_path: str,
     from_stage: str,
+    transcript_file: str | None = None,
+    title: str | None = None,
+    original_url: str | None = None,
 ) -> str:
-    source_config = load_yaml(Path(source_config_path))
+    source_config, input_info = _source_config_and_input(
+        source_config_path,
+        transcript_file,
+        title,
+        original_url,
+    )
     local_config = load_yaml(Path(local_config_path))
-    require_keys(source_config, ["source"])
     require_keys(local_config, ["llm", "tts", "publish"])
 
     run_paths = create_run(workspace, run_id)
+    status = init_run_status(
+        run_paths,
+        from_stage=from_stage,
+        input_info=input_info,
+        stages=PIPELINE_STAGES,
+    )
     stage_index = PIPELINE_STAGES.index(from_stage)
     raw_path: Path | None = None
     outputs: list[str] = []
 
     if stage_index <= PIPELINE_STAGES.index("ingest"):
-        raw_path = ingest_transcript_source(source_config["source"], run_paths)
+        raw_path = _run_stage(
+            status,
+            run_paths,
+            "ingest",
+            lambda: ingest_transcript_source(source_config["source"], run_paths),
+        )
         outputs.append(f"ingest: {raw_path}")
 
     if stage_index <= PIPELINE_STAGES.index("normalize"):
-        if raw_path is None:
-            raw_path = _raw_transcript_path(run_paths)
-        normalized_path = normalize_transcript(run_paths, raw_path)
+        def normalize_stage() -> Path:
+            nonlocal raw_path
+            if raw_path is None:
+                raw_path = _raw_transcript_path(run_paths)
+            return normalize_transcript(run_paths, raw_path)
+
+        normalized_path = _run_stage(status, run_paths, "normalize", normalize_stage)
         outputs.append(f"normalize: {normalized_path}")
 
     if stage_index <= PIPELINE_STAGES.index("adapt"):
-        script_path = adapt_to_chinese(run_paths, local_config["llm"])
+        def adapt_stage() -> tuple[str, dict]:
+            script_path = adapt_to_chinese(run_paths, local_config["llm"])
+            script_check = check_run_artifacts(run_paths, checks=("script",))
+            return script_path, script_check
+
+        script_path, script_check = _run_stage(status, run_paths, "adapt", adapt_stage)
         outputs.append(f"adapt: {script_path}")
-        script_check = check_run_artifacts(run_paths, checks=("script",))
         outputs.append(f"check script: {script_check['script_segments']} segments")
 
     if stage_index <= PIPELINE_STAGES.index("synthesize"):
-        manifest_path = synthesize_segments(run_paths, local_config["tts"])
+        def synthesize_stage() -> tuple[str, dict]:
+            manifest_path = synthesize_segments(run_paths, local_config["tts"])
+            segment_check = check_run_artifacts(run_paths, checks=("segments",))
+            return manifest_path, segment_check
+
+        manifest_path, segment_check = _run_stage(
+            status,
+            run_paths,
+            "synthesize",
+            synthesize_stage,
+        )
         outputs.append(f"synthesize: {manifest_path}")
-        segment_check = check_run_artifacts(run_paths, checks=("segments",))
         outputs.append(f"check segments: {segment_check['audio_segments']} files")
 
     if stage_index <= PIPELINE_STAGES.index("assemble"):
-        audio_path = assemble_audio(run_paths)
+        def assemble_stage() -> tuple[str, dict]:
+            audio_path = assemble_audio(run_paths)
+            output_check = check_run_artifacts(run_paths, checks=("output",))
+            return audio_path, output_check
+
+        audio_path, output_check = _run_stage(status, run_paths, "assemble", assemble_stage)
         outputs.append(f"assemble: {audio_path}")
-        output_check = check_run_artifacts(run_paths, checks=("output",))
         outputs.append(
             "check output: "
             f"{output_check['output_duration_seconds']:.3f}s, "
@@ -149,9 +241,15 @@ def run_pipeline(
         )
 
     if stage_index <= PIPELINE_STAGES.index("publish"):
-        feed_path = publish_episode(run_paths, local_config["publish"])
+        feed_path = _run_stage(
+            status,
+            run_paths,
+            "publish",
+            lambda: publish_episode(run_paths, local_config["publish"]),
+        )
         outputs.append(f"publish: {feed_path}")
 
+    mark_run_succeeded(status, run_paths)
     outputs.append(f"audio: {run_paths.output_audio}")
     outputs.append(f"feed: {run_paths.publish_dir / 'feed.xml'}")
     return "\n".join(outputs)
@@ -218,8 +316,11 @@ def main(argv: list[str] | None = None) -> int:
                 args.source_config,
                 args.local_config,
                 args.from_stage,
+                args.transcript_file,
+                args.title,
+                args.original_url,
             )
-        except CheckError as error:
+        except Exception as error:
             print(str(error), file=sys.stderr)
             return 1
         print(output)

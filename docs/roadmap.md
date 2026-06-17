@@ -55,9 +55,9 @@
 需要做：
 
 - 已增加一条完整 pipeline 命令：`babelecho run --workspace ... --run-id ... --source-config ... --local-config ...`。
+- 已支持手动 transcript 文件入口：`babelecho run --transcript-file ...`。
 - 已支持 `--from-stage` 从指定阶段继续执行，避免每次从头跑。
-- 支持手动导入 transcript 文件作为一等入口。
-- 明确每次 run 的状态、输入、输出路径和失败阶段。
+- 已通过 `workspace/runs/<run-id>/run.json` 明确每次 run 的状态、输入、输出路径和失败阶段。
 - 已增加基础质量检查命令：`babelecho check --workspace ... --run-id ...`。
 - `babelecho run` 已在 `adapt`、`synthesize`、`assemble` 后自动检查关键产物。
 - 固定私有静态发布目录和稳定 `feed.xml` 路径。
@@ -136,8 +136,7 @@
 
 ## 当前最高优先级
 
-1. 支持手动导入 transcript 作为稳定入口。
-2. 增加 TTS 前中文脚本人工编辑入口。
-3. 固定私有静态发布目录和稳定 `feed.xml` 路径。
-4. 增加专有名词和发音 override 的简单配置。
-5. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。
+1. 增加 TTS 前中文脚本人工预览和编辑入口。
+2. 固定私有静态发布目录和稳定 `feed.xml` 路径。
+3. 增加专有名词和发音 override 的简单配置。
+4. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。
