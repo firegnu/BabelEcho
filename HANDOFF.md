@@ -104,13 +104,22 @@
   - 5090D check smoke：`check-command-smoke` 使用 `babelecho run` 自动输出 `check script`、`check segments`、`check output`；独立 `babelecho check` 输出 `script_segments=1`、`audio_segments=1`、`output_sample_rate=16000`、`output_channels=1`、`output_duration_seconds=0.504`。
   - 5090D manual input smoke：`manual-input-status-smoke` 使用 `babelecho run --transcript-file tests/fixtures/sample.vtt --title "Manual Input Smoke"` 跑通；`run.json` 显示 `status=succeeded`、`from_stage=ingest`、6 个 stage 全部 `succeeded`、`audio=output/audio.mp3`、`feed=publish/feed.xml`、`source_type=transcript_file`。
   - 5090D preview/stable publish smoke：`preview-stable-smoke` 使用 `babelecho run --transcript-file tests/fixtures/sample.vtt --title "Preview Stable Smoke"` 跑通；stdout 包含 `stable feed: workspace/published/feed.xml`；`babelecho script` 输出 `script/edit` 路径、`--from-stage synthesize` 提示和中文稿；`workspace/published/feed.xml` 存在且非空，`run.json` 输出 `stable_feed=published/feed.xml`。
+- 已完成 MVP-0.5 本地专有名词和发音 override：
+  - `src/babelecho/overrides.py` 增加本地精确替换逻辑，读取 `overrides.path` 指向的 YAML 词表，改写 `workspace/runs/<run-id>/script/zh.json`。
+  - `src/babelecho/cli.py` 增加 `babelecho overrides --workspace ... --run-id ... --local-config ...`。
+  - `babelecho run` 在 `synthesize` 前自动应用 configured overrides，并在 stdout 输出替换数量。
+  - `workspace/config/overrides.example.yaml` 提供可提交的示例词表，真实 `workspace/config/overrides.yaml` 继续被 ignore。
+  - `workspace/config/local.example.yaml`、README、runbook 和 roadmap 已记录 override 用法。
+  - 本机全量测试：`37 passed`。
+  - 5090D 全量测试：`37 passed`。
+  - 5090D fixture smoke：`overrides-smoke` 使用临时 workspace 和 fixture provider 跑通；stdout 包含 `overrides: 2 replacements from 2 rules`；`script_text` 和 `manifest_text` 都为 `中文口播：欢迎 to the 样例节目.`；`run.json` 状态为 `succeeded`，稳定 `published/feed.xml` 存在。
 
 ## 3. 待完成的工作
 
 - MVP-0 acceptance 已完成：完整 transcript 到中文 MP3，再到静态 RSS/episode artifacts 的真实路径已经跑通。
 - 下一阶段是 MVP-0.5 Self-use，目标是让手动导入 transcript 后可以稳定生成一个私有中文 podcast feed，并能在播客客户端里听。
 - MVP-0.5 后续优先任务：
-  1. 增加专有名词和发音 override 的简单配置。
+  1. 用一个真实 transcript 做一次自用流程回归，确认 `run`、脚本预览、override、`--from-stage synthesize` 续跑和 publish 产物的实际手感。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源仍是手动提供 transcript 文件或 source config，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
@@ -152,15 +161,18 @@
 - `src/babelecho/synthesize.py`
 - `src/babelecho/audio.py`
 - `src/babelecho/publish.py`
+- `src/babelecho/overrides.py`
 - `tools/cosyvoice_tts_wrapper.py`
 - `tests/test_transcript.py`
 - `tests/test_audio.py`
 - `tests/test_llm.py`
 - `tests/test_cosyvoice_wrapper.py`
+- `tests/test_overrides.py`
+- `workspace/config/overrides.example.yaml`
 
 ## 6. 下一步建议
 
-1. 增加专有名词和发音 override 的简单配置。
+1. 用一个真实 transcript 做一次 MVP-0.5 自用流程回归，覆盖脚本预览、override、续跑和 publish 输出。
 2. 不要在下一步同时推进 ASR、voice clone、App、后台服务或真实来源发现。
 
 ## 当前 Git 状态
@@ -168,7 +180,8 @@
 - MVP-0 acceptance 收口基线提交：`815c296 docs: mark mvp0 acceptance complete`；当前 `main` / `origin/main` 可能包含后续 handoff 文档刷新提交，新 session 以 `git log --oneline -3` 为准。
 - MVP-0 acceptance 代码验证提交：`9444363 fix: parse transcript speaker labels`。
 - MVP-0.5 `babelecho run` 功能提交：`96776e8 feat: add pipeline run command`。
-- 5090D `/home/th5090d/Develop/personal_project/BabelEcho` 已切回 `main` 并完成过 `815c296` 验证；如需读取最新 handoff 文档，先 `git pull`。
+- MVP-0.5 override 功能提交：`4f92d37 feat: add script overrides`。
+- 5090D `/home/th5090d/Develop/personal_project/BabelEcho` 已用于本轮分支验证；新 session 如需继续远端验证，先执行 `git status --short --branch` 和 `git --no-pager log --oneline -3`，再按需要 `git pull` 或切回 `main`。
 - 本轮最终提交后，新 session 先运行：
 
   ```bash

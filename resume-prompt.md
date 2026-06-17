@@ -5,7 +5,7 @@
 ## 给新 session 的第一条指令
 
 ```text
-你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 已完成，MVP-0.5 的 `babelecho run`、`babelecho check`、手动 transcript 文件入口、`run.json` 状态记录、`babelecho script` 脚本预览和稳定 `workspace/published/feed.xml` 已完成。
+你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 已完成，MVP-0.5 的 `babelecho run`、`babelecho check`、手动 transcript 文件入口、`run.json` 状态记录、`babelecho script` 脚本预览、稳定 `workspace/published/feed.xml` 和本地专有名词/发音 override 已完成。
 
 重要约束：
 - 当前 MVP-0 是 transcript-first 工程链路；核心路径和 acceptance 已正式收口。
@@ -13,6 +13,7 @@
 - `babelecho run --transcript-file` 可以直接导入本地 transcript 文件；每次 run 会写 `workspace/runs/<run-id>/run.json` 记录输入、阶段状态、失败阶段、错误和输出路径。
 - `babelecho check` 可以检查中文脚本、TTS wav segment 和最终 MP3；`run` 已在关键阶段后自动调用这些检查。
 - `babelecho script` 可以在 TTS 前预览 `script/zh.json`，并提示编辑后从 `synthesize` 继续；`publish` 会把 feed 和 episode artifacts 同步到稳定目录 `workspace/published/`。
+- `overrides.path` 和 `babelecho overrides` 可以在 TTS 前对 `script/zh.json` 做本地精确替换；示例词表是 tracked `workspace/config/overrides.example.yaml`，真实词表继续放 ignored `workspace/config/overrides.yaml`。
 - 5090D 上 fixture 全链路已经跑通：ingest -> normalize -> adapt(fixture) -> synthesize(fixture) -> assemble -> publish。
 - 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 CosyVoice2 生成真实 wav/MP3 的真实 TTS 基线，但还没有 voice clone、ASR 或真实播客来源接入。
 - 自制长样本和 NASA 真实 podcast transcript 都已经生成可听中文 MP3；下一步不要再做泛泛听感实验，应进入 MVP-0.5 自用流程。
@@ -35,6 +36,7 @@ MVP-0.5 babelecho run command
 MVP-0.5 babelecho check command
 MVP-0.5 manual transcript input and run.json status
 MVP-0.5 script preview and stable published feed
+MVP-0.5 local terminology/pronunciation overrides
 ```
 
 进度：
@@ -52,6 +54,7 @@ MVP-0.5 script preview and stable published feed
 - 01.03 已在 5090D 上完成本地 TTS 验收。
 - 真实 NASA transcript 样本已在 5090D 上跑通 `normalize -> adapt -> synthesize -> assemble -> publish`。
 - 产品路线已整理到 `docs/roadmap.md`，下一步应进入 MVP-0.5 Self-use，不要跳到 MVP-1 或 Later。
+- 本地 override 已完成，下一步是用真实 transcript 做一次 MVP-0.5 自用流程回归。
 
 MacBook 已实现：
 
@@ -67,6 +70,8 @@ MacBook 已实现：
 - `src/babelecho/checks.py` 增加基础质量检查，`babelecho check` 可检查 script、segments、output。
 - `src/babelecho/script.py` 增加 `babelecho script`，输出 `script/zh.json` 路径、段落编号、文本和 `--from-stage synthesize` 续跑提示。
 - `src/babelecho/publish.py` 同步 run-local publish artifacts 到稳定目录 `workspace/published/`。
+- `src/babelecho/overrides.py` 增加本地精确替换逻辑，读取 `overrides.path` 指向的 YAML 词表并改写 `script/zh.json`。
+- `src/babelecho/cli.py` 增加 `babelecho overrides`，`babelecho run` 在 `synthesize` 前自动应用 configured overrides。
 - `babelecho run` 在 `adapt`、`synthesize`、`assemble` 后自动检查关键产物。
 - `babelecho run` 输出包含 `stable feed: workspace/published/feed.xml`。
 - `tests/test_end_to_end_fixture.py` 覆盖 `run` 的 fixture 全链路和从 `synthesize` 恢复执行。
@@ -74,9 +79,11 @@ MacBook 已实现：
 - `tests/test_end_to_end_fixture.py` 覆盖 `babelecho script` 输出和 stable publish feed。
 - `tests/test_publish.py` 覆盖 run-local 与 stable publish artifacts 同时生成。
 - `tests/test_checks.py` 覆盖空中文稿、超长段落、缺失 wav、缺失 MP3 和 ffprobe 元数据。
+- `tests/test_overrides.py` 覆盖 override 词表改写、未配置跳过和 CLI 命令。
 - `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
 - `workspace/config/deepseek.env.example` 已添加，真实 `workspace/config/deepseek.env` 被 ignore。
-- 本机全量测试：`34 passed`。
+- `workspace/config/overrides.example.yaml` 已添加示例词表，真实 `workspace/config/overrides.yaml` 被 ignore。
+- 本机全量测试：`37 passed`。
 
 5090D 已完成 DeepSeek API 和 `adapt` 验证，也完成 CosyVoice2 本地 TTS wrapper 验证。自制长样本和 NASA 真实 podcast transcript 都已生成可听 MP3。MVP-0 acceptance 已完成：NASA 样本重新生成 9 段 normalized/script/manifest，中文脚本无朗读式 speaker label，`publish/feed.xml` 和 episode artifacts 已验证。下一步进入 MVP-0.5 Self-use。不要同时接 ASR、voice clone、后台服务、App 或真实来源发现。
 
@@ -107,6 +114,14 @@ MVP-0.5 `babelecho script` 和稳定 `workspace/published/feed.xml` 已在 5090D
 - `babelecho script --workspace workspace --run-id preview-stable-smoke` 输出 `script/edit` 路径、`--from-stage synthesize` 提示和中文稿。
 - `workspace/published/feed.xml` 和 `workspace/published/episodes/preview-stable-smoke/audio.mp3` 存在且非空；`run.json` 输出 `stable_feed=published/feed.xml`。
 
+MVP-0.5 本地 override 已在 5090D 上通过验证：
+
+- 远端全量测试：`37 passed`。
+- `overrides-smoke` 使用临时 workspace、fixture LLM/TTS/publish 和临时 override YAML 跑通 `babelecho run --transcript-file tests/fixtures/sample.vtt --title "Overrides Smoke"`。
+- stdout 包含 `overrides: 2 replacements from 2 rules`。
+- `script_text` 和 `manifest_text` 都为 `中文口播：欢迎 to the 样例节目.`。
+- `run.json` 输出 `status=succeeded`，稳定 `published/feed.xml` 存在。
+
 ## 必读文件
 
 按顺序读：
@@ -121,7 +136,10 @@ MVP-0.5 `babelecho script` 和稳定 `workspace/published/feed.xml` 已在 5090D
 8. `src/babelecho/llm.py`
 9. `tests/test_llm.py`
 10. `tools/cosyvoice_tts_wrapper.py`
-11. `workspace/config/local.example.yaml`
+11. `src/babelecho/overrides.py`
+12. `tests/test_overrides.py`
+13. `workspace/config/local.example.yaml`
+14. `workspace/config/overrides.example.yaml`
 
 ## 当前项目事实
 
@@ -134,6 +152,7 @@ MVP-0.5 `babelecho script` 和稳定 `workspace/published/feed.xml` 已在 5090D
   - `ingest`
   - `normalize`
   - `adapt`
+  - `overrides`
   - `synthesize`
   - `assemble`
   - `publish`
@@ -160,7 +179,7 @@ MVP-0.5 `babelecho script` 和稳定 `workspace/published/feed.xml` 已在 5090D
 
 ## 下一个目标
 
-MVP-0 acceptance 已完成，MVP-0.5 第一段 `babelecho run` 和基础 `babelecho check` 已完成：
+MVP-0 acceptance 已完成，MVP-0.5 的 `babelecho run`、基础 `babelecho check`、脚本预览、稳定 publish 目录和本地 override 已完成：
 
 ```text
 真实英文 transcript -> normalized.json -> DeepSeek 中文口播稿 -> 5090D CosyVoice2 -> wav segments -> MP3 -> publish/feed.xml
@@ -168,7 +187,7 @@ MVP-0 acceptance 已完成，MVP-0.5 第一段 `babelecho run` 和基础 `babele
 
 下一步继续 MVP-0.5 Self-use：
 
-1. 增加专有名词和发音 override 的简单配置。
+1. 用一个真实 transcript 做一次自用流程回归，确认 `run`、脚本预览、override、`--from-stage synthesize` 续跑和 publish 产物的实际手感。
 
 不要进入：
 
@@ -194,7 +213,7 @@ MVP-0 acceptance 已满足：
 仍然保留到后续阶段：
 
 - 真实两人或多人播客不能长期使用单一中文声音；后续必须做 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定音色。
-- 自用版本还缺专有名词/发音 override；更复杂的多音色和真实来源仍留到后续阶段。
+- 自用版本还需要做一次真实 transcript 流程回归；更复杂的多音色和真实来源仍留到后续阶段。
 
 ## 如果发生分支情况
 
