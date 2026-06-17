@@ -69,10 +69,16 @@ MacBook 已实现：
 
 MVP-0.5 `babelecho run` 已在 5090D 上通过验证：
 
-- 远端全量测试：`23 passed`。
+- 远端全量测试：`32 passed`。
 - `run-command-smoke` 使用 fixture config 跑通 `babelecho run`。
 - 生成 `transcript/normalized.json`、`script/zh.json`、`segments/manifest.json`、`output/audio.mp3`、`publish/feed.xml` 和 episode MP3。
 - script/manifest 均为 1 段。
+
+MVP-0.5 `babelecho check` 已在 5090D 上通过验证：
+
+- 远端全量测试：`32 passed`。
+- `check-command-smoke` 使用 fixture config 跑通 `babelecho run` 自动检查。
+- 独立 `babelecho check` 输出 `script_segments=1`、`audio_segments=1`、`output_sample_rate=16000`、`output_channels=1`、`output_duration_seconds=0.504`。
 
 ## 必读文件
 
