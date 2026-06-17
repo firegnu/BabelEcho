@@ -28,7 +28,7 @@
   - 全量测试：`14 passed`
   - 本机真实 fixture pipeline 跑到 `publish/feed.xml`
   - 对 git 跟踪文件运行 `gitleaks` 和 `trufflehog`，未发现泄露。
-- 5090D 仓库此前已可通过 `ssh my-5090d-host` 远程执行验证；本机后续又推送了新文档提交。下次如果要在 5090D 上跑验证，先在远端项目目录执行 `git pull`。
+- 5090D 仓库可通过 `ssh my-5090d-host` 远程执行验证；当前 5090D 已切回 `main` 并同步到 `815c296 docs: mark mvp0 acceptance complete`。
 - 已确认 `http://127.0.0.1:8000/v1/models` 返回 `{"detail":"Not Found"}`，说明 8000 上有服务但不是当前需要的 OpenAI-compatible LLM endpoint。
 - 已决定不继续把 24GB 5090D 优先用于本地 LLM serving；先用 DeepSeek API 建立中文口播稿质量基线，把 5090D 留给本地 TTS。
 - 已在 MacBook 实现 DeepSeek/OpenAI-compatible provider：
@@ -158,7 +158,9 @@
 
 ## 当前 Git 状态
 
+- 当前 `main` / `origin/main` 最新提交：`815c296 docs: mark mvp0 acceptance complete`。
 - MVP-0 acceptance 代码验证提交：`9444363 fix: parse transcript speaker labels`。
+- 5090D `/home/th5090d/Develop/personal_project/BabelEcho` 已切回 `main` 并 fast-forward 到 `815c296`。
 - 本轮最终提交后，新 session 先运行：
 
   ```bash
@@ -166,5 +168,5 @@
   git --no-pager log --oneline -3
   ```
 
-- 如果需要在 5090D 上继续验证，先在远端 `/home/th5090d/Develop/personal_project/BabelEcho` 执行 `git pull`。
+- 如果需要在 5090D 上继续验证，先在远端 `/home/th5090d/Develop/personal_project/BabelEcho` 执行 `git status --short --branch`；如落后再 `git pull`。
 - 提交前继续执行隐私扫描：`gitleaks`、`trufflehog`、简单 grep。

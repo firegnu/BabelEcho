@@ -35,9 +35,9 @@ MVP-0 Acceptance closeout
 - 5090D 上已确认：
   - `git status --short --branch` 输出 `## main...origin/main`
   - `git --no-pager log --oneline -3` 输出：
-    - `114577b docs: add resume prompt for new sessions`
-    - `0644741 docs: add numbered plan for local llm adapt`
-    - `9be15d8 docs: refresh handoff after fixture smoke`
+    - `815c296 docs: mark mvp0 acceptance complete`
+    - `9444363 fix: parse transcript speaker labels`
+    - `b356114 docs: refresh resume prompt for roadmap`
   - `curl -sS http://127.0.0.1:8000/v1/models` 返回 `{"detail":"Not Found"}`，说明 8000 端口不是当前需要的 OpenAI-compatible LLM endpoint。
 - 已决策：不继续优先部署本地 LLM；先使用 DeepSeek API 做 LLM adaptation，5090D 后续专注本地 TTS。
 - 01.01 已在 5090D 上完成验收。
@@ -78,7 +78,7 @@ MacBook 已实现：
 
 - 仓库：`/Users/firegnu/Developer/personal_projs/BabelEcho`，远端 5090D 路径是 `/home/th5090d/Develop/personal_project/BabelEcho`。
 - 当前协作方式：本机改代码并 push，必要时通过 `ssh my-5090d-host` 在 5090D 上远程执行验证命令；不在 5090D 上安装或运行 Codex agent。
-- 本机当前最新提交应包含 `fix: parse transcript speaker labels` 或更新；如果需要在 5090D 上跑验证，先远程 `git pull`。
+- 本机和 5090D 当前最新提交应为 `815c296 docs: mark mvp0 acceptance complete` 或更新；如果需要在 5090D 上跑验证，先远程确认 `git status --short --branch` 为 `## main...origin/main`。
 - 已有 CLI 阶段：
   - `ingest`
   - `normalize`
