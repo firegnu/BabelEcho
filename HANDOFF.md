@@ -129,8 +129,9 @@
 - MVP-0.5 Self-use 已完成：手动导入 transcript 后，可以生成私有中文 podcast feed，并已完成真实自用回归。
 - 下一阶段是 MVP-1 Real Podcasts，目标是开始处理真实 podcast 来源和常见访谈节目。
 - MVP-1 后续优先任务：
-  1. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
-  2. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+  1. 先做固定中文音色校准，解决当前默认女声情绪过满的问题，选出更克制、清晰、适合长时间播客收听的默认音色。
+  2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+  3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源仍是手动提供 transcript 文件或 source config，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
@@ -143,7 +144,7 @@
 
 - MVP-0 采用 CLI-first、文件产物驱动，不先做 Web 后台、队列、数据库或常驻服务。
 - 最终方向仍是 local-first，但当前阶段明确接受 DeepSeek API 作为 LLM adaptation 的临时质量基线。
-- MVP-0.5 自用流程已收口；下一阶段先投入真实 podcast 来源和多说话人固定音色，不进入 voice clone、ASR、App 或后台服务。
+- MVP-0.5 自用流程已收口；下一阶段先投入固定中文音色校准，再做真实 podcast 来源和多说话人固定音色，不进入 voice clone、ASR、App 或后台服务。
 - MVP-0 可以接受单固定中文声音；真实多人播客体验需要 `speaker -> voice` 映射，单独进入下一阶段。
 - `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
@@ -184,9 +185,10 @@
 
 ## 6. 下一步建议
 
-1. 进入 MVP-1 Real Podcasts：先支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
-2. 设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
-3. 仍不要同时推进 ASR、voice clone、App 或后台服务。
+1. 先做 MVP-1 固定中文音色校准，解决当前默认女声情绪过满的问题。
+2. 再支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+3. 设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+4. 仍不要同时推进 ASR、voice clone、App 或后台服务。
 
 ## 当前 Git 状态
 

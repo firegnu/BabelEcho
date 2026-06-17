@@ -84,6 +84,9 @@
 
 需要做：
 
+- 先做固定中文音色校准，降低当前女声情绪过满的问题，选出更克制、清晰、适合长时间播客收听的默认音色。
+- 固定音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
+- 准备 2 到 3 个固定中文音色，至少保留主持人和嘉宾的候选区分。
 - 支持 RSS feed 或 episode URL 输入。
 - 支持 RSS `podcast:transcript`。
 - 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。
@@ -91,11 +94,11 @@
 - 支持多 episode feed，跳过已处理 episode。
 - 支持 speaker label 解析、人工 speaker 修正文件和缺失 speaker 的回退策略。
 - 支持 `speaker -> voice` 映射。
-- 准备 2 到 3 个固定中文音色，至少区分主持人和嘉宾。
 - 支持每个 podcast 的 source config 和每个 speaker 的 voice config。
 
 验收标准：
 
+- 至少选出一个比当前默认女声更克制的中文默认音色，并用真实样本短片段验证不会过度抒情或情绪饱满。
 - 一个有公开 transcript 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出。
 - 已处理 episode 不重复生成。
@@ -139,5 +142,6 @@
 
 ## 当前最高优先级
 
-1. 进入 MVP-1 Real Podcasts：先支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
-2. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
+1. 先做 MVP-1 固定中文音色校准，解决当前女声情绪过满的问题，选出更克制的默认播客音色。
+2. 再支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
