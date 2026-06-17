@@ -127,6 +127,27 @@ publish:
         / "transcript.zh.json"
     ).exists()
 
+    check_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "check",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "demo",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert check_result.returncode == 0, check_result.stderr
+    assert "script_segments=1" in check_result.stdout
+    assert "audio_segments=1" in check_result.stdout
+    assert "output_duration_seconds=" in check_result.stdout
+
 
 def test_run_command_resumes_from_synthesize(tmp_path: Path):
     workspace = tmp_path / "workspace"
@@ -225,3 +246,38 @@ publish:
     assert manifest["segments"][0]["text"] == "人工编辑后的中文稿。"
     assert (run_dir / "output" / "audio.mp3").exists()
     assert (run_dir / "publish" / "feed.xml").exists()
+
+
+def test_check_command_reports_script_failures(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    run_dir = workspace / "runs" / "bad-script"
+    (run_dir / "script").mkdir(parents=True)
+    write_json(
+        run_dir / "script" / "zh.json",
+        {
+            "episode_id": "bad-script",
+            "language": "zh-CN",
+            "segments": [{"id": "0001", "text": ""}],
+        },
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "check",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "bad-script",
+            "--checks",
+            "script",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "empty text" in result.stderr

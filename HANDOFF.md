@@ -86,8 +86,11 @@
 - 已开始 MVP-0.5 Self-use：
   - `src/babelecho/cli.py` 增加 `babelecho run`。
   - `run` 支持 `--from-stage` 从 `ingest`、`normalize`、`adapt`、`synthesize`、`assemble` 或 `publish` 继续执行。
+  - `src/babelecho/checks.py` 增加基础质量检查，`babelecho check` 可独立检查 script、segments、output。
+  - `run` 在 `adapt`、`synthesize`、`assemble` 后自动检查中文脚本、wav segment 和最终 MP3。
   - `tests/test_end_to_end_fixture.py` 覆盖 fixture 全链路和从 `synthesize` 恢复执行，保护手工编辑后的 `script/zh.json` 不被重新 adapt 覆盖。
-  - 本机全量测试：`23 passed`。
+  - `tests/test_checks.py` 覆盖空中文稿、超长段落、缺失 wav、缺失 MP3 和 ffprobe 元数据。
+  - 本机全量测试：`32 passed`。
   - 5090D 全量测试：`23 passed`。
   - 5090D fixture smoke：`run-command-smoke` 使用 `babelecho run` 生成 `transcript/normalized.json`、`script/zh.json`、`segments/manifest.json`、`output/audio.mp3`、`publish/feed.xml` 和 episode MP3；script/manifest 均为 1 段。
 
@@ -98,7 +101,7 @@
 - MVP-0.5 后续优先任务：
   1. 支持手动导入 transcript 文件作为稳定入口。
   2. 明确每次 run 的状态、输入、输出路径和失败阶段。
-  3. 增加基础质量检查和 TTS 前中文脚本人工编辑入口。
+  3. 增加 TTS 前中文脚本人工编辑入口。
   4. 增加专有名词和发音 override 的简单配置。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源仍是手写 YAML 指向 transcript 文件，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
@@ -149,14 +152,10 @@
 
 ## 6. 下一步建议
 
-1. 为 MVP-0.5 的下一段写一个小计划，重点是质量检查和人工脚本编辑，不要扩展真实来源或 App。
-2. 增加基础质量检查：
-   - 中文脚本为空时失败。
-   - 单段文本过长时提醒或失败。
-   - TTS 输出 wav 为空时失败。
-   - 最终 MP3 时长、采样率、声道可检查。
-3. 增加 TTS 前人工编辑入口，至少允许用户手动改 `script/zh.json` 后用 `babelecho run --from-stage synthesize` 继续跑。
-4. 固定私有静态发布目录和稳定 `feed.xml` 路径。
+1. 为 MVP-0.5 的下一段写一个小计划，重点是人工脚本编辑，不要扩展真实来源或 App。
+2. 增加 TTS 前人工编辑入口，至少允许用户手动改 `script/zh.json` 后用 `babelecho run --from-stage synthesize` 继续跑。
+3. 固定私有静态发布目录和稳定 `feed.xml` 路径。
+4. 增加专有名词和发音 override 的简单配置。
 5. 不要在下一步同时推进 ASR、voice clone、App、后台服务或真实来源发现。
 
 ## 当前 Git 状态

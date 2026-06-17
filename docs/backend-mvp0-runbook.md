@@ -81,6 +81,12 @@ The command runs:
 ingest -> normalize -> adapt -> synthesize -> assemble -> publish
 ```
 
+It also runs basic checks after generated artifacts are available:
+
+- after `adapt`: `script/zh.json` exists, has segments, and every segment has nonempty text below the configured length limit.
+- after `synthesize`: `segments/manifest.json` exists and every listed wav file exists and is nonempty.
+- after `assemble`: `output/audio.mp3` exists and `ffprobe` can read codec, duration, sample rate, and channel count.
+
 To resume after editing or preserving earlier artifacts, use `--from-stage`:
 
 ```bash
@@ -109,6 +115,22 @@ $PYTHON -m babelecho adapt --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-c
 $PYTHON -m babelecho synthesize --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config "$LOCAL_CONFIG"
 $PYTHON -m babelecho assemble --workspace "$WORKSPACE" --run-id "$RUN_ID"
 $PYTHON -m babelecho publish --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config "$LOCAL_CONFIG"
+```
+
+You can run checks independently:
+
+```bash
+$PYTHON -m babelecho check --workspace "$WORKSPACE" --run-id "$RUN_ID"
+```
+
+To check only selected artifacts:
+
+```bash
+$PYTHON -m babelecho check \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --checks script segments \
+  --max-script-chars 1200
 ```
 
 ## Expected Outputs

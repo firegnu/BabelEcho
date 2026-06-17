@@ -1,8 +1,10 @@
 import argparse
+import sys
 from pathlib import Path
 
 from .adapt import adapt_to_chinese
 from .audio import assemble_audio
+from .checks import CheckError, check_run_artifacts
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
 from .jsonio import read_json
@@ -12,6 +14,7 @@ from .synthesize import synthesize_segments
 from .transcript import normalize_transcript
 
 PIPELINE_STAGES = ("ingest", "normalize", "adapt", "synthesize", "assemble", "publish")
+CHECK_NAMES = ("script", "segments", "output")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -67,6 +70,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Resume from this stage.",
     )
 
+    check = subparsers.add_parser("check", help="Validate generated run artifacts.")
+    check.add_argument("--workspace", required=True)
+    check.add_argument("--run-id", required=True)
+    check.add_argument(
+        "--checks",
+        nargs="+",
+        choices=CHECK_NAMES,
+        default=CHECK_NAMES,
+        help="Artifact checks to run.",
+    )
+    check.add_argument(
+        "--max-script-chars",
+        type=int,
+        default=1200,
+        help="Maximum allowed characters per script segment.",
+    )
+
     return parser
 
 
@@ -108,14 +128,25 @@ def run_pipeline(
     if stage_index <= PIPELINE_STAGES.index("adapt"):
         script_path = adapt_to_chinese(run_paths, local_config["llm"])
         outputs.append(f"adapt: {script_path}")
+        script_check = check_run_artifacts(run_paths, checks=("script",))
+        outputs.append(f"check script: {script_check['script_segments']} segments")
 
     if stage_index <= PIPELINE_STAGES.index("synthesize"):
         manifest_path = synthesize_segments(run_paths, local_config["tts"])
         outputs.append(f"synthesize: {manifest_path}")
+        segment_check = check_run_artifacts(run_paths, checks=("segments",))
+        outputs.append(f"check segments: {segment_check['audio_segments']} files")
 
     if stage_index <= PIPELINE_STAGES.index("assemble"):
         audio_path = assemble_audio(run_paths)
         outputs.append(f"assemble: {audio_path}")
+        output_check = check_run_artifacts(run_paths, checks=("output",))
+        outputs.append(
+            "check output: "
+            f"{output_check['output_duration_seconds']:.3f}s, "
+            f"{output_check['output_sample_rate']} Hz, "
+            f"{output_check['output_channels']} ch"
+        )
 
     if stage_index <= PIPELINE_STAGES.index("publish"):
         feed_path = publish_episode(run_paths, local_config["publish"])
@@ -180,14 +211,33 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "run":
-        output = run_pipeline(
-            args.workspace,
-            args.run_id,
-            args.source_config,
-            args.local_config,
-            args.from_stage,
-        )
+        try:
+            output = run_pipeline(
+                args.workspace,
+                args.run_id,
+                args.source_config,
+                args.local_config,
+                args.from_stage,
+            )
+        except CheckError as error:
+            print(str(error), file=sys.stderr)
+            return 1
         print(output)
+        return 0
+
+    if args.command == "check":
+        run_paths = create_run(args.workspace, args.run_id)
+        try:
+            result = check_run_artifacts(
+                run_paths,
+                checks=tuple(args.checks),
+                max_script_chars=args.max_script_chars,
+            )
+        except CheckError as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        for key, value in result.items():
+            print(f"{key}={value}")
         return 0
 
     parser.print_help()
