@@ -5,11 +5,12 @@
 ## 给新 session 的第一条指令
 
 ```text
-你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 已完成，MVP-0.5 的 `babelecho run` 一条命令编排和 `babelecho check` 基础质量检查已完成。
+你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 已完成，MVP-0.5 的 `babelecho run`、`babelecho check`、手动 transcript 文件入口和 `run.json` 状态记录已完成。
 
 重要约束：
 - 当前 MVP-0 是 transcript-first 工程链路；核心路径和 acceptance 已正式收口。
 - MVP-0.5 已开始：`babelecho run` 可以串起 `ingest -> normalize -> adapt -> synthesize -> assemble -> publish`，并支持 `--from-stage` 从指定阶段继续执行。
+- `babelecho run --transcript-file` 可以直接导入本地 transcript 文件；每次 run 会写 `workspace/runs/<run-id>/run.json` 记录输入、阶段状态、失败阶段、错误和输出路径。
 - `babelecho check` 可以检查中文脚本、TTS wav segment 和最终 MP3；`run` 已在关键阶段后自动调用这些检查。
 - 5090D 上 fixture 全链路已经跑通：ingest -> normalize -> adapt(fixture) -> synthesize(fixture) -> assemble -> publish。
 - 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 CosyVoice2 生成真实 wav/MP3 的真实 TTS 基线，但还没有 voice clone、ASR 或真实播客来源接入。
@@ -31,6 +32,7 @@ docs/plans/01-backend-mvp0/03-local-tts.md
 MVP-0 Acceptance closeout
 MVP-0.5 babelecho run command
 MVP-0.5 babelecho check command
+MVP-0.5 manual transcript input and run.json status
 ```
 
 进度：
@@ -57,28 +59,38 @@ MacBook 已实现：
 - `src/babelecho/transcript.py` 解析 speaker label，把 `Host:`、`Nick Hague:`、`Host (Dane Turner):` 等标签写入 `segment["speaker"]`，并从 `segment["text"]` 中移除。
 - `tests/test_transcript.py` 覆盖段首 label、段内多轮 speaker turn 和普通冒号不误判。
 - `src/babelecho/cli.py` 增加 `babelecho run`，支持完整 pipeline 编排和 `--from-stage` 续跑。
+- `src/babelecho/cli.py` 支持 `babelecho run --transcript-file ... --title ...`，自用时可跳过 source YAML。
+- `src/babelecho/ingest.py` 支持 `source.type=transcript_file`。
+- `src/babelecho/status.py` 写入 `workspace/runs/<run-id>/run.json`，记录 run 输入、每个 stage 状态、失败阶段、错误和输出路径。
 - `src/babelecho/checks.py` 增加基础质量检查，`babelecho check` 可检查 script、segments、output。
 - `babelecho run` 在 `adapt`、`synthesize`、`assemble` 后自动检查关键产物。
 - `tests/test_end_to_end_fixture.py` 覆盖 `run` 的 fixture 全链路和从 `synthesize` 恢复执行。
+- `tests/test_end_to_end_fixture.py` 覆盖 `--transcript-file` 自用入口和 ingest 失败时 `run.json` 的失败状态。
 - `tests/test_checks.py` 覆盖空中文稿、超长段落、缺失 wav、缺失 MP3 和 ffprobe 元数据。
 - `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
 - `workspace/config/deepseek.env.example` 已添加，真实 `workspace/config/deepseek.env` 被 ignore。
-- 本机全量测试：`32 passed`。
+- 本机全量测试：`34 passed`。
 
 5090D 已完成 DeepSeek API 和 `adapt` 验证，也完成 CosyVoice2 本地 TTS wrapper 验证。自制长样本和 NASA 真实 podcast transcript 都已生成可听 MP3。MVP-0 acceptance 已完成：NASA 样本重新生成 9 段 normalized/script/manifest，中文脚本无朗读式 speaker label，`publish/feed.xml` 和 episode artifacts 已验证。下一步进入 MVP-0.5 Self-use。不要同时接 ASR、voice clone、后台服务、App 或真实来源发现。
 
 MVP-0.5 `babelecho run` 已在 5090D 上通过验证：
 
-- 远端全量测试：`32 passed`。
+- 远端全量测试：`34 passed`。
 - `run-command-smoke` 使用 fixture config 跑通 `babelecho run`。
 - 生成 `transcript/normalized.json`、`script/zh.json`、`segments/manifest.json`、`output/audio.mp3`、`publish/feed.xml` 和 episode MP3。
 - script/manifest 均为 1 段。
 
 MVP-0.5 `babelecho check` 已在 5090D 上通过验证：
 
-- 远端全量测试：`32 passed`。
+- 远端全量测试：`34 passed`。
 - `check-command-smoke` 使用 fixture config 跑通 `babelecho run` 自动检查。
 - 独立 `babelecho check` 输出 `script_segments=1`、`audio_segments=1`、`output_sample_rate=16000`、`output_channels=1`、`output_duration_seconds=0.504`。
+
+MVP-0.5 `--transcript-file` 和 `run.json` 已在 5090D 上通过验证：
+
+- 远端全量测试：`34 passed`。
+- `manual-input-status-smoke` 使用 `babelecho run --transcript-file tests/fixtures/sample.vtt --title "Manual Input Smoke"` 跑通 fixture pipeline。
+- `run.json` 输出 `status=succeeded`、`from_stage=ingest`、`input_transcript_file=tests/fixtures/sample.vtt`、6 个 stage 全部 `succeeded`、`audio=output/audio.mp3`、`feed=publish/feed.xml`。
 
 ## 必读文件
 
@@ -141,10 +153,9 @@ MVP-0 acceptance 已完成，MVP-0.5 第一段 `babelecho run` 和基础 `babele
 
 下一步继续 MVP-0.5 Self-use：
 
-1. 支持手动导入 transcript 文件作为一等入口。
-2. 明确每次 run 的状态、输入、输出路径和失败阶段。
-3. 增加中文脚本人工预览和编辑入口，至少允许在 TTS 前手动改 `script/zh.json`。
-4. 增加专有名词和发音 override 的简单配置。
+1. 增加中文脚本人工预览和编辑入口，至少允许在 TTS 前手动改 `script/zh.json`。
+2. 固定私有静态发布目录和稳定 `feed.xml` 路径。
+3. 增加专有名词和发音 override 的简单配置。
 
 不要进入：
 
@@ -170,7 +181,7 @@ MVP-0 acceptance 已满足：
 仍然保留到后续阶段：
 
 - 真实两人或多人播客不能长期使用单一中文声音；后续必须做 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定音色。
-- 自用版本还缺更明确的状态记录、质量检查、人工脚本编辑和稳定私有 feed 流程。
+- 自用版本还缺人工脚本编辑入口、稳定私有 feed 流程和专有名词/发音 override。
 
 ## 如果发生分支情况
 
