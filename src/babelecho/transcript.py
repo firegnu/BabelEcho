@@ -8,6 +8,13 @@ TIME_RE = re.compile(
     r"(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s+-->\s+"
     r"(?P<end>\d{2}:\d{2}:\d{2}[,.]\d{3})"
 )
+SPEAKER_LABEL_RE = re.compile(
+    r"(?P<prefix>^|(?<=[.!?])\s+)"
+    r"(?P<speaker>"
+    r"[A-Z][A-Za-z0-9'.-]*(?:\s+\([^)]+\))?"
+    r"(?:\s+[A-Z][A-Za-z0-9'.-]*){0,4}"
+    r"):\s+"
+)
 
 
 def parse_timestamp_ms(value: str) -> int:
@@ -27,25 +34,68 @@ def _segment(
     text: str,
     start_ms: int | None,
     end_ms: int | None,
+    speaker: str | None = None,
 ) -> dict:
     return {
         "id": f"{segment_id:04d}",
         "start_ms": start_ms,
         "end_ms": end_ms,
-        "speaker": None,
+        "speaker": speaker,
         "text": " ".join(text.split()),
         "source": "transcript",
     }
+
+
+def _split_speaker_turns(text: str) -> list[tuple[str | None, str]]:
+    normalized = " ".join(text.split())
+    matches = list(SPEAKER_LABEL_RE.finditer(normalized))
+    if not matches:
+        return [(None, normalized)]
+
+    turns: list[tuple[str | None, str]] = []
+    current_speaker: str | None = None
+    current_start = 0
+    for match in matches:
+        previous_text = normalized[current_start : match.start()].strip()
+        if previous_text:
+            turns.append((current_speaker, previous_text))
+        current_speaker = match.group("speaker").strip()
+        current_start = match.end()
+
+    remaining_text = normalized[current_start:].strip()
+    if remaining_text:
+        turns.append((current_speaker, remaining_text))
+    return turns
+
+
+def _segments_from_text(
+    first_segment_id: int,
+    text: str,
+    start_ms: int | None,
+    end_ms: int | None,
+) -> list[dict]:
+    segments = []
+    for offset, (speaker, segment_text) in enumerate(_split_speaker_turns(text)):
+        segments.append(
+            _segment(
+                first_segment_id + offset,
+                segment_text,
+                start_ms,
+                end_ms,
+                speaker,
+            )
+        )
+    return segments
 
 
 def parse_plain_text(content: str) -> list[dict]:
     paragraphs = [
         part.strip() for part in re.split(r"\n\s*\n", content) if part.strip()
     ]
-    return [
-        _segment(index + 1, paragraph, None, None)
-        for index, paragraph in enumerate(paragraphs)
-    ]
+    segments: list[dict] = []
+    for paragraph in paragraphs:
+        segments.extend(_segments_from_text(len(segments) + 1, paragraph, None, None))
+    return segments
 
 
 def parse_timed_text(content: str) -> list[dict]:
@@ -66,8 +116,8 @@ def parse_timed_text(content: str) -> list[dict]:
         text_lines = lines[time_index + 1 :]
         if not text_lines:
             continue
-        segments.append(
-            _segment(
+        segments.extend(
+            _segments_from_text(
                 len(segments) + 1,
                 " ".join(text_lines),
                 parse_timestamp_ms(match.group("start")),

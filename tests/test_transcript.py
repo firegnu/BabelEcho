@@ -22,6 +22,43 @@ def test_normalize_plain_text(tmp_path: Path):
     assert data["segments"][0]["text"] == "Welcome to the sample episode."
 
 
+def test_normalize_plain_text_extracts_speaker_labels(tmp_path: Path):
+    run_paths = create_run(tmp_path, "speaker-run")
+    raw = run_paths.transcript_dir / "raw.txt"
+    raw.write_text(
+        "\n\n".join(
+            [
+                "Host (Dane Turner): Houston, we have a podcast!",
+                (
+                    "This is setup. Nick Hague: Pleasure to be here. "
+                    "Host: So, can you tell us more?"
+                ),
+                "This note keeps an ordinary ratio: 2 to 1.",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    data = read_json(normalize_transcript(run_paths, raw))
+
+    assert [segment["id"] for segment in data["segments"]] == [
+        "0001",
+        "0002",
+        "0003",
+        "0004",
+        "0005",
+    ]
+    assert [
+        (segment["speaker"], segment["text"]) for segment in data["segments"]
+    ] == [
+        ("Host (Dane Turner)", "Houston, we have a podcast!"),
+        (None, "This is setup."),
+        ("Nick Hague", "Pleasure to be here."),
+        ("Host", "So, can you tell us more?"),
+        (None, "This note keeps an ordinary ratio: 2 to 1."),
+    ]
+
+
 def test_normalize_vtt(tmp_path: Path):
     run_paths = create_run(tmp_path, "vtt-run")
     raw = run_paths.transcript_dir / "raw.vtt"
