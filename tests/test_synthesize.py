@@ -269,6 +269,52 @@ def test_single_speaker_script_keeps_default_voice(monkeypatch, tmp_path: Path):
     assert all(isinstance(item, tuple) for item in captured["items"])
 
 
+def test_single_explicit_female_speaker_auto_selects_sft_female_voice(monkeypatch, tmp_path: Path):
+    run_paths = create_run(tmp_path, "auto-single-female-speaker-run")
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "auto-single-female-speaker-run",
+            "language": "zh-CN",
+            "segments": [
+                {"id": "0001", "source_segment_ids": ["0001"], "speaker": "FemaleHost", "text": "第一段。"},
+                {"id": "0002", "source_segment_ids": ["0002"], "speaker": "FemaleHost", "text": "第二段。"},
+            ],
+        },
+    )
+    captured = {}
+
+    def fake_synthesize_many_to_wav(items, batch_path, tts_config):
+        captured["items"] = items
+        captured["tts_config"] = tts_config
+        for item in items:
+            output_path = item["output_path"] if isinstance(item, dict) else item[1]
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"wav")
+
+    monkeypatch.setattr("babelecho.synthesize.synthesize_many_to_wav", fake_synthesize_many_to_wav)
+
+    manifest_path = synthesize_segments(
+        run_paths,
+        {
+            "provider": "local_cli",
+            "command": "tts-wrapper",
+            "voice": "default-zh",
+            "mode": "cross_lingual",
+            "prompt_wav": "/opt/CosyVoice/asset/cross_lingual_prompt.wav",
+            "speed": 1.0,
+        },
+    )
+
+    assert captured["tts_config"]["voice"] == "sft_builtin_4role"
+    assert "mode" not in captured["tts_config"]
+    assert "prompt_wav" not in captured["tts_config"]
+    assert [item["voice_role"] for item in captured["items"]] == ["female_a", "female_a"]
+    manifest = read_json(manifest_path)
+    assert manifest["tts_voice"] == "sft_builtin_4role"
+    assert [segment["voice_role"] for segment in manifest["segments"]] == ["female_a", "female_a"]
+
+
 def test_local_cli_tts_batch_includes_voice_roles_and_model_options(monkeypatch, tmp_path: Path):
     calls = []
     first_output = tmp_path / "segments" / "0001.wav"

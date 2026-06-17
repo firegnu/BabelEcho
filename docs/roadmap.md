@@ -92,7 +92,7 @@
 - 已支持 RSS item 内的 `podcast:transcript`。
 - 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D CosyVoice cross-lingual 默认音色生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
-- 已选定 MVP-1 固定音色选择规则：0/1 个 distinct speaker 使用原默认 `CosyVoice2-0.5B` cross-lingual 基线；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
+- 已选定 MVP-1 固定音色选择规则：0/1 个 distinct speaker 且没有显式女声标签时使用原默认 `CosyVoice2-0.5B` cross-lingual 基线；单个 speaker 标签包含 `female` 或 `女` 时切到 `tts.voice=sft_builtin_4role` 的 `female_a`；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
 - `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，也不依赖额外参考 wav。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中按 speaker 首次出现顺序分配 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
 - 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。

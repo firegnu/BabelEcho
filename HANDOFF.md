@@ -137,9 +137,9 @@
   - 公开 RSS 端到端 Real Run 已完成：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 `#030: When Should You Monetize Your Podcast?`，经 RSS transcript -> DeepSeek -> 5090D CosyVoice cross_lingual 默认音色 -> assemble -> publish 成功；script/manifest 75 段，最终 MP3 为 `24000 Hz`、mono、约 `840.8s`，产物已拷回本机 ignored `workspace/runs/mvp1-real-rss-monetize-20260617/`。
   - TTS 执行效率优化已完成：`local_cli` synthesis 会写 `segments/tts-batch.json` 并一次启动 wrapper，wrapper 只加载一次 CosyVoice 后循环生成 wav；旧单段 `--text-file --output` wrapper 调用仍保留。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
-  - MVP-1 固定音色规则已实现：`script/zh.json` 中 0/1 个 distinct speaker 继续使用原默认 `CosyVoice2-0.5B + cross_lingual_prompt.wav + speed=1.0`；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
+  - MVP-1 固定音色规则已实现：`script/zh.json` 中 0/1 个 distinct speaker 且没有显式女声标签时继续使用原默认 `CosyVoice2-0.5B + cross_lingual_prompt.wav + speed=1.0`；单个 speaker 标签包含 `female` 或 `女` 时自动切到 `tts.voice=sft_builtin_4role` 的 `female_a`；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
   - `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；按 speaker 首次出现顺序映射到 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
-  - `sft_builtin_4role` 不做原主播 voice clone，不依赖额外参考 wav；本机测试 `50 passed`，5090D 临时 wrapper smoke 已验证四角色真实 wav 输出为 `22050 Hz` mono。
+  - `sft_builtin_4role` 不做原主播 voice clone，不依赖额外参考 wav；本机测试 `55 passed`，5090D 临时 wrapper smoke 已验证四角色真实 wav 输出为 `22050 Hz` mono。
 - 多人多音色已作为 MVP-1 固定 profile 落地；不要把它回填到 MVP-0.5。
 - DeepSeek adapt 基线已经跑通；后续只在 prompt 质量明显不满足时再回到 LLM adapt。
 - MVP-1 固定中文音色校准已开始：
@@ -168,7 +168,7 @@
 - MVP-0 采用 CLI-first、文件产物驱动，不先做 Web 后台、队列、数据库或常驻服务。
 - 最终方向仍是 local-first，但当前阶段明确接受 DeepSeek API 作为 LLM adaptation 的临时质量基线。
 - MVP-0.5 自用流程已收口；MVP-1 已完成默认固定中文音色和四角色多 speaker profile，后续继续真实 podcast 来源、真实多 speaker 回归和多 episode feed，不进入 voice clone、ASR、App 或后台服务。
-- MVP-0 可以接受单固定中文声音；MVP-1 当前规则是 0/1 speaker 用原 CosyVoice2 cross-lingual，2+ speakers 用 `sft_builtin_4role`。
+- MVP-0 可以接受单固定中文声音；MVP-1 当前规则是 0/1 speaker 且没有显式女声标签时用原 CosyVoice2 cross-lingual，单个 `female` / `女` speaker 用 `sft_builtin_4role` 的 `female_a`，2+ speakers 用 `sft_builtin_4role`。
 - `DEEPSEEK_API_KEY` 只能放在 ignored `workspace/config/deepseek.env` 中，不能写入 tracked 文件。
 - 真实 runtime config、生成音频、run outputs、模型缓存、conda env 不进入 git。
 - 5090D 执行代码方式：MacBook 修改并 push；必要时通过 `ssh my-5090d-host` 在远端运行验证命令，但不在 5090D 上安装或运行 Codex agent。

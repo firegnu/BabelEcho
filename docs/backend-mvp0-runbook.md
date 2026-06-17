@@ -66,8 +66,10 @@ ignored local config, then rerun from `synthesize` to avoid another LLM call.
 
 For MVP-1, TTS model selection is automatic:
 
-- 0/1 distinct speaker in `script/zh.json`: use the original CosyVoice2
-  `cross_lingual` fixed voice.
+- 0/1 distinct speaker without an explicit female marker in `script/zh.json`:
+  use the original CosyVoice2 `cross_lingual` fixed voice.
+- 1 distinct speaker labeled with `female` or `女`: use the SFT built-in
+  four-role profile with `female_a`.
 - 2+ distinct speakers: use the SFT built-in four-role profile.
 
 The multi-speaker profile is equivalent to this effective config:
