@@ -22,9 +22,9 @@
 | --- | --- | --- |
 | MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | done |
 | MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | done |
-| MVP-1 Real Podcasts | 支持真实 podcast 来源、多说话人和多 episode feed | next |
+| MVP-1 Real Podcasts | 支持真实 podcast 来源、多说话人和多 episode feed | active |
 | MVP-2 Automation | 自动扫描、批处理、状态记录和远程运维 | later |
-| Later | ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
+| Later | 授权参考音色扩展、ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
 
 ## MVP-0 Acceptance
 
@@ -84,9 +84,10 @@
 
 需要做：
 
-- 先做固定中文音色校准，降低当前女声情绪过满的问题，选出更克制、清晰、适合长时间播客收听的默认音色。
+- 固定中文默认音色基线已选定：`cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`，对应第二轮样本 `d-cross-lingual-speed-100.mp3`。
 - 固定音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
-- 准备 2 到 3 个固定中文音色，至少保留主持人和嘉宾的候选区分。
+- 当前不再继续围绕 CosyVoice 内置的两个 wav 反复微调；后续如需新固定音色，准备本地授权的男声/中性参考 wav，再用同一条 `cross_lingual` 路线替换 `prompt_wav` 做对比。
+- 准备 2 到 3 个固定中文音色，至少保留主持人和嘉宾的候选区分；这属于后续语音专项，不阻塞真实 podcast 来源接入。
 - 支持 RSS feed 或 episode URL 输入。
 - 支持 RSS `podcast:transcript`。
 - 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。
@@ -98,7 +99,7 @@
 
 验收标准：
 
-- 至少选出一个比当前默认女声更克制的中文默认音色，并用真实样本短片段验证不会过度抒情或情绪饱满。
+- 已选出一个比当前默认女声更克制的中文默认音色：`cross_lingual_prompt.wav + speed=1.0`。
 - 一个有公开 transcript 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出。
 - 已处理 episode 不重复生成。
@@ -132,6 +133,7 @@
 
 这些能力有价值，但不应该阻塞自用版本：
 
+- 本地授权男声/中性参考 wav 比选：收集或录制可长期使用的参考音频，用 `mode=cross_lingual` 替换 `prompt_wav`，与当前默认基线对比。它是固定音色扩展，不是原主播 voice clone。
 - 本地 LLM 替代 DeepSeek。
 - ASR fallback，用于没有 transcript 的 episode。
 - 原主播 voice clone。
@@ -142,6 +144,6 @@
 
 ## 当前最高优先级
 
-1. 先做 MVP-1 固定中文音色校准，解决当前女声情绪过满的问题，选出更克制的默认播客音色。
-2. 再支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+1. 使用 `cross_lingual_prompt.wav + speed=1.0` 作为 MVP-1 默认固定中文音色基线。
+2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
 3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。

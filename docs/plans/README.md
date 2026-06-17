@@ -56,3 +56,14 @@ docs/plans/
 ### Roadmap
 
 - [BabelEcho Roadmap](../roadmap.md) - `active`
+
+### MVP-1 Real Podcasts
+
+- Fixed Chinese voice baseline - `done`: selected `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`.
+- Real podcast RSS or episode URL input - `next`.
+- `speaker -> voice` mapping for common interview shows - `later`.
+
+### Deferred Voice Work
+
+- Authorized male/neutral reference wav comparison - `deferred`: use the same `cross_lingual` route with a local authorized `prompt_wav`; this is fixed-voice expansion, not original-host voice clone.
+- Original-host voice clone - `deferred`.

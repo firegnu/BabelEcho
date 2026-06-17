@@ -17,10 +17,10 @@
 - 5090D 上 fixture 全链路已经跑通：ingest -> normalize -> adapt(fixture) -> synthesize(fixture) -> assemble -> publish。
 - 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 CosyVoice2 生成真实 wav/MP3 的真实 TTS 基线，但还没有 voice clone、ASR 或真实播客来源接入。
 - 自制长样本、NASA 真实 podcast transcript 和 MVP-0.5 自用回归都已经生成可听中文 MP3；下一步不要再做泛泛听感实验，应进入 MVP-1 Real Podcasts。
-- MVP-1 第一优先级是固定中文音色校准：当前默认女声情绪过满，先选出更克制、清晰、适合长时间播客收听的默认音色；不做原主播 voice clone。
+- MVP-1 固定中文默认音色基线已选定：`cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`；不做原主播 voice clone。
 - 音色校准第一轮已生成三条本地 TTS 样本，未调用 DeepSeek：`workspace/runs/voice-calibration-20260617/a-current-zero-shot-female.mp3`、`b-neutral-instruct2-female.mp3`、`c-cross-lingual-reference.mp3`。这些产物在 ignored `workspace/runs/` 下，不提交。
-- 用户当前反馈：C 最好。已沿 cross-lingual/reference-audio 路线继续，提交 `ee30dd6` 把 wrapper 的 `mode`、`prompt_wav` 和 `speed` 暴露为配置项。
-- 第二轮已在 5090D 生成三条 cross-lingual speed 微调样本，未调用 DeepSeek：`workspace/runs/voice-calibration-20260617-round2/d-cross-lingual-speed-100.mp3`、`e-cross-lingual-speed-095.mp3`、`f-cross-lingual-speed-090.mp3`。这些产物在 ignored `workspace/runs/` 下，不提交。
+- 用户当前反馈：D 最满意。MVP-1 默认固定中文音色基线已选定为 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`，对应 `workspace/runs/voice-calibration-20260617-round2/d-cross-lingual-speed-100.mp3`。
+- 不再继续围绕 CosyVoice 内置两个 wav 反复微调。后续如需新固定音色，准备本地授权的男声/中性参考 wav，再用同一条 `cross_lingual` 路线替换 `prompt_wav` 做对比；该项已按 voice clone 类似方式放入 deferred voice work，但它不是原主播 voice clone。
 - MVP-0 收口已完成：speaker label 解析/清洗、NASA 样本 `normalize -> adapt -> synthesize -> assemble -> publish` 回归、docs 标记完成。
 - `docs/roadmap.md` 已记录从 MVP-0 Acceptance 到 MVP-0.5 Self-use、MVP-1 Real Podcasts、MVP-2 Automation 的产品路线；当前下一阶段是 MVP-1。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
@@ -206,8 +206,8 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 
 下一步进入 MVP-1 Real Podcasts：
 
-1. 先做固定中文音色校准，解决当前默认女声情绪过满的问题。
-2. 再支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+1. 使用已选定的默认固定中文音色基线：`cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`。
+2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
 3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
 
 不要进入：
@@ -241,8 +241,8 @@ MVP-0.5 acceptance 已满足：
 - 真实两人或多人播客不能长期使用单一中文声音；后续必须做 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定音色。
 - 真实 podcast 来源、多 episode feed 和不同 speaker 固定音色进入 MVP-1。
 - 固定中文音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
-- 第一轮音色校准样本已在 5090D 生成并拷回本机，等待用户试听反馈后再继续；如 B/C 都不合适，下一轮需要准备新的本地男声/中性参考 wav，仍不进入 git。
-- 用户已反馈 C 最好；第二轮已基于同一个 `cross_lingual_prompt.wav` 生成 speed 1.0 / 0.95 / 0.90 三个变体。下一步先让用户试听 D/E/F；如果仍不够克制，再放入一个本地授权男声/中性 `prompt_wav` 继续同一路线。
+- 第一轮和第二轮音色校准样本已在 5090D 生成并拷回本机 ignored `workspace/runs/`；这些音频不进入 git。
+- 用户已反馈 D 最满意；MVP-1 默认固定中文音色基线采用 `cross_lingual_prompt.wav + speed=1.0`。下一步转向真实 podcast RSS 或 episode URL 输入；授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
 
 ## 如果发生分支情况
 

@@ -129,7 +129,7 @@
 - MVP-0.5 Self-use 已完成：手动导入 transcript 后，可以生成私有中文 podcast feed，并已完成真实自用回归。
 - 下一阶段是 MVP-1 Real Podcasts，目标是开始处理真实 podcast 来源和常见访谈节目。
 - MVP-1 后续优先任务：
-  1. 先做固定中文音色校准，解决当前默认女声情绪过满的问题，选出更克制、清晰、适合长时间播客收听的默认音色。
+  1. 使用已选定的固定中文默认音色基线：`cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`。
   2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
   3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
@@ -147,7 +147,7 @@
     - `b-neutral-instruct2-female.mp3`：同一参考音频，使用 `inference_instruct2` 尝试压情绪到自然平静，约 `23.6s`。
     - `c-cross-lingual-reference.mp3`：使用 `cross_lingual_prompt.wav` 的参考音色，约 `24.3s`。
   - 三条样本均为 `24000 Hz`、mono；真实 wav/MP3 和 manifest 不进入 git。
-  - 用户当前反馈：C 最好。下一轮优先沿 cross-lingual/reference-audio 路线继续微调，而不是继续围绕默认 zero-shot 女声。
+  - 第一轮用户反馈：C 最好，因此第二轮沿 cross-lingual/reference-audio 路线继续微调，而不是继续围绕默认 zero-shot 女声。
   - 已提交 `ee30dd6 feat: configure cosyvoice reference mode`：
     - `src/babelecho/tts.py` 会把 `tts.mode`、`tts.prompt_wav` 和 `tts.speed` 转发给本地 wrapper。
     - `tools/cosyvoice_tts_wrapper.py` 支持 `zero_shot` 和 `cross_lingual` 两种非 voice-clone 模式，并支持 `speed`。
@@ -156,7 +156,9 @@
     - `d-cross-lingual-speed-100.mp3`：`mode=cross_lingual`，`speed=1.0`，约 `24.7s`。
     - `e-cross-lingual-speed-095.mp3`：`mode=cross_lingual`，`speed=0.95`，约 `26.0s`。
     - `f-cross-lingual-speed-090.mp3`：`mode=cross_lingual`，`speed=0.90`，约 `27.5s`。
-  - 第二轮未调用 DeepSeek，只使用第一轮相同中文样本文本和 `cross_lingual_prompt.wav`。5090D 当前 CosyVoice asset 目录仍只有 `zero_shot_prompt.wav` 和 `cross_lingual_prompt.wav`；如 D/E/F 仍不够克制，下一步需要放入本地授权的男声/中性参考 wav 后继续同一路线。
+  - 用户当前反馈：D 最满意。MVP-1 默认固定中文音色基线已选定为 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`。
+  - 第二轮未调用 DeepSeek，只使用第一轮相同中文样本文本和 `cross_lingual_prompt.wav`。5090D 当前 CosyVoice asset 目录仍只有 `zero_shot_prompt.wav` 和 `cross_lingual_prompt.wav`。
+  - 不再继续围绕 CosyVoice 内置两个 wav 反复微调。后续如需新固定音色，准备本地授权的男声/中性参考 wav，再用同一条 `cross_lingual` 路线替换 `prompt_wav` 做对比；该项已按 voice clone 类似方式放入 deferred voice work，但它不是原主播 voice clone。
 
 ## 4. 关键决策
 
@@ -203,8 +205,8 @@
 
 ## 6. 下一步建议
 
-1. 先做 MVP-1 固定中文音色校准，解决当前默认女声情绪过满的问题。
-2. 再支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+1. 使用已选定的 MVP-1 默认固定中文音色基线：`cross_lingual_prompt.wav + speed=1.0`。
+2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
 3. 设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
 4. 仍不要同时推进 ASR、voice clone、App 或后台服务。
 
