@@ -60,7 +60,7 @@ docs/plans/
 ### MVP-1 Real Podcasts
 
 - Fixed Chinese voice baseline - `done`: selected `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`.
-- Real podcast RSS or episode URL input - `next`.
+- [02.01 Real Podcast Transcript Source Input](./02-real-podcasts/01-real-podcast-transcript-source.md) - `done`
 - `speaker -> voice` mapping for common interview shows - `later`.
 
 ### Deferred Voice Work

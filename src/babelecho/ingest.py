@@ -4,6 +4,7 @@ from urllib.request import urlopen
 
 from .jsonio import write_json
 from .paths import RunPaths
+from .podcast import discover_podcast_transcript
 
 
 TRANSCRIPT_EXTENSIONS = {
@@ -37,8 +38,26 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
     elif source_type == "transcript_file":
         transcript_source = source_config.get("transcript_file")
         source_key = "transcript_file"
+    elif source_type == "podcast_rss":
+        feed_url = source_config.get("feed_url")
+        if not feed_url:
+            raise ValueError("source.feed_url is required")
+        transcript = discover_podcast_transcript(
+            _read_source(feed_url),
+            source_config.get("episode_url"),
+        )
+        transcript_source = transcript.transcript_url
+        source_key = "transcript_url"
+        source_config = {
+            **source_config,
+            "title": source_config.get("title") or transcript.title,
+            "original_url": source_config.get("original_url") or transcript.episode_url,
+            "transcript_url": transcript.transcript_url,
+        }
     else:
-        raise ValueError("MVP-0 supports only source.type=transcript_url or transcript_file")
+        raise ValueError(
+            "BabelEcho supports source.type=transcript_url, transcript_file, or podcast_rss"
+        )
     if not transcript_source:
         raise ValueError(f"source.{source_key} is required")
 
@@ -52,6 +71,8 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
             "source_type": source_type,
             "title": source_config.get("title", "Untitled Episode"),
             "original_url": source_config.get("original_url"),
+            "feed_url": source_config.get("feed_url"),
+            "episode_url": source_config.get("episode_url"),
             source_key: transcript_source,
             "raw_transcript": str(raw_path.relative_to(run_paths.run_dir)),
         },

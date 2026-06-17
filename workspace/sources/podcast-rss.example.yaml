@@ -1,0 +1,5 @@
+source:
+  type: podcast_rss
+  feed_url: "https://example.com/podcast/feed.xml"
+  # Optional. Match an RSS item by link, guid, or enclosure url.
+  episode_url: "https://example.com/podcast/episodes/1"

@@ -240,6 +240,80 @@ publish:
     ]
 
 
+def test_run_command_accepts_podcast_feed_and_stops_at_adapt(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    transcript = Path("tests/fixtures/sample.vtt").resolve()
+    feed = tmp_path / "feed.xml"
+    feed.write_text(
+        f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Fixture Podcast</title>
+    <item>
+      <title>Feed Episode</title>
+      <link>https://example.com/feed-episode</link>
+      <podcast:transcript url="{transcript}" type="text/vtt" language="en" />
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "feed-demo",
+            "--podcast-feed",
+            str(feed),
+            "--episode-url",
+            "https://example.com/feed-episode",
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "adapt",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    run_dir = workspace / "runs" / "feed-demo"
+    assert result.returncode == 0, result.stderr
+    assert "adapt:" in result.stdout
+    assert (run_dir / "transcript" / "raw.vtt").exists()
+    assert (run_dir / "script" / "zh.json").exists()
+
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "podcast_rss"
+    assert source["feed_url"] == str(feed)
+    assert source["episode_url"] == "https://example.com/feed-episode"
+    assert source["title"] == "Feed Episode"
+    assert source["transcript_url"] == str(transcript)
+
+    status = read_json(run_dir / "run.json")
+    assert status["input"]["podcast_feed"] == str(feed)
+    assert status["input"]["episode_url"] == "https://example.com/feed-episode"
+
+
 def test_run_command_stops_at_requested_stage(tmp_path: Path):
     workspace = tmp_path / "workspace"
     local_config = tmp_path / "local.yaml"

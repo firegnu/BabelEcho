@@ -82,6 +82,8 @@ def build_parser() -> argparse.ArgumentParser:
     run_input = run.add_mutually_exclusive_group(required=True)
     run_input.add_argument("--source-config")
     run_input.add_argument("--transcript-file")
+    run_input.add_argument("--podcast-feed")
+    run.add_argument("--episode-url")
     run.add_argument("--title")
     run.add_argument("--original-url")
     run.add_argument("--local-config", required=True)
@@ -129,6 +131,8 @@ def _raw_transcript_path(run_paths) -> Path:
 def _source_config_and_input(
     source_config_path: str | None,
     transcript_file: str | None,
+    podcast_feed: str | None,
+    episode_url: str | None,
     title: str | None,
     original_url: str | None,
 ) -> tuple[dict, dict]:
@@ -137,8 +141,25 @@ def _source_config_and_input(
         require_keys(source_config, ["source"])
         return source_config, {"source_config": str(Path(source_config_path))}
 
+    if podcast_feed:
+        source = {
+            "type": "podcast_rss",
+            "feed_url": podcast_feed,
+        }
+        input_info = {"podcast_feed": podcast_feed}
+        if episode_url:
+            source["episode_url"] = episode_url
+            input_info["episode_url"] = episode_url
+        if title:
+            source["title"] = title
+            input_info["title"] = title
+        if original_url:
+            source["original_url"] = original_url
+            input_info["original_url"] = original_url
+        return {"source": source}, input_info
+
     if not transcript_file:
-        raise ValueError("Either source_config_path or transcript_file is required")
+        raise ValueError("source_config_path, transcript_file, or podcast_feed is required")
 
     transcript_path = Path(transcript_file)
     episode_title = title or transcript_path.stem
@@ -176,12 +197,16 @@ def run_pipeline(
     from_stage: str,
     to_stage: str,
     transcript_file: str | None = None,
+    podcast_feed: str | None = None,
+    episode_url: str | None = None,
     title: str | None = None,
     original_url: str | None = None,
 ) -> str:
     source_config, input_info = _source_config_and_input(
         source_config_path,
         transcript_file,
+        podcast_feed,
+        episode_url,
         title,
         original_url,
     )
@@ -374,6 +399,8 @@ def main(argv: list[str] | None = None) -> int:
                 args.from_stage,
                 args.to_stage,
                 args.transcript_file,
+                args.podcast_feed,
+                args.episode_url,
                 args.title,
                 args.original_url,
             )

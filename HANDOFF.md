@@ -130,10 +130,10 @@
 - 下一阶段是 MVP-1 Real Podcasts，目标是开始处理真实 podcast 来源和常见访谈节目。
 - MVP-1 后续优先任务：
   1. 使用已选定的固定中文默认音色基线：`cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`。
-  2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+  2. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
   3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
-  - 来源仍是手动提供 transcript 文件或 source config，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
+  - 来源已新增第一版 RSS feed 输入：`source.type=podcast_rss` 和 `babelecho run --podcast-feed ...`，只支持 RSS item 内的 `podcast:transcript`；公开 RSS smoke 使用 `https://feeds.transistor.fm/podcasting-advice` 跑到 `adapt`，fixture script 共 74 段，未调用 DeepSeek。还没有接 Apple Podcasts、Spotify、YouTube 页面解析。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
   - 当前 TTS 是单固定声音，不做原主播 voice clone。
   - 还没有多说话人 `speaker -> voice` 映射；真实两人或多人播客不能长期用一个中文声音读完整集，后续必须支持至少主持人/嘉宾不同固定音色。
@@ -206,7 +206,7 @@
 ## 6. 下一步建议
 
 1. 使用已选定的 MVP-1 默认固定中文音色基线：`cross_lingual_prompt.wav + speed=1.0`。
-2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+2. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
 3. 设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
 4. 仍不要同时推进 ASR、voice clone、App 或后台服务。
 

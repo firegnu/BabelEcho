@@ -97,6 +97,23 @@ $PYTHON -m babelecho run \
   --local-config "$LOCAL_CONFIG"
 ```
 
+MVP-1 also supports a narrow RSS transcript entry. The feed must expose a
+complete episode transcript through `podcast:transcript`; missing transcripts
+fail clearly and do not trigger ASR:
+
+```bash
+$PYTHON -m babelecho run \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --podcast-feed "https://example.com/podcast/feed.xml" \
+  --episode-url "https://example.com/podcast/episodes/1" \
+  --local-config "$LOCAL_CONFIG"
+```
+
+`--episode-url` is optional. When present, it matches an RSS item by `link`,
+`guid`, or `enclosure url`. Without it, BabelEcho uses the first item that has a
+`podcast:transcript` URL.
+
 The command runs:
 
 ```text

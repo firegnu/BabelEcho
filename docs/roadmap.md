@@ -88,8 +88,8 @@
 - 固定音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 当前不再继续围绕 CosyVoice 内置的两个 wav 反复微调；后续如需新固定音色，准备本地授权的男声/中性参考 wav，再用同一条 `cross_lingual` 路线替换 `prompt_wav` 做对比。
 - 准备 2 到 3 个固定中文音色，至少保留主持人和嘉宾的候选区分；这属于后续语音专项，不阻塞真实 podcast 来源接入。
-- 支持 RSS feed 或 episode URL 输入。
-- 支持 RSS `podcast:transcript`。
+- 已支持第一版 RSS feed 输入：`babelecho run --podcast-feed ...`，并用公开 feed 跑通到 `adapt`。
+- 已支持 RSS item 内的 `podcast:transcript`。
 - 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
@@ -100,7 +100,7 @@
 验收标准：
 
 - 已选出一个比当前默认女声更克制的中文默认音色：`cross_lingual_prompt.wav + speed=1.0`。
-- 一个有公开 transcript 的 RSS feed 可以被处理成中文 feed。
+- 一个有公开 `podcast:transcript` 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出。
 - 已处理 episode 不重复生成。
 
@@ -145,5 +145,5 @@
 ## 当前最高优先级
 
 1. 使用 `cross_lingual_prompt.wav + speed=1.0` 作为 MVP-1 默认固定中文音色基线。
-2. 支持一个真实 podcast RSS 或 episode URL 输入，并优先复用公开 transcript。
+2. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
 3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
