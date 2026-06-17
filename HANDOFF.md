@@ -148,7 +148,15 @@
     - `c-cross-lingual-reference.mp3`：使用 `cross_lingual_prompt.wav` 的参考音色，约 `24.3s`。
   - 三条样本均为 `24000 Hz`、mono；真实 wav/MP3 和 manifest 不进入 git。
   - 用户当前反馈：C 最好。下一轮优先沿 cross-lingual/reference-audio 路线继续微调，而不是继续围绕默认 zero-shot 女声。
-  - 后续建议：准备或寻找更克制的本地男声/中性参考 wav；同时把 wrapper 的 TTS mode、prompt wav 和 speed 暴露成可配置项，便于继续做 A/B。
+  - 已提交 `ee30dd6 feat: configure cosyvoice reference mode`：
+    - `src/babelecho/tts.py` 会把 `tts.mode`、`tts.prompt_wav` 和 `tts.speed` 转发给本地 wrapper。
+    - `tools/cosyvoice_tts_wrapper.py` 支持 `zero_shot` 和 `cross_lingual` 两种非 voice-clone 模式，并支持 `speed`。
+    - 本机全量测试：`41 passed`。
+  - 已在 5090D 生成第二轮 cross-lingual speed 微调样本，并拷回本机 ignored 路径 `workspace/runs/voice-calibration-20260617-round2/`：
+    - `d-cross-lingual-speed-100.mp3`：`mode=cross_lingual`，`speed=1.0`，约 `24.7s`。
+    - `e-cross-lingual-speed-095.mp3`：`mode=cross_lingual`，`speed=0.95`，约 `26.0s`。
+    - `f-cross-lingual-speed-090.mp3`：`mode=cross_lingual`，`speed=0.90`，约 `27.5s`。
+  - 第二轮未调用 DeepSeek，只使用第一轮相同中文样本文本和 `cross_lingual_prompt.wav`。5090D 当前 CosyVoice asset 目录仍只有 `zero_shot_prompt.wav` 和 `cross_lingual_prompt.wav`；如 D/E/F 仍不够克制，下一步需要放入本地授权的男声/中性参考 wav 后继续同一路线。
 
 ## 4. 关键决策
 
