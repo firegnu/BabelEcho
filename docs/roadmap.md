@@ -90,6 +90,7 @@
 - 准备 2 到 3 个固定中文音色，至少保留主持人和嘉宾的候选区分；这属于后续语音专项，不阻塞真实 podcast 来源接入。
 - 已支持第一版 RSS feed 输入：`babelecho run --podcast-feed ...`，并用公开 feed 跑通到 `adapt`。
 - 已支持 RSS item 内的 `podcast:transcript`。
+- 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D CosyVoice cross-lingual 默认音色生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
 - 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
@@ -144,6 +145,6 @@
 
 ## 当前最高优先级
 
-1. 使用 `cross_lingual_prompt.wav + speed=1.0` 作为 MVP-1 默认固定中文音色基线。
+1. 优化真实节目 TTS 执行效率，避免每个 segment 都重新启动 CosyVoice。
 2. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
 3. 为常见访谈节目设计 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定中文音色。
