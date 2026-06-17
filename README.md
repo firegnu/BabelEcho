@@ -16,6 +16,7 @@ The current pipeline supports:
 - One-command pipeline orchestration with `babelecho run`.
 - Manual transcript input with `babelecho run --transcript-file`.
 - Chinese script preview with `babelecho script` before TTS.
+- Local terminology and pronunciation overrides before TTS with exact replacements.
 - Basic artifact checks with `babelecho check`.
 - Run status tracking in `workspace/runs/<run-id>/run.json`.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.
@@ -50,10 +51,12 @@ src/babelecho/
   audio.py
   publish.py
   script.py
+  overrides.py
   status.py
 tests/
 workspace/
   config/local.example.yaml
+  config/overrides.example.yaml
   sources/hardcoded.example.yaml
 ```
 
@@ -76,6 +79,7 @@ The real 5090D run expects:
 - A complete transcript source.
 - Either DeepSeek API LLM config with an ignored `workspace/config/deepseek.env` key file, or a local vLLM endpoint for the later all-local path.
 - A local TTS CLI wrapper configured in `workspace/config/local.yaml`.
+- Optional local terminology overrides configured through an ignored `workspace/config/overrides.yaml`.
 - `ffmpeg` available on `PATH`.
 
 ## Important Docs

@@ -290,6 +290,7 @@ def test_run_command_resumes_from_synthesize(tmp_path: Path):
     run_dir = workspace / "runs" / "resume-demo"
     source_config = tmp_path / "source.yaml"
     local_config = tmp_path / "local.yaml"
+    overrides = tmp_path / "overrides.yaml"
     source_config.write_text(
         """
 source:
@@ -297,6 +298,16 @@ source:
   transcript_url: "tests/fixtures/sample.vtt"
   title: "Resume Episode"
   original_url: "https://example.com/resume"
+""",
+        encoding="utf-8",
+    )
+    overrides.write_text(
+        """
+replacements:
+  - from: "NASA"
+    to: "美国国家航空航天局"
+  - from: "Crew-9"
+    to: "Crew Nine"
 """,
         encoding="utf-8",
     )
@@ -308,6 +319,8 @@ tts:
   provider: fixture
 publish:
   base_url: "https://example.com/babelecho"
+overrides:
+  path: "{overrides_path}"
 """,
         encoding="utf-8",
     )
@@ -349,10 +362,14 @@ publish:
                     "id": "0001",
                     "source_segment_ids": ["0001"],
                     "speaker": None,
-                    "text": "人工编辑后的中文稿。",
+                    "text": "人工编辑后的 NASA Crew-9 中文稿。",
                 }
             ],
         },
+    )
+    local_config.write_text(
+        local_config.read_text(encoding="utf-8").format(overrides_path=overrides),
+        encoding="utf-8",
     )
 
     result = subprocess.run(
@@ -378,8 +395,9 @@ publish:
     )
 
     assert result.returncode == 0, result.stderr
+    assert "overrides: 2 replacements from 2 rules" in result.stdout
     manifest = read_json(run_dir / "segments" / "manifest.json")
-    assert manifest["segments"][0]["text"] == "人工编辑后的中文稿。"
+    assert manifest["segments"][0]["text"] == "人工编辑后的 美国国家航空航天局 Crew Nine 中文稿。"
     assert (run_dir / "output" / "audio.mp3").exists()
     assert (run_dir / "publish" / "feed.xml").exists()
 

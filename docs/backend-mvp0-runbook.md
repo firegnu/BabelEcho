@@ -96,6 +96,8 @@ The command runs:
 ingest -> normalize -> adapt -> synthesize -> assemble -> publish
 ```
 
+If `overrides.path` is configured, `run` applies script overrides between `adapt` and `synthesize`.
+
 It also runs basic checks after generated artifacts are available:
 
 - after `adapt`: `script/zh.json` exists, has segments, and every segment has nonempty text below the configured length limit.
@@ -118,6 +120,28 @@ $PYTHON -m babelecho script --workspace "$WORKSPACE" --run-id "$RUN_ID"
 ```
 
 The command prints the `script/zh.json` path, numbered script segments, and the `--from-stage synthesize` resume hint. Edit `$WORKSPACE/runs/$RUN_ID/script/zh.json` manually, then resume from `synthesize`.
+
+To apply local terminology or pronunciation overrides before TTS, copy the tracked example to an ignored local config and enable it from `local.yaml`:
+
+```bash
+cp workspace/config/overrides.example.yaml "$WORKSPACE/config/overrides.yaml"
+```
+
+```yaml
+overrides:
+  path: "workspace/config/overrides.yaml"
+```
+
+Overrides are exact text replacements applied to `$WORKSPACE/runs/$RUN_ID/script/zh.json`. They are intentionally simple and local: use them for names, acronyms, and phrases that should be rewritten before TTS. When configured, `babelecho run` applies them automatically before `synthesize`.
+
+To apply overrides manually after previewing or editing the script:
+
+```bash
+$PYTHON -m babelecho overrides \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --local-config "$LOCAL_CONFIG"
+```
 
 To resume after editing or preserving earlier artifacts, use `--from-stage`:
 
@@ -144,6 +168,7 @@ export LOCAL_CONFIG=$WORKSPACE/config/local.yaml
 $PYTHON -m babelecho ingest --workspace "$WORKSPACE" --run-id "$RUN_ID" --source-config "$SOURCE_CONFIG"
 $PYTHON -m babelecho normalize --workspace "$WORKSPACE" --run-id "$RUN_ID" --raw-transcript "$WORKSPACE/runs/$RUN_ID/transcript/raw.vtt"
 $PYTHON -m babelecho adapt --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config "$LOCAL_CONFIG"
+$PYTHON -m babelecho overrides --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config "$LOCAL_CONFIG"
 $PYTHON -m babelecho synthesize --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config "$LOCAL_CONFIG"
 $PYTHON -m babelecho assemble --workspace "$WORKSPACE" --run-id "$RUN_ID"
 $PYTHON -m babelecho publish --workspace "$WORKSPACE" --run-id "$RUN_ID" --local-config "$LOCAL_CONFIG"

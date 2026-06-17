@@ -21,7 +21,7 @@
 | 阶段 | 目标 | 状态 |
 | --- | --- | --- |
 | MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | done |
-| MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | next |
+| MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | in progress |
 | MVP-1 Real Podcasts | 支持真实 podcast 来源、多说话人和多 episode feed | planned |
 | MVP-2 Automation | 自动扫描、批处理、状态记录和远程运维 | later |
 | Later | ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
@@ -67,7 +67,7 @@
   - 单段文本过长时提醒或失败。
   - TTS 输出 wav 为空时失败。
   - 最终 MP3 时长、采样率、声道可检查。
-- 增加专有名词和发音 override 的简单配置。
+- 已增加专有名词和发音 override 的简单配置：`overrides.path` 加 `babelecho overrides`，在 TTS 前对中文脚本做本地精确替换。
 
 验收标准：
 
@@ -136,5 +136,5 @@
 
 ## 当前最高优先级
 
-1. 增加专有名词和发音 override 的简单配置。
+1. 用一个真实 transcript 做一次 MVP-0.5 自用流程回归，确认 `run`、脚本预览、override、续跑和发布产物的实际手感。
 2. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。

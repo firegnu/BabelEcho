@@ -15,5 +15,10 @@ tts:
   voice: "default-zh"
   output_format: "wav"
 
+# Optional. Copy workspace/config/overrides.example.yaml to an ignored
+# workspace/config/overrides.yaml, then enable this path.
+# overrides:
+#   path: "workspace/config/overrides.yaml"
+
 publish:
   base_url: "https://example.com/babelecho"

@@ -8,6 +8,7 @@ from .checks import CheckError, check_run_artifacts
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
 from .jsonio import read_json
+from .overrides import apply_script_overrides
 from .paths import create_run
 from .publish import publish_episode
 from .script import preview_chinese_script
@@ -69,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
     script = subparsers.add_parser("script", help="Preview the Chinese script before TTS.")
     script.add_argument("--workspace", required=True)
     script.add_argument("--run-id", required=True)
+
+    overrides = subparsers.add_parser("overrides", help="Apply local script overrides.")
+    overrides.add_argument("--workspace", required=True)
+    overrides.add_argument("--run-id", required=True)
+    overrides.add_argument("--local-config", required=True)
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
@@ -216,17 +222,24 @@ def run_pipeline(
         outputs.append(f"check script: {script_check['script_segments']} segments")
 
     if stage_index <= PIPELINE_STAGES.index("synthesize"):
-        def synthesize_stage() -> tuple[str, dict]:
+        def synthesize_stage() -> tuple[dict, str, dict]:
+            override_result = apply_script_overrides(run_paths, local_config.get("overrides"))
             manifest_path = synthesize_segments(run_paths, local_config["tts"])
             segment_check = check_run_artifacts(run_paths, checks=("segments",))
-            return manifest_path, segment_check
+            return override_result, manifest_path, segment_check
 
-        manifest_path, segment_check = _run_stage(
+        override_result, manifest_path, segment_check = _run_stage(
             status,
             run_paths,
             "synthesize",
             synthesize_stage,
         )
+        if override_result["rules"]:
+            outputs.append(
+                "overrides: "
+                f"{override_result['replacements']} replacements "
+                f"from {override_result['rules']} rules"
+            )
         outputs.append(f"synthesize: {manifest_path}")
         outputs.append(f"check segments: {segment_check['audio_segments']} files")
 
@@ -300,6 +313,18 @@ def main(argv: list[str] | None = None) -> int:
             print(str(error), file=sys.stderr)
             return 1
         print(output)
+        return 0
+
+    if args.command == "overrides":
+        config = load_yaml(Path(args.local_config))
+        run_paths = create_run(args.workspace, args.run_id)
+        try:
+            result = apply_script_overrides(run_paths, config.get("overrides"))
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
+        print(f"overrides: {result['replacements']} replacements from {result['rules']} rules")
+        print(f"script: {result['script']}")
         return 0
 
     if args.command == "assemble":
