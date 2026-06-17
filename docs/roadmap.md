@@ -60,13 +60,13 @@
 - 已通过 `workspace/runs/<run-id>/run.json` 明确每次 run 的状态、输入、输出路径和失败阶段。
 - 已增加基础质量检查命令：`babelecho check --workspace ... --run-id ...`。
 - `babelecho run` 已在 `adapt`、`synthesize`、`assemble` 后自动检查关键产物。
-- 固定私有静态发布目录和稳定 `feed.xml` 路径。
+- 已增加 TTS 前中文脚本预览入口：`babelecho script --workspace ... --run-id ...`。
+- 已固定私有静态发布目录和稳定 `workspace/published/feed.xml` 路径。
 - 基础质量检查已覆盖：
   - 中文脚本为空时失败。
   - 单段文本过长时提醒或失败。
   - TTS 输出 wav 为空时失败。
   - 最终 MP3 时长、采样率、声道可检查。
-- 增加中文脚本人工预览和编辑入口，至少允许在 TTS 前手动改 `script/zh.json`。
 - 增加专有名词和发音 override 的简单配置。
 
 验收标准：
@@ -136,7 +136,5 @@
 
 ## 当前最高优先级
 
-1. 增加 TTS 前中文脚本人工预览和编辑入口。
-2. 固定私有静态发布目录和稳定 `feed.xml` 路径。
-3. 增加专有名词和发音 override 的简单配置。
-4. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。
+1. 增加专有名词和发音 override 的简单配置。
+2. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。

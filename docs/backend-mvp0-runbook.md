@@ -101,6 +101,7 @@ It also runs basic checks after generated artifacts are available:
 - after `adapt`: `script/zh.json` exists, has segments, and every segment has nonempty text below the configured length limit.
 - after `synthesize`: `segments/manifest.json` exists and every listed wav file exists and is nonempty.
 - after `assemble`: `output/audio.mp3` exists and `ffprobe` can read codec, duration, sample rate, and channel count.
+- after `publish`: run-local publish artifacts are copied to the stable private feed directory under `$WORKSPACE/published/`.
 
 Each `run` writes status to:
 
@@ -109,6 +110,14 @@ $WORKSPACE/runs/$RUN_ID/run.json
 ```
 
 The file records the input, `from_stage`, each stage status, failed stage, error string, and known output paths. Use it first when a run fails.
+
+To preview the Chinese script before TTS:
+
+```bash
+$PYTHON -m babelecho script --workspace "$WORKSPACE" --run-id "$RUN_ID"
+```
+
+The command prints the `script/zh.json` path, numbered script segments, and the `--from-stage synthesize` resume hint. Edit `$WORKSPACE/runs/$RUN_ID/script/zh.json` manually, then resume from `synthesize`.
 
 To resume after editing or preserving earlier artifacts, use `--from-stage`:
 
@@ -165,6 +174,8 @@ $PYTHON -m babelecho check \
 - `$WORKSPACE/runs/$RUN_ID/publish/feed.xml`
 - `$WORKSPACE/runs/$RUN_ID/publish/episodes/$RUN_ID/audio.mp3`
 - `$WORKSPACE/runs/$RUN_ID/run.json`
+- `$WORKSPACE/published/feed.xml`
+- `$WORKSPACE/published/episodes/$RUN_ID/audio.mp3`
 
 ## Local Fixture Test
 

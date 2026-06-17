@@ -33,6 +33,14 @@ class RunPaths:
     def output_audio(self) -> Path:
         return self.output_dir / "audio.mp3"
 
+    @property
+    def stable_publish_dir(self) -> Path:
+        return self.workspace / "published"
+
+    @property
+    def stable_feed(self) -> Path:
+        return self.stable_publish_dir / "feed.xml"
+
 
 def create_run(workspace: str | Path, run_id: str) -> RunPaths:
     root = Path(workspace)

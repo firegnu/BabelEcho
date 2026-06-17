@@ -57,4 +57,10 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
     tree = ElementTree.ElementTree(rss)
     ElementTree.indent(tree, space="  ")
     tree.write(feed_path, encoding="utf-8", xml_declaration=True)
+
+    stable_episode_dir = run_paths.stable_publish_dir / "episodes" / episode_id
+    stable_episode_dir.mkdir(parents=True, exist_ok=True)
+    for name in ["audio.mp3", "metadata.json", "transcript.en.json", "transcript.zh.json"]:
+        shutil.copy2(episode_dir / name, stable_episode_dir / name)
+    shutil.copy2(feed_path, run_paths.stable_feed)
     return str(feed_path)

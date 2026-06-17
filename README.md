@@ -15,11 +15,12 @@ The current pipeline supports:
 - Stage-by-stage Python CLI commands.
 - One-command pipeline orchestration with `babelecho run`.
 - Manual transcript input with `babelecho run --transcript-file`.
+- Chinese script preview with `babelecho script` before TTS.
 - Basic artifact checks with `babelecho check`.
 - Run status tracking in `workspace/runs/<run-id>/run.json`.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.
 - Fixture tests for the full pure pipeline.
-- Static podcast output: `feed.xml` plus generated audio artifacts.
+- Static podcast output under both `workspace/runs/<run-id>/publish/` and stable `workspace/published/`.
 
 MVP-0 does not support:
 
@@ -48,6 +49,7 @@ src/babelecho/
   synthesize.py
   audio.py
   publish.py
+  script.py
   status.py
 tests/
 workspace/

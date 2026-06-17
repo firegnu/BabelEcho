@@ -117,6 +117,8 @@ publish:
     assert "publish/feed.xml" in result.stdout
     assert (workspace / "runs" / "demo" / "output" / "audio.mp3").exists()
     assert (workspace / "runs" / "demo" / "publish" / "feed.xml").exists()
+    assert (workspace / "published" / "feed.xml").exists()
+    assert (workspace / "published" / "episodes" / "demo" / "audio.mp3").exists()
     assert (
         workspace
         / "runs"
@@ -147,6 +149,29 @@ publish:
     assert "script_segments=1" in check_result.stdout
     assert "audio_segments=1" in check_result.stdout
     assert "output_duration_seconds=" in check_result.stdout
+
+    script_result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "script",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "demo",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert script_result.returncode == 0, script_result.stderr
+    assert "script:" in script_result.stdout
+    assert "workspace/runs/demo/script/zh.json" in script_result.stdout
+    assert "0001" in script_result.stdout
+    assert "中文口播：Welcome to the sample episode." in script_result.stdout
+    assert "--from-stage synthesize" in script_result.stdout
 
 
 def test_run_command_accepts_transcript_file_and_writes_status(tmp_path: Path):
@@ -203,6 +228,7 @@ publish:
     assert status["input"]["transcript_file"] == str(transcript)
     assert status["outputs"]["audio"] == "output/audio.mp3"
     assert status["outputs"]["feed"] == "publish/feed.xml"
+    assert status["outputs"]["stable_feed"] == "published/feed.xml"
     assert [stage["status"] for stage in status["stages"]] == [
         "succeeded",
         "succeeded",

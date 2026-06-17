@@ -10,6 +10,7 @@ from .ingest import ingest_transcript_source
 from .jsonio import read_json
 from .paths import create_run
 from .publish import publish_episode
+from .script import preview_chinese_script
 from .status import (
     init_run_status,
     mark_run_succeeded,
@@ -64,6 +65,10 @@ def build_parser() -> argparse.ArgumentParser:
     publish.add_argument("--workspace", required=True)
     publish.add_argument("--run-id", required=True)
     publish.add_argument("--local-config", required=True)
+
+    script = subparsers.add_parser("script", help="Preview the Chinese script before TTS.")
+    script.add_argument("--workspace", required=True)
+    script.add_argument("--run-id", required=True)
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
@@ -283,6 +288,16 @@ def main(argv: list[str] | None = None) -> int:
         require_keys(config, ["publish"])
         run_paths = create_run(args.workspace, args.run_id)
         output = publish_episode(run_paths, config["publish"])
+        print(output)
+        return 0
+
+    if args.command == "script":
+        run_paths = create_run(args.workspace, args.run_id)
+        try:
+            output = preview_chinese_script(run_paths)
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
         print(output)
         return 0
 

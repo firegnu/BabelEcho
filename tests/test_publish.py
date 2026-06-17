@@ -1,7 +1,7 @@
 from pathlib import Path
 from xml.etree import ElementTree
 
-from babelecho.jsonio import write_json
+from babelecho.jsonio import read_json, write_json
 from babelecho.paths import create_run
 from babelecho.publish import publish_episode
 
@@ -31,6 +31,10 @@ def test_publish_episode_writes_feed_and_artifacts(tmp_path: Path):
 
     assert Path(feed_path).exists()
     assert (run_paths.publish_dir / "episodes" / "publish-run" / "audio.mp3").exists()
+    assert (run_paths.workspace / "published" / "feed.xml").exists()
+    assert (run_paths.workspace / "published" / "episodes" / "publish-run" / "audio.mp3").exists()
+    metadata = read_json(run_paths.workspace / "published" / "episodes" / "publish-run" / "metadata.json")
+    assert metadata["audio_url"] == "https://example.com/babelecho/episodes/publish-run/audio.mp3"
     root = ElementTree.parse(feed_path).getroot()
     assert root.tag == "rss"
     assert root.find("./channel/item/title").text == "Sample Episode"

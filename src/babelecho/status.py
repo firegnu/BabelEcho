@@ -11,7 +11,10 @@ def _now() -> str:
 
 
 def _relative(run_paths: RunPaths, path: Path) -> str:
-    return str(path.relative_to(run_paths.run_dir))
+    try:
+        return str(path.relative_to(run_paths.run_dir))
+    except ValueError:
+        return str(path.relative_to(run_paths.workspace))
 
 
 def _stage(status: dict[str, Any], name: str) -> dict[str, Any]:
@@ -30,6 +33,7 @@ def collect_outputs(run_paths: RunPaths) -> dict[str, str]:
         "segments_manifest": run_paths.segments_dir / "manifest.json",
         "audio": run_paths.output_audio,
         "feed": run_paths.publish_dir / "feed.xml",
+        "stable_feed": run_paths.stable_feed,
     }
     for name, path in candidates.items():
         if path.exists():
