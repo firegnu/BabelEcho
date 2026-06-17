@@ -85,8 +85,11 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
         "COSYVOICE_REPO or --cosyvoice-repo",
         args.cosyvoice_repo or os.environ.get("COSYVOICE_REPO"),
     )
-    model_dir_value = args.model_dir or os.environ.get("COSYVOICE_MODEL_DIR")
-    if args.voice == "sft_builtin_4role" and not model_dir_value:
+    if args.voice == "sft_builtin_4role":
+        model_dir_value = args.model_dir
+    else:
+        model_dir_value = args.model_dir or os.environ.get("COSYVOICE_MODEL_DIR")
+    if not model_dir_value and args.voice == "sft_builtin_4role":
         model_dir_value = str(cosyvoice_repo / "pretrained_models" / "CosyVoice-300M-SFT")
     model_dir = _required_path("COSYVOICE_MODEL_DIR or --model-dir", model_dir_value)
     prompt_text = (

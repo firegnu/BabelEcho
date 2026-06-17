@@ -92,13 +92,15 @@ def test_resolve_config_rejects_unsupported_voice(monkeypatch, tmp_path: Path):
 def test_resolve_config_accepts_sft_builtin_4role_voice(monkeypatch, tmp_path: Path):
     wrapper = load_wrapper()
     monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
-    monkeypatch.setenv("COSYVOICE_MODEL_DIR", "/models/CosyVoice-300M-SFT")
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", "/models/CosyVoice2-0.5B")
     args = wrapper.parse_args(
         [
             "--batch-file",
             str(tmp_path / "tts-batch.json"),
             "--voice",
             "sft_builtin_4role",
+            "--model-dir",
+            "/models/CosyVoice-300M-SFT",
         ]
     )
 
@@ -112,6 +114,24 @@ def test_resolve_config_defaults_sft_model_dir_from_repo(monkeypatch, tmp_path: 
     wrapper = load_wrapper()
     monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
     monkeypatch.delenv("COSYVOICE_MODEL_DIR", raising=False)
+    args = wrapper.parse_args(
+        [
+            "--batch-file",
+            str(tmp_path / "tts-batch.json"),
+            "--voice",
+            "sft_builtin_4role",
+        ]
+    )
+
+    config = wrapper.resolve_config(args)
+
+    assert config.model_dir == Path("/opt/CosyVoice/pretrained_models/CosyVoice-300M-SFT")
+
+
+def test_resolve_config_ignores_default_model_env_for_sft_voice(monkeypatch, tmp_path: Path):
+    wrapper = load_wrapper()
+    monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", "/models/CosyVoice2-0.5B")
     args = wrapper.parse_args(
         [
             "--batch-file",

@@ -107,7 +107,7 @@ tts:
 
 ```text
 15 passed
-53 passed
+54 passed
 ```
 
 已覆盖：
@@ -118,6 +118,7 @@ tts:
 - `segments/manifest.json` 记录 `speaker` 和 `voice_role`。
 - `tts-batch.json` 每个 item 写入 `voice_role`。
 - `local_cli` 可以把 `cosyvoice_repo` 和 `model_dir` 传给 wrapper。
+- `sft_builtin_4role` 不会误用 launcher 中指向 CosyVoice2 的 `COSYVOICE_MODEL_DIR`；未显式传 `--model-dir` 时默认使用 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT`。
 - wrapper 支持 `sft_builtin_4role` 并调用 `CosyVoice.inference_sft`。
 - 5090D 临时 wrapper smoke 已通过：四个角色均生成 `22050 Hz`、mono wav。
 

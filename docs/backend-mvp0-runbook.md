@@ -87,6 +87,9 @@ This profile maps script speakers by first appearance to `female_a`, `male_a`,
 It is fixed-speaker synthesis, not original-host voice cloning.
 If `model_dir` is not set, the wrapper defaults to
 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for this profile.
+The SFT profile intentionally does not reuse `COSYVOICE_MODEL_DIR` from the
+launcher, because that launcher default points at `CosyVoice2-0.5B` for the
+single-speaker path.
 
 For `local_cli` synthesis, BabelEcho writes a `segments/tts-batch.json` file and
 starts the wrapper once per `synthesize` stage. The wrapper loads CosyVoice once,
