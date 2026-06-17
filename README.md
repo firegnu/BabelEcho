@@ -91,6 +91,7 @@ The real 5090D run expects:
 - [Backend MVP-0 design](docs/backend-mvp.md)
 - [Backend MVP-0 tech stack](docs/backend-mvp0-tech-stack.md)
 - [Backend MVP-0 runbook](docs/backend-mvp0-runbook.md)
+- [Voice calibration explainer](docs/voice-calibration-explainer.md)
 - [Plan index](docs/plans/README.md)
 - [Implementation plan](docs/superpowers/plans/2026-06-16-backend-mvp0.md)
 
