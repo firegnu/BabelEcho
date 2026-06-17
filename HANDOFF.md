@@ -89,24 +89,28 @@
   - `run` 支持 `--transcript-file` 直接导入本地 transcript，并可用 `--title` 写入 episode 标题，避免自用时手写 source YAML。
   - `src/babelecho/status.py` 增加 `workspace/runs/<run-id>/run.json`，记录 input、`from_stage`、每个 stage 状态、失败阶段、错误和已知输出路径。
   - `src/babelecho/checks.py` 增加基础质量检查，`babelecho check` 可独立检查 script、segments、output。
+  - `src/babelecho/script.py` 增加 `babelecho script`，可在 TTS 前打印 `script/zh.json` 路径、段落编号、文本和 `--from-stage synthesize` 续跑提示。
+  - `src/babelecho/publish.py` 仍保留 run-local publish artifacts，同时同步 `feed.xml` 和 episode artifacts 到稳定目录 `workspace/published/`。
   - `run` 在 `adapt`、`synthesize`、`assemble` 后自动检查中文脚本、wav segment 和最终 MP3。
+  - `run` 输出包含 `stable feed: workspace/published/feed.xml`。
   - `tests/test_end_to_end_fixture.py` 覆盖 fixture 全链路和从 `synthesize` 恢复执行，保护手工编辑后的 `script/zh.json` 不被重新 adapt 覆盖。
   - `tests/test_end_to_end_fixture.py` 覆盖 `--transcript-file` 自用入口和 ingest 失败时的 `run.json` 失败记录。
+  - `tests/test_end_to_end_fixture.py` 覆盖 `babelecho script` 输出和 `workspace/published/feed.xml` 生成。
+  - `tests/test_publish.py` 覆盖 run-local publish artifacts 与 stable publish artifacts 同时生成。
   - `tests/test_checks.py` 覆盖空中文稿、超长段落、缺失 wav、缺失 MP3 和 ffprobe 元数据。
   - 本机全量测试：`34 passed`。
   - 5090D 全量测试：`34 passed`。
   - 5090D fixture smoke：`run-command-smoke` 使用 `babelecho run` 生成 `transcript/normalized.json`、`script/zh.json`、`segments/manifest.json`、`output/audio.mp3`、`publish/feed.xml` 和 episode MP3；script/manifest 均为 1 段。
   - 5090D check smoke：`check-command-smoke` 使用 `babelecho run` 自动输出 `check script`、`check segments`、`check output`；独立 `babelecho check` 输出 `script_segments=1`、`audio_segments=1`、`output_sample_rate=16000`、`output_channels=1`、`output_duration_seconds=0.504`。
   - 5090D manual input smoke：`manual-input-status-smoke` 使用 `babelecho run --transcript-file tests/fixtures/sample.vtt --title "Manual Input Smoke"` 跑通；`run.json` 显示 `status=succeeded`、`from_stage=ingest`、6 个 stage 全部 `succeeded`、`audio=output/audio.mp3`、`feed=publish/feed.xml`、`source_type=transcript_file`。
+  - 5090D preview/stable publish smoke：`preview-stable-smoke` 使用 `babelecho run --transcript-file tests/fixtures/sample.vtt --title "Preview Stable Smoke"` 跑通；stdout 包含 `stable feed: workspace/published/feed.xml`；`babelecho script` 输出 `script/edit` 路径、`--from-stage synthesize` 提示和中文稿；`workspace/published/feed.xml` 存在且非空，`run.json` 输出 `stable_feed=published/feed.xml`。
 
 ## 3. 待完成的工作
 
 - MVP-0 acceptance 已完成：完整 transcript 到中文 MP3，再到静态 RSS/episode artifacts 的真实路径已经跑通。
 - 下一阶段是 MVP-0.5 Self-use，目标是让手动导入 transcript 后可以稳定生成一个私有中文 podcast feed，并能在播客客户端里听。
 - MVP-0.5 后续优先任务：
-  1. 增加 TTS 前中文脚本人工预览和编辑入口。
-  2. 固定私有静态发布目录和稳定 `feed.xml` 路径。
-  3. 增加专有名词和发音 override 的简单配置。
+  1. 增加专有名词和发音 override 的简单配置。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源仍是手动提供 transcript 文件或 source config，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
@@ -156,11 +160,8 @@
 
 ## 6. 下一步建议
 
-1. 为 MVP-0.5 的下一段写一个小计划，重点是人工脚本编辑，不要扩展真实来源或 App。
-2. 增加 TTS 前人工编辑入口，至少允许用户手动改 `script/zh.json` 后用 `babelecho run --from-stage synthesize` 继续跑。
-3. 固定私有静态发布目录和稳定 `feed.xml` 路径。
-4. 增加专有名词和发音 override 的简单配置。
-5. 不要在下一步同时推进 ASR、voice clone、App、后台服务或真实来源发现。
+1. 增加专有名词和发音 override 的简单配置。
+2. 不要在下一步同时推进 ASR、voice clone、App、后台服务或真实来源发现。
 
 ## 当前 Git 状态
 
