@@ -257,6 +257,7 @@ def run_pipeline(
     mark_run_succeeded(status, run_paths)
     outputs.append(f"audio: {run_paths.output_audio}")
     outputs.append(f"feed: {run_paths.publish_dir / 'feed.xml'}")
+    outputs.append(f"stable feed: {run_paths.stable_feed}")
     return "\n".join(outputs)
 
 

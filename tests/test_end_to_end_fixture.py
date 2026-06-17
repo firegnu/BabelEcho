@@ -115,6 +115,7 @@ publish:
     assert result.returncode == 0, result.stderr
     assert "output/audio.mp3" in result.stdout
     assert "publish/feed.xml" in result.stdout
+    assert "published/feed.xml" in result.stdout
     assert (workspace / "runs" / "demo" / "output" / "audio.mp3").exists()
     assert (workspace / "runs" / "demo" / "publish" / "feed.xml").exists()
     assert (workspace / "published" / "feed.xml").exists()
