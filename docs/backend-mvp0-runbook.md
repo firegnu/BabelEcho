@@ -53,26 +53,20 @@ An ignored local config can point at it:
 tts:
   provider: local_cli
   command: "/home/th5090d/miniforge3/envs/babelecho-tts/bin/tts-wrapper"
-  voice: "default-zh"
-  mode: "cross_lingual"
-  prompt_wav: "/home/th5090d/Develop/ai_tools/CosyVoice/asset/cross_lingual_prompt.wav"
+  voice: "sft_builtin_4role"
+  cosyvoice_repo: "/home/th5090d/Develop/ai_tools/CosyVoice"
   speed: 1.0
   output_format: "wav"
 ```
 
-For MVP-1 voice calibration, `mode: cross_lingual` uses a local reference wav
-without cloning an original podcast host. Tune `prompt_wav` and `speed` in the
-ignored local config, then rerun from `synthesize` to avoid another LLM call.
+For MVP-1, the deployment default uses only `CosyVoice-300M-SFT`:
 
-For MVP-1, TTS model selection is automatic:
+- 0/1 distinct speaker without an explicit gender marker: use `female_a`.
+- 1 distinct speaker labeled with `male` or `男`: use `male_a`.
+- 1 distinct speaker labeled with `female` or `女`: use `female_a`.
+- 2+ distinct speakers: use first-appearance mapping across the four roles.
 
-- 0/1 distinct speaker without an explicit female marker in `script/zh.json`:
-  use the original CosyVoice2 `cross_lingual` fixed voice.
-- 1 distinct speaker labeled with `female` or `女`: use the SFT built-in
-  four-role profile with `female_a`.
-- 2+ distinct speakers: use the SFT built-in four-role profile.
-
-The multi-speaker profile is equivalent to this effective config:
+The profile is equivalent to this effective config:
 
 ```yaml
 tts:
@@ -90,8 +84,8 @@ It is fixed-speaker synthesis, not original-host voice cloning.
 If `model_dir` is not set, the wrapper defaults to
 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for this profile.
 The SFT profile intentionally does not reuse `COSYVOICE_MODEL_DIR` from the
-launcher, because that launcher default points at `CosyVoice2-0.5B` for the
-single-speaker path.
+launcher, so an old launcher default pointing at `CosyVoice2-0.5B` cannot pull
+the runtime back to the previous model.
 
 For `local_cli` synthesis, BabelEcho writes a `segments/tts-batch.json` file and
 starts the wrapper once per `synthesize` stage. The wrapper loads CosyVoice once,

@@ -5,7 +5,8 @@ from .tts import synthesize_many_to_wav
 
 SFT_BUILTIN_4ROLE_SEQUENCE = ["female_a", "male_a", "female_b", "male_b"]
 SINGLE_SPEAKER_KEYS = {"mode", "prompt_text", "prompt_wav"}
-FEMALE_SPEAKER_MARKERS = ("female", "女")
+FEMALE_SPEAKER_MARKERS = ("female", "woman", "女")
+MALE_SPEAKER_MARKERS = ("male", "man", "男")
 
 
 def _speaker_count(segments: list[dict]) -> int:
@@ -28,12 +29,16 @@ def _single_speaker(segments: list[dict]) -> str | None:
     return next(iter(speakers))
 
 
-def _has_explicit_female_speaker(segments: list[dict]) -> bool:
+def _single_speaker_role(segments: list[dict]) -> str:
     speaker = _single_speaker(segments)
     if speaker is None:
-        return False
+        return "female_a"
     speaker_key = str(speaker).casefold()
-    return any(marker in speaker_key for marker in FEMALE_SPEAKER_MARKERS)
+    if any(marker in speaker_key for marker in FEMALE_SPEAKER_MARKERS):
+        return "female_a"
+    if any(marker in speaker_key for marker in MALE_SPEAKER_MARKERS):
+        return "male_a"
+    return "female_a"
 
 
 def _select_sft_voice(effective_config: dict) -> dict:
@@ -45,21 +50,15 @@ def _select_sft_voice(effective_config: dict) -> dict:
 
 def _effective_tts_config(segments: list[dict], tts_config: dict) -> dict:
     effective_config = dict(tts_config)
-    if _has_explicit_female_speaker(segments):
-        return _select_sft_voice(effective_config)
-
-    if _speaker_count(segments) <= 1:
-        return effective_config
-
-    if effective_config.get("voice", "default-zh") == "sft_builtin_4role":
-        return effective_config
-
     return _select_sft_voice(effective_config)
 
 
 def _voice_roles_for_segments(segments: list[dict], tts_config: dict) -> list[str | None]:
     if tts_config.get("voice") != "sft_builtin_4role":
         return [None] * len(segments)
+
+    if _speaker_count(segments) <= 1:
+        return [_single_speaker_role(segments)] * len(segments)
 
     speaker_to_role: dict[str, str] = {}
     roles = []

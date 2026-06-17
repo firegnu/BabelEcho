@@ -7,6 +7,9 @@ from typing import Any
 from .jsonio import write_json
 
 
+DEFAULT_LOCAL_CLI_VOICE = "sft_builtin_4role"
+
+
 def write_silent_wav(
     path: Path,
     duration_seconds: float = 0.2,
@@ -37,7 +40,7 @@ def synthesize_text_to_wav(text: str, output_path: Path, tts_config: dict) -> No
             "--output",
             str(output_path),
             "--voice",
-            tts_config.get("voice", "default-zh"),
+            tts_config.get("voice", DEFAULT_LOCAL_CLI_VOICE),
         ]
         for config_key, flag in [
             ("cosyvoice_repo", "--cosyvoice-repo"),
@@ -98,7 +101,7 @@ def synthesize_many_to_wav(
             "--batch-file",
             str(batch_path),
             "--voice",
-            tts_config.get("voice", "default-zh"),
+            tts_config.get("voice", DEFAULT_LOCAL_CLI_VOICE),
         ]
         for config_key, flag in [
             ("cosyvoice_repo", "--cosyvoice-repo"),

@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 DEFAULT_PROMPT_TEXT = "希望你以后能够做的比我还好呦。"
+DEFAULT_VOICE = "sft_builtin_4role"
 SUPPORTED_VOICES = {"default-zh", "sft_builtin_4role"}
 SFT_ROLE_SPEAKERS = {
     "female_a": "中文女",
@@ -57,7 +58,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--text-file")
     parser.add_argument("--output")
     parser.add_argument("--batch-file")
-    parser.add_argument("--voice", default="default-zh")
+    parser.add_argument("--voice", default=DEFAULT_VOICE)
     parser.add_argument("--cosyvoice-repo")
     parser.add_argument("--model-dir")
     parser.add_argument("--prompt-text")

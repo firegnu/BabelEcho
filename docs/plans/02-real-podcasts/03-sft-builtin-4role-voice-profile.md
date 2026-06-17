@@ -11,20 +11,22 @@
 为 MVP-1 常见多人访谈节目提供固定中文多说话人基线，并固定自动选择规则：
 
 ```text
-0/1 speaker without explicit female marker -> CosyVoice2 cross_lingual
+0/1 speaker without explicit gender marker -> CosyVoice-300M-SFT female_a
+1 speaker labeled male/男 -> CosyVoice-300M-SFT male_a
 1 speaker labeled female/女 -> CosyVoice-300M-SFT female_a
 2+ speakers -> stable voice role -> CosyVoice-300M-SFT speaker id -> wav segment
 ```
 
 ## 结论
 
-已选定 `sft_builtin_4role` 作为 MVP-1 多 speaker 基线。它不做原主播 voice clone，也不需要额外参考 wav；它只使用 `CosyVoice-300M-SFT` 自带 speaker id。
+已选定 `sft_builtin_4role` 作为 MVP-1 单模型 TTS 基线。它不做原主播 voice clone，也不需要额外参考 wav；运行默认只使用 `CosyVoice-300M-SFT` 自带 speaker id，不再要求部署 `CosyVoice2-0.5B`。
 
 最终规则：
 
-- `script/zh.json` 中检测到 0 或 1 个 distinct speaker，且没有显式女声标签：继续使用原默认模型 `CosyVoice2-0.5B` 的 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`。
-- 单个 speaker 标签包含 `female` 或 `女`：自动切换到 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`，并固定使用 `female_a`。
-- 检测到 2 个及以上 distinct speaker：自动切换到 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`。
+- `script/zh.json` 中检测到 0 或 1 个 distinct speaker，且没有显式性别标签：使用 `female_a`。
+- 单个 speaker 标签包含 `male` 或 `男`：使用 `male_a`。
+- 单个 speaker 标签包含 `female` 或 `女`：使用 `female_a`。
+- 检测到 2 个及以上 distinct speaker：按首次出现顺序映射到四个固定角色。
 
 固定角色映射：
 
@@ -46,8 +48,8 @@
 In:
 
 - 新增 `tts.voice: sft_builtin_4role` profile。
-- 默认配置仍可写 `tts.voice: default-zh`；`synthesize` 会按 speaker 数量和显式女声标签自动选择实际 TTS voice。
-- 单个 speaker 标签包含 `female` 或 `女` 时，固定分配到 `female_a`。
+- 默认配置写 `tts.voice: sft_builtin_4role`；`synthesize` 也会把旧的 `default-zh` 配置覆盖到 `sft_builtin_4role`，避免运行时依赖 CosyVoice2。
+- 单个 speaker 标签包含 `male` / `男` 时固定分配到 `male_a`；包含 `female` / `女` 或没有显式性别标签时固定分配到 `female_a`。
 - `synthesize` 按 `script/zh.json` 里 speaker 首次出现顺序分配角色：
   - 第 1 个 speaker -> `female_a`
   - 第 2 个 speaker -> `male_a`
@@ -61,32 +63,31 @@ In:
 
 Out:
 
-- 不做声纹或语义 speaker gender detection；只识别 `speaker` 标签中的显式 `female` / `女` 标记。
+- 不做声纹或语义 speaker gender detection；只识别 `speaker` 标签中的显式 `male` / `男` / `female` / `女` 标记。
 - 不做自动角色命名或人工修正文件。
 - 不做原主播 voice clone。
 - 不做新模型训练或修改 `spk2info.pt`。
 
 ## 配置
 
-默认配置仍然指向单音色基线；当 script 里只有 0/1 个 speaker 且没有显式女声标签时使用它：
+默认配置指向 300M SFT：
 
 ```yaml
 tts:
   provider: local_cli
   command: "tts-wrapper"
-  voice: "default-zh"
-  mode: "cross_lingual"
-  prompt_wav: "/path/to/CosyVoice/asset/cross_lingual_prompt.wav"
+  voice: "sft_builtin_4role"
+  cosyvoice_repo: "/path/to/CosyVoice"
   speed: 1.0
 ```
 
-多人播客不用手动切换 voice。只要 `script/zh.json` 中有 2 个及以上 speaker，或单个 speaker 标签包含 `female` / `女`，`synthesize` 会自动使用：
+旧配置中如果仍写 `voice: "default-zh"`，`synthesize` 会自动覆盖为：
 
 ```yaml
 tts:
   provider: local_cli
   command: "tts-wrapper"
-  voice: "sft_builtin_4role" # selected automatically for 2+ speakers
+  voice: "sft_builtin_4role"
   cosyvoice_repo: "/home/th5090d/Develop/ai_tools/CosyVoice"
   speed: 1.0
 ```
@@ -109,15 +110,16 @@ tts:
 结果：
 
 ```text
-17 passed
-55 passed
+20 passed
+58 passed
 ```
 
 已覆盖：
 
-- 0/1 个 speaker 且没有显式女声标签时保持 `default-zh` / `CosyVoice2 cross_lingual`。
-- 单个 speaker 标签包含 `female` 或 `女` 时自动切到 `sft_builtin_4role` / `female_a`。
-- 2 个及以上 speaker 会从 `default-zh` 自动切到 `sft_builtin_4role`。
+- 0/1 个 speaker 且没有显式性别标签时使用 `sft_builtin_4role` / `female_a`。
+- 单个 speaker 标签包含 `male` / `男` 时使用 `sft_builtin_4role` / `male_a`。
+- 单个 speaker 标签包含 `female` / `女` 时使用 `sft_builtin_4role` / `female_a`。
+- 2 个及以上 speaker 会使用 `sft_builtin_4role` 的四角色映射。
 - `synthesize` 按 speaker 首次出现顺序稳定分配四角色。
 - `segments/manifest.json` 记录 `speaker` 和 `voice_role`。
 - `tts-batch.json` 每个 item 写入 `voice_role`。

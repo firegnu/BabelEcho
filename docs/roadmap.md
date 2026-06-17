@@ -34,7 +34,7 @@
 
 - Fixture 全链路：`ingest -> normalize -> adapt -> synthesize -> assemble -> publish`。
 - DeepSeek API 生成自然中文口播稿。
-- 5090D 本地 CosyVoice2 生成真实中文 wav/MP3。
+- 5090D 本地 TTS 生成真实中文 wav/MP3；MVP-1 当前运行默认已切到 `CosyVoice-300M-SFT`。
 - Transcript parser 已解析并清洗真实 speaker label，例如 `Host:`、`Nick Hague:`；label 写入 `segment["speaker"]`，不再留在 `segment["text"]` 中被 TTS 朗读。
 - NASA 真实 transcript 样本已在 5090D 上重新跑通 `normalize -> adapt -> synthesize -> assemble -> publish`。
 - `nasa-crew9-real-smoke` 验证结果：normalized/script/manifest 都是 9 段；中文脚本 label 扫描无 `主持人：` / `尼克·黑格：` 朗读式标签；最终 MP3 为 `24000 Hz`、mono、约 `361.1s`。
@@ -69,7 +69,7 @@
   - TTS 输出 wav 为空时失败。
   - 最终 MP3 时长、采样率、声道可检查。
 - 已增加专有名词和发音 override 的简单配置：`overrides.path` 加 `babelecho overrides`，在 TTS 前对中文脚本做本地精确替换。
-- 已完成真实自用回归：`mvp05-selfuse-nasa` 使用 NASA Crew-9 transcript，经 DeepSeek adapt、`babelecho script` 预览、override、5090D CosyVoice2 TTS、assemble 和 publish 跑通。
+- 已完成真实自用回归：`mvp05-selfuse-nasa` 使用 NASA Crew-9 transcript，经 DeepSeek adapt、`babelecho script` 预览、override、5090D 本地 TTS、assemble 和 publish 跑通。
 - `mvp05-selfuse-nasa` 验证结果：script/manifest 均为 9 段；override 命中 10 次；最终 MP3 为 `24000 Hz`、mono、约 `355.5s`；`workspace/published/feed.xml` 已生成。
 
 验收标准：
@@ -84,16 +84,16 @@
 
 需要做：
 
-- 固定中文默认音色基线已选定：`cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`，对应第二轮样本 `d-cross-lingual-speed-100.mp3`。
+- 运行默认已改为单模型 `CosyVoice-300M-SFT` / `sft_builtin_4role`，不用再部署 CosyVoice2。
 - 固定音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
-- 当前不再继续围绕 CosyVoice 内置的两个 wav 反复微调；后续如需新固定音色，准备本地授权的男声/中性参考 wav，再用同一条 `cross_lingual` 路线替换 `prompt_wav` 做对比。
-- 准备 2 到 3 个固定中文音色，至少保留主持人和嘉宾的候选区分；这属于后续语音专项，不阻塞真实 podcast 来源接入。
+- 历史 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0` 样本只保留为校准记录；当前不再继续围绕 CosyVoice 内置的两个 wav 反复微调。
+- 后续如需新固定音色，优先找可直接用于 300M SFT 或同级单模型部署的方案，不阻塞真实 podcast 来源接入。
 - 已支持第一版 RSS feed 输入：`babelecho run --podcast-feed ...`，并用公开 feed 跑通到 `adapt`。
 - 已支持 RSS item 内的 `podcast:transcript`。
-- 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D CosyVoice cross-lingual 默认音色生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
+- 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D TTS 生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
-- 已选定 MVP-1 固定音色选择规则：0/1 个 distinct speaker 且没有显式女声标签时使用原默认 `CosyVoice2-0.5B` cross-lingual 基线；单个 speaker 标签包含 `female` 或 `女` 时切到 `tts.voice=sft_builtin_4role` 的 `female_a`；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
-- `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，也不依赖额外参考 wav。
+- 已选定 MVP-1 单模型 TTS 规则：运行默认只部署 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`；0/1 个 distinct speaker 且没有显式性别标签时使用 `female_a`，单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 使用 `speaker -> voice_role` 稳定映射。
+- `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，不依赖额外参考 wav，也不要求部署 `CosyVoice2-0.5B`。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中按 speaker 首次出现顺序分配 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
 - 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
@@ -103,7 +103,7 @@
 
 验收标准：
 
-- 已选出一个比当前默认女声更克制的中文默认音色：`cross_lingual_prompt.wav + speed=1.0`。
+- 当前运行默认改为 `CosyVoice-300M-SFT`，历史 `cross_lingual_prompt.wav + speed=1.0` 只保留为校准记录，不作为部署要求。
 - 一个有公开 `podcast:transcript` 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出；三到四人节目可以用 `sft_builtin_4role` 输出可区分的固定角色。
 - 已处理 episode 不重复生成。
@@ -137,7 +137,7 @@
 
 这些能力有价值，但不应该阻塞自用版本：
 
-- 本地授权男声/中性参考 wav 比选：收集或录制可长期使用的参考音频，用 `mode=cross_lingual` 替换 `prompt_wav`，与当前默认基线对比。它是固定音色扩展，不是原主播 voice clone。
+- 后续固定音色扩展：优先评估不重新引入双模型部署的方案；它是固定音色扩展，不是原主播 voice clone。
 - 本地 LLM 替代 DeepSeek。
 - ASR fallback，用于没有 transcript 的 episode。
 - 原主播 voice clone。

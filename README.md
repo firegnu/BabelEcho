@@ -2,7 +2,7 @@
 
 BabelEcho is a local-first pipeline for converting English podcast transcripts into Chinese podcast audio.
 
-MVP-0 and MVP-0.5 are complete. MVP-1 has selected the fixed voice rule: single-speaker scripts without an explicit female marker use the original `CosyVoice2-0.5B` cross-lingual baseline, single speakers labeled with `female` or `女` use `sft_builtin_4role`/`female_a`, and 2+ speakers automatically use `sft_builtin_4role` with `CosyVoice-300M-SFT` built-in speakers. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
+MVP-0 and MVP-0.5 are complete. MVP-1 has selected one deployed TTS model: `CosyVoice-300M-SFT`. Single-speaker scripts use `female_a` by default, explicit `male`/`男` labels use `male_a`, explicit `female`/`女` labels use `female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping with the built-in `female_a / male_a / female_b / male_b` roles. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
 
 Current validation track: use DeepSeek API for the LLM adaptation baseline, then use the 5090D for local Chinese TTS. This is a temporary hybrid path to validate script quality and audio synthesis before replacing the cloud LLM with a local model.
 
@@ -18,7 +18,7 @@ The current pipeline supports:
 - Partial pipeline execution with `babelecho run --to-stage ...` and resume with `--from-stage ...`.
 - Chinese script preview with `babelecho script` before TTS.
 - Local terminology and pronunciation overrides before TTS with exact replacements.
-- Automatic TTS model selection: single speaker without an explicit female marker stays on the original fixed voice; single speaker labeled with `female` or `女` uses `female_a`; 2+ speakers use stable `speaker -> voice_role` mapping with `sft_builtin_4role`.
+- Automatic TTS voice-role selection on `CosyVoice-300M-SFT`: unlabeled single speaker uses `female_a`, explicit male/female single speakers use `male_a`/`female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping.
 - Basic artifact checks with `babelecho check`.
 - Run status tracking in `workspace/runs/<run-id>/run.json`.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.

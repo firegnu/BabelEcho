@@ -42,6 +42,23 @@ def test_resolve_config_uses_env_defaults(monkeypatch, tmp_path: Path):
     assert config.speed == 1.0
 
 
+def test_resolve_config_defaults_to_sft_builtin_4role(monkeypatch, tmp_path: Path):
+    wrapper = load_wrapper()
+    monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
+    monkeypatch.setenv("COSYVOICE_MODEL_DIR", "/models/CosyVoice2-0.5B")
+    args = wrapper.parse_args(
+        [
+            "--batch-file",
+            str(tmp_path / "tts-batch.json"),
+        ]
+    )
+
+    config = wrapper.resolve_config(args)
+
+    assert config.voice == "sft_builtin_4role"
+    assert config.model_dir == Path("/opt/CosyVoice/pretrained_models/CosyVoice-300M-SFT")
+
+
 def test_resolve_config_accepts_cross_lingual_voice_options(monkeypatch, tmp_path: Path):
     wrapper = load_wrapper()
     monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")

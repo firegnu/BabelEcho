@@ -15,18 +15,18 @@
 - `babelecho script` 可以在 TTS 前预览 `script/zh.json`，并提示编辑后从 `synthesize` 继续；`publish` 会把 feed 和 episode artifacts 同步到稳定目录 `workspace/published/`。
 - `overrides.path` 和 `babelecho overrides` 可以在 TTS 前对 `script/zh.json` 做本地精确替换；示例词表是 tracked `workspace/config/overrides.example.yaml`，真实词表继续放 ignored `workspace/config/overrides.yaml`。
 - 5090D 上 fixture 全链路已经跑通：ingest -> normalize -> adapt(fixture) -> synthesize(fixture) -> assemble -> publish。
-- 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 CosyVoice2 生成真实 wav/MP3 的真实 TTS 基线，但还没有 voice clone、ASR 或真实播客来源接入。
+- 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 TTS 生成真实 wav/MP3 的真实基线，但还没有 voice clone、ASR 或完整真实播客来源接入。
 - 自制长样本、NASA 真实 podcast transcript 和 MVP-0.5 自用回归都已经生成可听中文 MP3；下一步不要再做泛泛听感实验，应进入 MVP-1 Real Podcasts。
-- MVP-1 固定中文默认音色基线已选定：`cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`；不做原主播 voice clone。
+- MVP-1 当前 TTS 运行默认已改为单模型：只部署 `CosyVoice-300M-SFT`，使用 `tts.voice=sft_builtin_4role`；不做原主播 voice clone。
 - 音色校准第一轮已生成三条本地 TTS 样本，未调用 DeepSeek：`workspace/runs/voice-calibration-20260617/a-current-zero-shot-female.mp3`、`b-neutral-instruct2-female.mp3`、`c-cross-lingual-reference.mp3`。这些产物在 ignored `workspace/runs/` 下，不提交。
-- 用户当前反馈：D 最满意。MVP-1 默认固定中文音色基线已选定为 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0`，对应 `workspace/runs/voice-calibration-20260617-round2/d-cross-lingual-speed-100.mp3`。
+- 用户曾反馈 D 最满意；但后续单男、单女、多人验证后，MVP-1 运行默认已改为 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`，历史 D 样本只保留为校准记录。
 - 不再继续围绕 CosyVoice 内置两个 wav 反复微调。后续如需新固定音色，准备本地授权的男声/中性参考 wav，再用同一条 `cross_lingual` 路线替换 `prompt_wav` 做对比；该项已按 voice clone 类似方式放入 deferred voice work，但它不是原主播 voice clone。
 - MVP-1 真实来源第一版已完成：新增 `source.type=podcast_rss` 和 `babelecho run --podcast-feed ...`，只支持 RSS item 内的 `podcast:transcript`，找不到 transcript 时明确失败，不做 ASR。公开 RSS smoke 使用 `https://feeds.transistor.fm/podcasting-advice` 跑到 `adapt`，fixture script 共 74 段，未调用 DeepSeek。
-- MVP-1 公开 RSS 端到端 Real Run 已完成：`mvp1-real-rss-monetize-20260617` 使用 `https://feeds.transistor.fm/podcasts-for-profit-with-morgan-franklin` 的 `#030: When Should You Monetize Your Podcast?`，经 RSS transcript -> DeepSeek -> 5090D CosyVoice cross_lingual 默认音色 -> MP3 -> feed 全链路成功；script/manifest 75 段，MP3 `24000 Hz` mono，约 `840.8s`，产物在 ignored `workspace/runs/mvp1-real-rss-monetize-20260617/`。
+- MVP-1 公开 RSS 端到端 Real Run 已完成：`mvp1-real-rss-monetize-20260617` 使用 `https://feeds.transistor.fm/podcasts-for-profit-with-morgan-franklin` 的 `#030: When Should You Monetize Your Podcast?`，经 RSS transcript -> DeepSeek -> 5090D TTS -> MP3 -> feed 全链路成功；script/manifest 75 段，MP3 约 `840.8s`，产物在 ignored `workspace/runs/mvp1-real-rss-monetize-20260617/`。
 - MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 只加载一次 CosyVoice 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
-- MVP-1 固定音色规则已选定并实现：`script/zh.json` 中 0/1 个 distinct speaker 且没有显式女声标签时继续使用原默认 `CosyVoice2-0.5B + cross_lingual_prompt.wav + speed=1.0`；单个 speaker 标签包含 `female` 或 `女` 时自动切到 `tts.voice=sft_builtin_4role` 的 `female_a`；2 个及以上 distinct speaker 自动切到 `tts.voice=sft_builtin_4role`。
-- `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；按 speaker 首次出现顺序映射到 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。不做原主播 voice clone，不依赖额外参考 wav。
-- 本机测试 `55 passed`；5090D 临时 wrapper smoke 已验证四角色真实 SFT wav 输出均为 `22050 Hz` mono。计划记录见 `docs/plans/02-real-podcasts/03-sft-builtin-4role-voice-profile.md`。
+- MVP-1 固定音色规则已选定并实现：运行默认只用 `CosyVoice-300M-SFT` 的 `tts.voice=sft_builtin_4role`。0/1 个 distinct speaker 且没有显式性别标签时使用 `female_a`；单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 按首次出现顺序映射到 `female_a / male_a / female_b / male_b`。
+- `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。不做原主播 voice clone，不依赖额外参考 wav，不要求部署 `CosyVoice2-0.5B`。
+- 本机测试计数以当前 `pytest -q` 为准；5090D 临时 wrapper smoke 已验证四角色真实 SFT wav 输出均为 `22050 Hz` mono。计划记录见 `docs/plans/02-real-podcasts/03-sft-builtin-4role-voice-profile.md`。
 - MVP-0 收口已完成：speaker label 解析/清洗、NASA 样本 `normalize -> adapt -> synthesize -> assemble -> publish` 回归、docs 标记完成。
 - `docs/roadmap.md` 已记录从 MVP-0 Acceptance 到 MVP-0.5 Self-use、MVP-1 Real Podcasts、MVP-2 Automation 的产品路线；当前下一阶段是 MVP-1。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
@@ -97,7 +97,7 @@ MacBook 已实现：
 - `workspace/config/overrides.example.yaml` 已添加示例词表，真实 `workspace/config/overrides.yaml` 被 ignore。
 - 本机全量测试：`38 passed`。
 
-5090D 已完成 DeepSeek API 和 `adapt` 验证，也完成 CosyVoice2 本地 TTS wrapper 验证。自制长样本、NASA 真实 podcast transcript 和 MVP-0.5 自用回归都已生成可听 MP3。MVP-0 acceptance 与 MVP-0.5 Self-use 已完成。下一步进入 MVP-1 Real Podcasts。不要同时接 ASR、voice clone、后台服务或 App。
+5090D 已完成 DeepSeek API 和 `adapt` 验证，也完成本地 TTS wrapper 验证。自制长样本、NASA 真实 podcast transcript 和 MVP-0.5 自用回归都已生成可听 MP3。MVP-0 acceptance 与 MVP-0.5 Self-use 已完成。下一步进入 MVP-1 Real Podcasts。不要同时接 ASR、voice clone、后台服务或 App。
 
 MVP-0.5 `babelecho run` 已在 5090D 上通过验证：
 
@@ -137,7 +137,7 @@ MVP-0.5 本地 override 已在 5090D 上通过验证：
 MVP-0.5 self-use acceptance 已在 5090D 上完成：
 
 - 真实 run-id：`mvp05-selfuse-nasa`。
-- 回归流程：真实 NASA Crew-9 transcript -> `ingest` -> `normalize` -> `adapt(DeepSeek)` -> `babelecho script` 预览 -> override -> `run --from-stage synthesize` -> CosyVoice2 TTS -> `assemble` -> `publish`。
+- 回归流程：真实 NASA Crew-9 transcript -> `ingest` -> `normalize` -> `adapt(DeepSeek)` -> `babelecho script` 预览 -> override -> `run --from-stage synthesize` -> 本地 TTS -> `assemble` -> `publish`。
 - script/manifest 均为 9 段；override 命中 10 次。
 - 最终 MP3 为 `24000 Hz`、mono、约 `355.5s`。
 - `run.json` 输出 `status=succeeded`、`from_stage=synthesize`；`workspace/published/feed.xml` 已生成。
@@ -191,7 +191,7 @@ MVP-0.5 self-use acceptance 已在 5090D 上完成：
 - DeepSeek 生成的 `workspace/runs/fixture-smoke/script/zh.json` 样例输出为自然中文：`欢迎收听本期节目。`
 - 5090D 上本地 TTS 专用环境是 `/home/th5090d/miniforge3/envs/babelecho-tts`。
 - CosyVoice 代码目录是 `/home/th5090d/Develop/ai_tools/CosyVoice`。
-- CosyVoice2 模型目录是 `/home/th5090d/Develop/ai_tools/CosyVoice/pretrained_models/CosyVoice2-0.5B`。
+- 历史 CosyVoice2 模型目录是 `/home/th5090d/Develop/ai_tools/CosyVoice/pretrained_models/CosyVoice2-0.5B`；MVP-1 当前运行默认不再要求部署它。
 - 远端 runtime launcher 是 `/home/th5090d/miniforge3/envs/babelecho-tts/bin/tts-wrapper`。
 - `workspace/config/local-cosyvoice.yaml` 是 ignored runtime config，TTS command 指向上述 launcher。
 - `babelecho synthesize --workspace workspace --run-id fixture-smoke --local-config workspace/config/local-cosyvoice.yaml` 已成功生成真实 wav。
@@ -207,7 +207,7 @@ MVP-0.5 self-use acceptance 已在 5090D 上完成：
 MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 
 ```text
-真实英文 transcript -> normalized.json -> DeepSeek 中文口播稿 -> 5090D CosyVoice2 -> wav segments -> MP3 -> publish/feed.xml
+真实英文 transcript -> normalized.json -> DeepSeek 中文口播稿 -> 5090D CosyVoice-300M-SFT -> wav segments -> MP3 -> publish/feed.xml
 ```
 
 下一步继续 MVP-1 Real Podcasts：
@@ -238,7 +238,7 @@ MVP-0 acceptance 已满足：
 
 MVP-0.5 acceptance 已满足：
 
-- `mvp05-selfuse-nasa` 使用真实 NASA Crew-9 transcript，跑通 DeepSeek adapt、脚本预览、override、5090D CosyVoice2 TTS、assemble 和 publish。
+- `mvp05-selfuse-nasa` 使用真实 NASA Crew-9 transcript，跑通 DeepSeek adapt、脚本预览、override、5090D 本地 TTS、assemble 和 publish。
 - 最终 MP3 和稳定 feed 已生成，产物已拷回本机 ignored `workspace/runs/mvp05-selfuse-nasa/`。
 - `run --to-stage adapt` 已支持 TTS 前停下预览，`run --from-stage synthesize` 已支持从预览/编辑后的脚本继续。
 
@@ -248,7 +248,7 @@ MVP-0.5 acceptance 已满足：
 - 真实 podcast 来源扩展和多 episode feed 仍在 MVP-1 后续。
 - 固定中文音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 第一轮和第二轮音色校准样本已在 5090D 生成并拷回本机 ignored `workspace/runs/`；这些音频不进入 git。
-- 用户已反馈 D 最满意；MVP-1 默认固定中文音色基线采用 `cross_lingual_prompt.wav + speed=1.0`。
+- 用户曾反馈 D 最满意；后续单男、单女、多人验证后，MVP-1 运行默认已改为 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`，D 样本只保留为历史校准记录。
 - 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；TTS batch wrapper 已解决每段重复加载 CosyVoice 的主要性能问题；`sft_builtin_4role` 已提供 MVP-1 多 speaker 基线。后续重点转向真实 RSS 多 speaker 回归、更多 transcript 发现形态和多 episode feed。授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
 
 ## 如果发生分支情况
