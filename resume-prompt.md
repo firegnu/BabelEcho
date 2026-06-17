@@ -62,6 +62,13 @@ MacBook 已实现：
 
 5090D 已完成 DeepSeek API 和 `adapt` 验证，也完成 CosyVoice2 本地 TTS wrapper 验证。自制长样本和 NASA 真实 podcast transcript 都已生成可听 MP3。MVP-0 acceptance 已完成：NASA 样本重新生成 9 段 normalized/script/manifest，中文脚本无朗读式 speaker label，`publish/feed.xml` 和 episode artifacts 已验证。下一步进入 MVP-0.5 Self-use。不要同时接 ASR、voice clone、后台服务、App 或真实来源发现。
 
+MVP-0.5 `babelecho run` 已在 5090D 上通过验证：
+
+- 远端全量测试：`23 passed`。
+- `run-command-smoke` 使用 fixture config 跑通 `babelecho run`。
+- 生成 `transcript/normalized.json`、`script/zh.json`、`segments/manifest.json`、`output/audio.mp3`、`publish/feed.xml` 和 episode MP3。
+- script/manifest 均为 1 段。
+
 ## 必读文件
 
 按顺序读：

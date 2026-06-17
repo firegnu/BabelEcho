@@ -88,6 +88,8 @@
   - `run` 支持 `--from-stage` 从 `ingest`、`normalize`、`adapt`、`synthesize`、`assemble` 或 `publish` 继续执行。
   - `tests/test_end_to_end_fixture.py` 覆盖 fixture 全链路和从 `synthesize` 恢复执行，保护手工编辑后的 `script/zh.json` 不被重新 adapt 覆盖。
   - 本机全量测试：`23 passed`。
+  - 5090D 全量测试：`23 passed`。
+  - 5090D fixture smoke：`run-command-smoke` 使用 `babelecho run` 生成 `transcript/normalized.json`、`script/zh.json`、`segments/manifest.json`、`output/audio.mp3`、`publish/feed.xml` 和 episode MP3；script/manifest 均为 1 段。
 
 ## 3. 待完成的工作
 
