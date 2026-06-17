@@ -9,6 +9,7 @@
 - 明确产品边界：后端负责拉取 transcript、转译、生成中文音频和发布产物；macOS App 后续只消费已转换好的中文 podcast，不参与转换流程。
 - 明确 MVP-0 约束：只支持完整 transcript 输入，不做 ASR、不做音频-only 输入、不做原主播 voice clone、不做后台服务或 App 集成。
 - 已实现分阶段 Python CLI：
+  - `run`：一条命令编排 `ingest -> normalize -> adapt -> synthesize -> assemble -> publish`。
   - `ingest`：读取 transcript URL 或本地 transcript 文件。
   - `normalize`：解析 `.vtt`、`.srt`、`.txt` 到统一 JSON。
   - `adapt`：当前已支持 fixture LLM、本地 OpenAI-compatible vLLM，以及 DeepSeek/OpenAI-compatible provider。
@@ -82,18 +83,21 @@
   - `nasa-crew9-real-smoke` 最终 normalized/script/manifest 均为 9 段；英文 segment text 无 `Host:` / `Nick Hague:` 标签残留；中文脚本无 `主持人：` / `尼克·黑格：` 朗读式标签残留。
   - 最终 MP3：`mp3`、`24000 Hz`、mono、约 `361.1s`。
   - 已验证 publish artifacts：`publish/feed.xml`、episode MP3、`transcript.en.json`、`transcript.zh.json`、`metadata.json`。
+- 已开始 MVP-0.5 Self-use：
+  - `src/babelecho/cli.py` 增加 `babelecho run`。
+  - `run` 支持 `--from-stage` 从 `ingest`、`normalize`、`adapt`、`synthesize`、`assemble` 或 `publish` 继续执行。
+  - `tests/test_end_to_end_fixture.py` 覆盖 fixture 全链路和从 `synthesize` 恢复执行，保护手工编辑后的 `script/zh.json` 不被重新 adapt 覆盖。
+  - 本机全量测试：`23 passed`。
 
 ## 3. 待完成的工作
 
 - MVP-0 acceptance 已完成：完整 transcript 到中文 MP3，再到静态 RSS/episode artifacts 的真实路径已经跑通。
 - 下一阶段是 MVP-0.5 Self-use，目标是让手动导入 transcript 后可以稳定生成一个私有中文 podcast feed，并能在播客客户端里听。
-- MVP-0.5 优先任务：
-  1. 增加一条完整 pipeline 命令，例如 `babelecho run --workspace ... --run-id ... --source-config ... --local-config ...`。
-  2. 支持手动导入 transcript 文件作为一等入口。
-  3. 明确每次 run 的状态、输入、输出路径和失败阶段。
-  4. 支持从失败阶段继续执行，避免每次从头跑。
-  5. 增加基础质量检查和 TTS 前中文脚本人工编辑入口。
-  6. 增加专有名词和发音 override 的简单配置。
+- MVP-0.5 后续优先任务：
+  1. 支持手动导入 transcript 文件作为稳定入口。
+  2. 明确每次 run 的状态、输入、输出路径和失败阶段。
+  3. 增加基础质量检查和 TTS 前中文脚本人工编辑入口。
+  4. 增加专有名词和发音 override 的简单配置。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 CosyVoice2 合成 wav，但仍不是完整产品：
   - 来源仍是手写 YAML 指向 transcript 文件，没有接真实 Apple Podcasts、Spotify、YouTube 或其他来源发现逻辑。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
@@ -143,17 +147,14 @@
 
 ## 6. 下一步建议
 
-1. 为 MVP-0.5 写一个小计划，重点是一条命令自用流程，而不是扩展真实来源或 App。
-2. 实现 `babelecho run` 或等价编排命令：
-   - 串起 `ingest -> normalize -> adapt -> synthesize -> assemble -> publish`。
-   - 支持从指定阶段继续执行。
-   - 清楚输出 run 状态和 artifact 路径。
-3. 增加基础质量检查：
+1. 为 MVP-0.5 的下一段写一个小计划，重点是质量检查和人工脚本编辑，不要扩展真实来源或 App。
+2. 增加基础质量检查：
    - 中文脚本为空时失败。
    - 单段文本过长时提醒或失败。
    - TTS 输出 wav 为空时失败。
    - 最终 MP3 时长、采样率、声道可检查。
-4. 增加 TTS 前人工编辑入口，至少允许用户手动改 `script/zh.json` 后继续跑。
+3. 增加 TTS 前人工编辑入口，至少允许用户手动改 `script/zh.json` 后用 `babelecho run --from-stage synthesize` 继续跑。
+4. 固定私有静态发布目录和稳定 `feed.xml` 路径。
 5. 不要在下一步同时推进 ASR、voice clone、App、后台服务或真实来源发现。
 
 ## 当前 Git 状态

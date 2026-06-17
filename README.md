@@ -2,17 +2,18 @@
 
 BabelEcho is a local-first pipeline for converting English podcast transcripts into Chinese podcast audio.
 
-The current focus is MVP-0: take one complete English transcript, adapt it into a natural Chinese spoken script, synthesize Chinese audio locally, assemble the final audio file, and publish a minimal podcast feed.
+MVP-0 is complete. The current focus is MVP-0.5: make the transcript-first pipeline usable for self-use by running one complete English transcript through adaptation, local TTS, assembly, and static podcast publishing with a single command.
 
 Current validation track: use DeepSeek API for the LLM adaptation baseline, then use the 5090D for local Chinese TTS. This is a temporary hybrid path to validate script quality and audio synthesis before replacing the cloud LLM with a local model.
 
 ## Current Scope
 
-MVP-0 supports:
+The current pipeline supports:
 
 - Transcript-first input only.
 - Local-first execution, with a temporary DeepSeek API exception for the LLM adaptation baseline.
 - Stage-by-stage Python CLI commands.
+- One-command pipeline orchestration with `babelecho run`.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.
 - Fixture tests for the full pure pipeline.
 - Static podcast output: `feed.xml` plus generated audio artifacts.
@@ -60,7 +61,7 @@ conda create -p ./.conda/babelecho-dev python=3.12 pip setuptools wheel pytest p
 .conda/babelecho-dev/bin/python -m pytest -v
 ```
 
-## Running MVP-0
+## Running The Pipeline
 
 See [docs/backend-mvp0-runbook.md](docs/backend-mvp0-runbook.md).
 

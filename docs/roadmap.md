@@ -54,10 +54,10 @@
 
 需要做：
 
-- 增加一条完整 pipeline 命令，例如 `babelecho run --workspace ... --run-id ... --source-config ... --local-config ...`。
+- 已增加一条完整 pipeline 命令：`babelecho run --workspace ... --run-id ... --source-config ... --local-config ...`。
+- 已支持 `--from-stage` 从指定阶段继续执行，避免每次从头跑。
 - 支持手动导入 transcript 文件作为一等入口。
 - 明确每次 run 的状态、输入、输出路径和失败阶段。
-- 支持从失败阶段继续执行，避免每次从头跑。
 - 固定私有静态发布目录和稳定 `feed.xml` 路径。
 - 增加基础质量检查：
   - 中文脚本为空时失败。
@@ -134,8 +134,8 @@
 
 ## 当前最高优先级
 
-1. 开始 MVP-0.5 的一条命令自用流程。
-2. 支持手动导入 transcript 作为稳定入口。
-3. 明确 run 状态、失败阶段和恢复执行方式。
-4. 增加基础质量检查和 TTS 前中文脚本人工编辑入口。
+1. 支持手动导入 transcript 作为稳定入口。
+2. 明确 run 状态、失败阶段和恢复执行方式。
+3. 增加基础质量检查和 TTS 前中文脚本人工编辑入口。
+4. 固定私有静态发布目录和稳定 `feed.xml` 路径。
 5. 保留多说话人 `speaker -> voice` 映射到后续 MVP-1/专项计划。

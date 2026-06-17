@@ -5,10 +5,11 @@
 ## 给新 session 的第一条指令
 
 ```text
-你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 已完成，下一步进入 MVP-0.5 Self-use。
+你现在在 BabelEcho 项目中工作。请先阅读 resume-prompt.md、HANDOFF.md、docs/roadmap.md、docs/plans/README.md、docs/plans/01-backend-mvp0/01-local-llm-adapt.md 和 docs/plans/01-backend-mvp0/03-local-tts.md。01.01 DeepSeek LLM Adapt 基线接入已经完成，01.03 本地中文 TTS 接入也已在 5090D 上完成验证；MVP-0 acceptance 已完成，MVP-0.5 的 `babelecho run` 一条命令编排已完成。
 
 重要约束：
 - 当前 MVP-0 是 transcript-first 工程链路；核心路径和 acceptance 已正式收口。
+- MVP-0.5 已开始：`babelecho run` 可以串起 `ingest -> normalize -> adapt -> synthesize -> assemble -> publish`，并支持 `--from-stage` 从指定阶段继续执行。
 - 5090D 上 fixture 全链路已经跑通：ingest -> normalize -> adapt(fixture) -> synthesize(fixture) -> assemble -> publish。
 - 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 CosyVoice2 生成真实 wav/MP3 的真实 TTS 基线，但还没有 voice clone、ASR 或真实播客来源接入。
 - 自制长样本和 NASA 真实 podcast transcript 都已经生成可听中文 MP3；下一步不要再做泛泛听感实验，应进入 MVP-0.5 自用流程。
@@ -27,6 +28,7 @@
 docs/plans/01-backend-mvp0/01-local-llm-adapt.md
 docs/plans/01-backend-mvp0/03-local-tts.md
 MVP-0 Acceptance closeout
+MVP-0.5 babelecho run command
 ```
 
 进度：
@@ -52,9 +54,11 @@ MacBook 已实现：
 - `tests/test_llm.py` 覆盖 DeepSeek provider 行为。
 - `src/babelecho/transcript.py` 解析 speaker label，把 `Host:`、`Nick Hague:`、`Host (Dane Turner):` 等标签写入 `segment["speaker"]`，并从 `segment["text"]` 中移除。
 - `tests/test_transcript.py` 覆盖段首 label、段内多轮 speaker turn 和普通冒号不误判。
+- `src/babelecho/cli.py` 增加 `babelecho run`，支持完整 pipeline 编排和 `--from-stage` 续跑。
+- `tests/test_end_to_end_fixture.py` 覆盖 `run` 的 fixture 全链路和从 `synthesize` 恢复执行。
 - `workspace/config/local.example.yaml` 已改成 DeepSeek LLM + 本地 TTS 示例。
 - `workspace/config/deepseek.env.example` 已添加，真实 `workspace/config/deepseek.env` 被 ignore。
-- 本机全量测试：`21 passed`。
+- 本机全量测试：`23 passed`。
 
 5090D 已完成 DeepSeek API 和 `adapt` 验证，也完成 CosyVoice2 本地 TTS wrapper 验证。自制长样本和 NASA 真实 podcast transcript 都已生成可听 MP3。MVP-0 acceptance 已完成：NASA 样本重新生成 9 段 normalized/script/manifest，中文脚本无朗读式 speaker label，`publish/feed.xml` 和 episode artifacts 已验证。下一步进入 MVP-0.5 Self-use。不要同时接 ASR、voice clone、后台服务、App 或真实来源发现。
 
@@ -80,6 +84,7 @@ MacBook 已实现：
 - 当前协作方式：本机改代码并 push，必要时通过 `ssh my-5090d-host` 在 5090D 上远程执行验证命令；不在 5090D 上安装或运行 Codex agent。
 - MVP-0 acceptance 收口基线提交是 `815c296 docs: mark mvp0 acceptance complete`；当前 `origin/main` 可能包含后续 handoff 文档刷新提交。新 session 以 `git log --oneline -3` 为准；如果需要在 5090D 上跑验证，先在远端 `git pull`。
 - 已有 CLI 阶段：
+  - `run`
   - `ingest`
   - `normalize`
   - `adapt`
@@ -109,25 +114,23 @@ MacBook 已实现：
 
 ## 下一个目标
 
-MVP-0 acceptance 已完成：
+MVP-0 acceptance 已完成，MVP-0.5 第一段 `babelecho run` 已完成：
 
 ```text
 真实英文 transcript -> normalized.json -> DeepSeek 中文口播稿 -> 5090D CosyVoice2 -> wav segments -> MP3 -> publish/feed.xml
 ```
 
-下一步进入 MVP-0.5 Self-use：
+下一步继续 MVP-0.5 Self-use：
 
-1. 增加一条完整 pipeline 命令，例如 `babelecho run --workspace ... --run-id ... --source-config ... --local-config ...`。
-2. 支持手动导入 transcript 文件作为一等入口。
-3. 明确每次 run 的状态、输入、输出路径和失败阶段。
-4. 支持从失败阶段继续执行，避免每次从头跑。
-5. 增加基础质量检查：
+1. 支持手动导入 transcript 文件作为一等入口。
+2. 明确每次 run 的状态、输入、输出路径和失败阶段。
+3. 增加基础质量检查：
    - 中文脚本为空时失败。
    - 单段文本过长时提醒或失败。
    - TTS 输出 wav 为空时失败。
    - 最终 MP3 时长、采样率、声道可检查。
-6. 增加中文脚本人工预览和编辑入口，至少允许在 TTS 前手动改 `script/zh.json`。
-7. 增加专有名词和发音 override 的简单配置。
+4. 增加中文脚本人工预览和编辑入口，至少允许在 TTS 前手动改 `script/zh.json`。
+5. 增加专有名词和发音 override 的简单配置。
 
 不要进入：
 
@@ -153,7 +156,7 @@ MVP-0 acceptance 已满足：
 仍然保留到后续阶段：
 
 - 真实两人或多人播客不能长期使用单一中文声音；后续必须做 `speaker -> voice` 映射，至少支持主持人和嘉宾不同固定音色。
-- 自用版本还缺一条命令、失败恢复、质量检查、人工脚本编辑和稳定私有 feed 流程。
+- 自用版本还缺更明确的状态记录、质量检查、人工脚本编辑和稳定私有 feed 流程。
 
 ## 如果发生分支情况
 

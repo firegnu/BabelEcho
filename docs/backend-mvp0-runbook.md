@@ -59,6 +59,43 @@ tts:
 
 ## Commands
 
+Preferred MVP-0.5 self-use entry:
+
+```bash
+export PYTHON=.conda/babelecho-dev/bin/python
+export WORKSPACE=/path/to/babelecho-workspace
+export RUN_ID=first-episode
+export SOURCE_CONFIG=$WORKSPACE/sources/hardcoded.yaml
+export LOCAL_CONFIG=$WORKSPACE/config/local.yaml
+
+$PYTHON -m babelecho run \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --source-config "$SOURCE_CONFIG" \
+  --local-config "$LOCAL_CONFIG"
+```
+
+The command runs:
+
+```text
+ingest -> normalize -> adapt -> synthesize -> assemble -> publish
+```
+
+To resume after editing or preserving earlier artifacts, use `--from-stage`:
+
+```bash
+$PYTHON -m babelecho run \
+  --workspace "$WORKSPACE" \
+  --run-id "$RUN_ID" \
+  --source-config "$SOURCE_CONFIG" \
+  --local-config "$LOCAL_CONFIG" \
+  --from-stage synthesize
+```
+
+Supported values are `ingest`, `normalize`, `adapt`, `synthesize`, `assemble`, and `publish`. For example, `--from-stage synthesize` reuses the existing `script/zh.json`, which is useful after manually editing the Chinese script or avoiding another paid LLM call.
+
+Individual stage commands remain useful for debugging:
+
 ```bash
 export PYTHON=.conda/babelecho-dev/bin/python
 export WORKSPACE=/path/to/babelecho-workspace
@@ -85,7 +122,7 @@ $PYTHON -m babelecho publish --workspace "$WORKSPACE" --run-id "$RUN_ID" --local
 
 ## Local Fixture Test
 
-Use this on the MacBook or 5090D to verify the pure pipeline without real LLM, TTS, or ffmpeg execution:
+Use this on the MacBook or 5090D to verify the pure pipeline without real LLM or TTS execution:
 
 ```bash
 .conda/babelecho-dev/bin/python -m pytest -v
