@@ -314,6 +314,87 @@ publish:
     assert status["input"]["episode_url"] == "https://example.com/feed-episode"
 
 
+def test_run_command_accepts_podcast_index_episode_source_config(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    source_config = tmp_path / "source.yaml"
+    local_config = tmp_path / "local.yaml"
+    transcript = Path("tests/fixtures/sample.vtt").resolve()
+    episode_json = tmp_path / "episode.json"
+    episode_json.write_text(
+        f"""{{
+  "episode": {{
+    "title": "PodcastIndex Feed Episode",
+    "link": "https://example.com/pi-episode",
+    "transcripts": [
+      {{
+        "url": "{transcript}",
+        "type": "text/vtt"
+      }}
+    ]
+  }}
+}}
+""",
+        encoding="utf-8",
+    )
+    source_config.write_text(
+        f"""
+source:
+  type: podcast_index_episode
+  episode_json: "{episode_json}"
+""",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "pi-feed-demo",
+            "--source-config",
+            str(source_config),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "adapt",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    run_dir = workspace / "runs" / "pi-feed-demo"
+    assert result.returncode == 0, result.stderr
+    assert "adapt:" in result.stdout
+    assert (run_dir / "transcript" / "raw.vtt").exists()
+    assert (run_dir / "script" / "zh.json").exists()
+
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "podcast_index_episode"
+    assert source["episode_json"] == str(episode_json)
+    assert source["title"] == "PodcastIndex Feed Episode"
+    assert source["original_url"] == "https://example.com/pi-episode"
+    assert source["transcript_url"] == str(transcript)
+
+    status = read_json(run_dir / "run.json")
+    assert status["input"]["source_config"] == str(source_config)
+
+
 def test_run_command_stops_at_requested_stage(tmp_path: Path):
     workspace = tmp_path / "workspace"
     local_config = tmp_path / "local.yaml"

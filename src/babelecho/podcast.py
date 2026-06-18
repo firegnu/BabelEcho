@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Any
 import xml.etree.ElementTree as ET
 
 
@@ -29,6 +30,13 @@ def _enclosure_url(item: ET.Element) -> str | None:
 
 def _item_url(item: ET.Element) -> str | None:
     return _text(item, "link") or _text(item, "guid") or _enclosure_url(item)
+
+
+def _str_value(value: Any) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
 
 
 def _matches_episode(item: ET.Element, episode_url: str | None) -> bool:
@@ -75,3 +83,43 @@ def discover_podcast_transcript(feed_bytes: bytes, episode_url: str | None = Non
     if episode_url and not matched_episode:
         raise ValueError(f"Episode not found in RSS feed: {episode_url}")
     raise ValueError("No transcript found in RSS feed episode")
+
+
+def _podcast_index_episode(payload: dict[str, Any]) -> dict[str, Any]:
+    episode = payload.get("episode")
+    if isinstance(episode, dict):
+        return episode
+    return payload
+
+
+def _podcast_index_transcript_url(episode: dict[str, Any]) -> str | None:
+    transcripts = episode.get("transcripts")
+    if isinstance(transcripts, list):
+        for transcript in transcripts:
+            if isinstance(transcript, dict):
+                url = _str_value(transcript.get("url"))
+                if url:
+                    return url
+
+    return _str_value(episode.get("transcriptUrl"))
+
+
+def _podcast_index_episode_url(episode: dict[str, Any]) -> str | None:
+    return (
+        _str_value(episode.get("link"))
+        or _str_value(episode.get("guid"))
+        or _str_value(episode.get("enclosureUrl"))
+    )
+
+
+def discover_podcast_index_transcript(payload: dict[str, Any]) -> PodcastTranscript:
+    episode = _podcast_index_episode(payload)
+    transcript_url = _podcast_index_transcript_url(episode)
+    if not transcript_url:
+        raise ValueError("No transcript found in PodcastIndex episode")
+
+    return PodcastTranscript(
+        title=_str_value(episode.get("title")) or "Untitled Episode",
+        episode_url=_podcast_index_episode_url(episode),
+        transcript_url=transcript_url,
+    )

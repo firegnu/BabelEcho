@@ -81,3 +81,10 @@ raw_transcript
   ```
 
   结果：找到 `https://share.transistor.fm/s/e6cbd9db/transcript.txt`，生成 `raw.txt`、`normalized.json` 和 fixture 中文脚本；script 共 74 段。该 smoke 使用 fixture LLM/TTS config，未调用 DeepSeek。
+
+2026-06-18 扩展记录：
+
+- 新增 `source.type=podcast_index_episode`，用于已获取的 PodcastIndex episode JSON。
+- `ingest` 优先读取 `transcripts[].url`，没有可用列表项时回退到 `transcriptUrl`。
+- `babelecho run --source-config ... --to-stage adapt` 已覆盖该 source type。
+- 该扩展不包含 PodcastIndex API 鉴权/请求、搜索或订阅扫描。

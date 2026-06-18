@@ -1,0 +1,5 @@
+source:
+  type: podcast_index_episode
+  # Local file path or URL containing a PodcastIndex episode JSON object or
+  # an API response with an "episode" object.
+  episode_json: "workspace/sources/podcast-index-episode.example.json"

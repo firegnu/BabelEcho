@@ -73,3 +73,79 @@ def test_ingest_podcast_rss_fails_when_episode_has_no_transcript(tmp_path: Path)
             },
             run_paths,
         )
+
+
+def test_ingest_podcast_index_episode_prefers_transcripts_list(tmp_path: Path):
+    transcript = tmp_path / "episode.srt"
+    transcript.write_text("1\n00:00:00,000 --> 00:00:01,000\nHello.\n", encoding="utf-8")
+    fallback = tmp_path / "fallback.txt"
+    fallback.write_text("Fallback transcript", encoding="utf-8")
+    episode_json = tmp_path / "episode.json"
+    episode_json.write_text(
+        f"""{{
+  "episode": {{
+    "title": "PodcastIndex Episode",
+    "link": "https://example.com/episodes/pi",
+    "enclosureUrl": "https://cdn.example.com/pi.mp3",
+    "transcriptUrl": "{fallback}",
+    "transcripts": [
+      {{
+        "url": "{transcript}",
+        "type": "application/srt"
+      }}
+    ]
+  }}
+}}
+""",
+        encoding="utf-8",
+    )
+    run_paths = create_run(tmp_path / "workspace", "pi-demo")
+
+    raw_path = ingest_transcript_source(
+        {
+            "type": "podcast_index_episode",
+            "episode_json": str(episode_json),
+        },
+        run_paths,
+    )
+
+    source = read_json(run_paths.source_json)
+    assert raw_path == run_paths.transcript_dir / "raw.srt"
+    assert raw_path.read_text(encoding="utf-8").startswith("1\n")
+    assert source["source_type"] == "podcast_index_episode"
+    assert source["episode_json"] == str(episode_json)
+    assert source["transcript_url"] == str(transcript)
+    assert source["title"] == "PodcastIndex Episode"
+    assert source["original_url"] == "https://example.com/episodes/pi"
+
+
+def test_ingest_podcast_index_episode_falls_back_to_transcript_url(tmp_path: Path):
+    transcript = tmp_path / "episode.txt"
+    transcript.write_text("Plain transcript", encoding="utf-8")
+    episode_json = tmp_path / "episode.json"
+    episode_json.write_text(
+        f"""{{
+  "title": "PodcastIndex Fallback Episode",
+  "guid": "episode-guid-2",
+  "transcriptUrl": "{transcript}",
+  "transcripts": []
+}}
+""",
+        encoding="utf-8",
+    )
+    run_paths = create_run(tmp_path / "workspace", "pi-fallback")
+
+    raw_path = ingest_transcript_source(
+        {
+            "type": "podcast_index_episode",
+            "episode_json": str(episode_json),
+        },
+        run_paths,
+    )
+
+    source = read_json(run_paths.source_json)
+    assert raw_path == run_paths.transcript_dir / "raw.txt"
+    assert raw_path.read_text(encoding="utf-8") == "Plain transcript"
+    assert source["transcript_url"] == str(transcript)
+    assert source["title"] == "PodcastIndex Fallback Episode"
+    assert source["original_url"] == "episode-guid-2"

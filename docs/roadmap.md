@@ -95,7 +95,8 @@
 - 已选定 MVP-1 单模型 TTS 规则：运行默认只部署 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`；0/1 个 distinct speaker 且没有显式性别标签时使用 `female_a`，单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 使用 `speaker -> voice_role` 稳定映射。
 - `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，不依赖额外参考 wav，也不要求部署 `CosyVoice2-0.5B`。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中按 speaker 首次出现顺序分配 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
-- 支持 PodcastIndex 的 `transcripts` / `transcriptUrl`。
+- 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
+- 后续仍需接入 PodcastIndex API 鉴权/请求，或从 episode 页面解析 transcript 链接。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
 - 支持 speaker label 解析、人工 speaker 修正文件和缺失 speaker 的回退策略。
@@ -148,6 +149,6 @@
 
 ## 当前最高优先级
 
-1. 继续扩展真实来源：支持更多 transcript 发现形态，例如 PodcastIndex `transcripts` / `transcriptUrl` 或 episode 页面提供的 transcript 链接。
+1. 继续扩展真实来源：在已支持 PodcastIndex episode JSON 的基础上，接入 PodcastIndex API 鉴权/请求，或支持 episode 页面提供的 transcript 链接。
 2. 在真实 RSS run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
 3. 支持多 episode feed，跳过已处理 episode。

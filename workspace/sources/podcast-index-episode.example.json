@@ -1,0 +1,13 @@
+{
+  "episode": {
+    "title": "Example PodcastIndex Episode",
+    "link": "https://example.com/podcast/episodes/1",
+    "transcripts": [
+      {
+        "url": "https://example.com/podcast/episodes/1/transcript.vtt",
+        "type": "text/vtt"
+      }
+    ],
+    "transcriptUrl": "https://example.com/podcast/episodes/1/transcript.txt"
+  }
+}
