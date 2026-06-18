@@ -41,6 +41,7 @@
 - MVP-1 Episode Page Transcript Source 已完成：新增 `source.type=episode_page`，可从播客官网 episode 页面发现 transcript 链接或 transcript 正文，并保存干净 `transcript/raw.txt`；99% Invisible 真实 smoke 已通过到 `ingest`。这不包含 YouTube、Spotify、Apple Podcasts 页面，也不做 JS 渲染、ASR 或音频下载。
 - MVP-1 Discovery Adapters 第一版已完成：新增 `babelecho itunes search`，可用 iTunes Search API 找 podcast RSS `feedUrl` 并输出 `source.type=podcast_rss`；新增 `babelecho rss episodes`，可列 RSS feed 内 episodes、标记 transcript yes/no，并把选中 episode 写成带 `episode_url` 的 `source.type=podcast_rss`；新增 `source.type=youtube_captions`，用本机 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
 - MVP-1 On-demand Episode Convert 已完成第一版：新增 `babelecho episode convert`，用于自用点播式单集转换；`--url` 会把 YouTube URL 映射到 `source.type=youtube_captions`，把普通 http/https 或本地 episode 页面映射到 `source.type=episode_page`，也可直接传 `--source-config` 或 `--transcript-file` 复用现有 pipeline。该入口不做节目订阅扫描、不做多集批处理、不做 ASR。真实入口 smoke `on-demand-99pi-karaoke-fixture-20260618` 已用 99% Invisible `Karaoke Videos` URL 跑到 `adapt`，解析到 150 段 normalized/script；该 smoke 使用 fixture local config，未调用 DeepSeek 或 TTS。5090D 真实 full-chain run `on-demand-99pi-karaoke-real-20260618` 已成功：同一 URL 经 chunked DeepSeek、`speaker_voices.mode: infer_once`、`sft_builtin_4role` TTS、assemble/publish 全链路完成；150 段、7 个 speaker 推断、最终 MP3 约 `1904.3s`，已拷回本机 ignored `workspace/runs/on-demand-99pi-karaoke-real-20260618/output/audio.mp3` 便于试听。
+- MVP-1 下一步计划已落到 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`：当前真实瓶颈是很多用户想听的 episode 拿不到 transcript，或拿到后 HTML / YouTube captions / speaker 格式不稳定。下一步先做 transcript candidates、候选评分、cleaned transcript、YouTube captions 合并、HTML speaker 修复和 CLI 失败诊断，不先动 ASR、TTS 或 DeepSeek prompt。
 - MVP-1 Chunked DeepSeek Adapt 已完成：可在 local config 设置 `adapt.mode: chunked`、`chunk_max_segments`、`chunk_max_chars`，将多个完整 transcript segment 合并到一次 DeepSeek 请求；不切开单个 segment，返回必须保留原始 id，最终 `script/zh.json` 按原始 id 顺序合并，TTS 不依赖 chunk 返回顺序。chunk 结果会写入 run-local `script/adapt-chunks/` 便于排查。
 - MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 按本批次需要延迟加载 300M SFT 和/或 CosyVoice2 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - MVP-1 固定音色规则已选定并实现：运行默认使用 `tts.voice=sft_builtin_4role` 固定角色 profile。未启用 speaker voice 推断时，0/1 个 distinct speaker 且没有显式性别标签使用 `female_a`；单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 按首次出现顺序映射到 `female_a / male_a / female_b / male_b`。实际渲染时 `male_a` 调用 `CosyVoice2 cross_lingual + speed=1.1`，其余三路调用 `CosyVoice-300M-SFT`。后续 300M 微调只影响未来可选 role/model，不自动改变当前默认。
@@ -237,8 +238,8 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 
 下一步继续 MVP-1 Real Podcasts：
 
-1. 继续补点播入口的真实失败诊断和站点/API 边界记录。
-2. 后续再做搜索式 episode 选择，保持用户指定某一期后才转换。
+1. 执行 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`，优先解决 transcript candidates、评分、清洗、YouTube captions 合并和 HTML speaker 保留。
+2. 继续保持点播式单集转换为主入口，先提高“用户指定某一期后能拿到干净 transcript”的成功率，再做搜索式 episode 选择。
 3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、训练/试听样本和验收标准，不影响当前 MVP-1 默认规则。
 
 不要进入：
@@ -270,11 +271,11 @@ MVP-0.5 acceptance 已满足：
 仍然保留到后续阶段：
 
 - 真实 RSS、episode_page/on-demand 和 transcript-file 路径已有多 speaker 真实回归；PodcastIndex API 上的 `speaker_voices.mode: infer_once` 多 speaker profile 仍需真实回归；每个 podcast 的 source config 和批处理仍未做。
-- 真实 podcast 来源扩展仍在 MVP-1 后续；当前主线已校正为点播式单集转换，而不是订阅式多 episode 扫描。官网 episode 页面 transcript 链接解析已通过 `source.type=episode_page` 完成第一版，PodcastIndex API episode ingest 已通过 `source.type=podcast_index_api` 完成第一版，PodcastIndex 搜索/选择 CLI 已完成第一版，iTunes feed discovery、RSS episode selection 和 YouTube captions source 已完成第一版代码路径。
+- 真实 podcast 来源扩展仍在 MVP-1 后续；当前主线已校正为点播式单集转换，而不是订阅式多 episode 扫描。官网 episode 页面 transcript 链接解析已通过 `source.type=episode_page` 完成第一版，PodcastIndex API episode ingest 已通过 `source.type=podcast_index_api` 完成第一版，PodcastIndex 搜索/选择 CLI 已完成第一版，iTunes feed discovery、RSS episode selection 和 YouTube captions source 已完成第一版代码路径。下一步是 02.09：多 transcript candidate 发现、评分、清洗和诊断。
 - 固定中文音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 第一轮和第二轮音色校准样本已在 5090D 生成并拷回本机 ignored `workspace/runs/`；这些音频不进入 git。
 - 用户曾反馈 SFT 男声 D 版 EQ 比原始男声亮；后续确认 `male_a` 最终改为 `CosyVoice2 cross_lingual + speed=1.1`，D 样本只保留为历史校准记录。
-- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；已支持从已获取的 PodcastIndex episode JSON 读取 `transcripts[].url` / `transcriptUrl`；已支持 PodcastIndex API episode ingest 和搜索/选择 CLI；已支持官网 episode 页面 transcript-only ingest；DeepSeek adapt 已支持按完整 segment chunk 批量调用；TTS batch wrapper 已解决每段重复启动 wrapper 的主要性能问题；`sft_builtin_4role` 已提供 MVP-1 多 speaker 角色基线，`male_a` 已改走 CosyVoice2 speed 1.1，`speaker_voices.mode: infer_once` 已补上每集一次 LLM 性别方向推断。后续重点转向点播入口失败诊断、搜索式 episode 选择和 PodcastIndex API 真实多 speaker 回归。授权男声/中性 reference wav 比选降级；更优先的音色扩展方向是微调 300M SFT 以增加多个中文男声/女声。
+- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；已支持从已获取的 PodcastIndex episode JSON 读取 `transcripts[].url` / `transcriptUrl`；已支持 PodcastIndex API episode ingest 和搜索/选择 CLI；已支持官网 episode 页面 transcript-only ingest；DeepSeek adapt 已支持按完整 segment chunk 批量调用；TTS batch wrapper 已解决每段重复启动 wrapper 的主要性能问题；`sft_builtin_4role` 已提供 MVP-1 多 speaker 角色基线，`male_a` 已改走 CosyVoice2 speed 1.1，`speaker_voices.mode: infer_once` 已补上每集一次 LLM 性别方向推断。后续重点转向 02.09 transcript candidate cleaning，再做搜索式 episode 选择和 PodcastIndex API 真实多 speaker 回归。授权男声/中性 reference wav 比选降级；更优先的音色扩展方向是微调 300M SFT 以增加多个中文男声/女声。
 
 ## 如果发生分支情况
 

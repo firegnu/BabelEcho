@@ -105,10 +105,11 @@
 - 已支持第一版 RSS episode selection：`babelecho rss episodes --feed-url ...` 可列出 feed 内 episodes，标记 transcript yes/no，并把选中 episode 写成 `source.type=podcast_rss`。
 - 已支持第一版 `source.type=youtube_captions`：用 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
 - 点播式单集转换入口已完成：用户给一个 episode URL、已有 source YAML 或 transcript file，系统只转换这一集。
+- 当前真实瓶颈已转移到 transcript discovery / cleaning：不少用户想听的 episode 不是拿不到 transcript，就是拿到后 HTML / captions / speaker 格式不稳定。下一步已拆成 `02.09 Transcript Candidate Cleaning`。
 - 多 episode 批处理和跳过已处理 episode 后移，不作为当前主流程。
 - Spotify 和 Apple Podcasts 页面不在 `episode_page` 范围内；YouTube 只走字幕 source，不走页面正文解析。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
-- 支持点播转换的清晰失败诊断：不支持的 URL、没有公开字幕、页面/RSS 没有 transcript。
+- 支持点播转换的清晰失败诊断：不支持的 URL、没有公开字幕、页面/RSS 没有 transcript；下一步会扩展为候选 transcript 记录、评分、清洗和拒绝原因。
 - 支持 speaker label 解析、每集一次 LLM speaker voice 推断、可编辑 run-local `script/speaker-voices.json` 和缺失/unknown speaker 的回退策略。
 - 支持每个 podcast 的 source config 和每个 speaker 的 voice config。
 
@@ -160,6 +161,6 @@
 
 ## 当前最高优先级
 
-1. 继续以点播式单集转换为主入口，补真实失败诊断和站点/API 边界记录。
-2. 后续再做搜索式 episode 选择，保持用户指定某一期后才转换。
+1. 执行 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`：增加 transcript candidates、评分、清洗、YouTube captions 合并和 HTML speaker 修复。
+2. 继续以点播式单集转换为主入口，先把“拿到干净 transcript”的成功率做上去，再做搜索式 episode 选择。
 3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。

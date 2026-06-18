@@ -129,8 +129,8 @@
 - MVP-0.5 Self-use 已完成：手动导入 transcript 后，可以生成私有中文 podcast feed，并已完成真实自用回归。
 - 下一阶段是 MVP-1 Real Podcasts，目标是开始处理真实 podcast 来源和常见访谈节目。
 - MVP-1 后续优先任务：
-  1. 继续补点播入口的真实失败诊断和站点/API 边界记录。
-  2. 后续再做搜索式 episode 选择，保持用户指定某一期后才转换。
+  1. 执行 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`，解决 transcript candidates、评分、清洗、YouTube captions 合并和 HTML speaker 保留。
+  2. 保持点播式单集转换为主入口，先提高“用户指定某一期后能拿到干净 transcript”的成功率，再做搜索式 episode 选择。
   3. PodcastIndex API 上的真实多 speaker 回归仍可后补；多 episode feed、跳过已处理 episode 后移到 MVP-2。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 TTS 合成 wav，但仍不是完整产品：
   - 来源已新增第一版 RSS feed 输入：`source.type=podcast_rss` 和 `babelecho run --podcast-feed ...`，只支持 RSS item 内的 `podcast:transcript`；公开 RSS smoke 使用 `https://feeds.transistor.fm/podcasting-advice` 跑到 `adapt`，fixture script 共 74 段，未调用 DeepSeek。还没有接 Apple Podcasts、Spotify、YouTube 页面解析。
@@ -209,8 +209,8 @@
 
 ## 6. 下一步建议
 
-1. 继续补点播入口的真实失败诊断和站点/API 边界记录。
-2. 后续再做搜索式 episode 选择，保持用户指定某一期后才转换。
+1. 执行 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`。
+2. 继续保持点播式单集转换为主入口，优先提升 transcript 获取与清洗成功率。
 3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、训练/试听样本和验收标准，不影响当前 MVP-1 默认规则。
 4. 仍不要同时推进 ASR、voice clone、App 或后台服务。
 
