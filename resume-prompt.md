@@ -230,9 +230,9 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 
 下一步继续 MVP-1 Real Podcasts：
 
-1. 在真实 RSS、episode_page 或 podcast_index_api run 上验证 `speaker_voices.mode: infer_once` 的多 speaker profile，并听测 speaker 性别方向是否明显改善。
-2. 用 iTunes -> RSS episode selection 选出有 transcript 的真实 episode，跑到 `adapt`。
-3. 支持多 episode feed，跳过已处理 episode。
+1. 先做点播式单集转换入口：用户给 episode URL / source YAML / transcript file，只转换这一集，不做节目订阅扫描。
+2. 保留现有 adapter 合同，优先复用 YouTube captions、官网 episode_page、RSS episode 和本地 transcript。
+3. 在点播式真实 run 上验证 `speaker_voices.mode: infer_once` 的多 speaker profile，并听测 speaker 性别方向是否明显改善。
 4. 继续补真实来源的失败诊断和站点/API 边界记录。
 
 不要进入：
@@ -264,11 +264,11 @@ MVP-0.5 acceptance 已满足：
 仍然保留到后续阶段：
 
 - 真实 RSS / episode_page / podcast_index_api 上的 `speaker_voices.mode: infer_once` 多 speaker profile 仍需真实回归；每个 podcast 的 source config 和批处理仍未做。
-- 真实 podcast 来源扩展和多 episode feed 仍在 MVP-1 后续；官网 episode 页面 transcript 链接解析已通过 `source.type=episode_page` 完成第一版，PodcastIndex API episode ingest 已通过 `source.type=podcast_index_api` 完成第一版，PodcastIndex 搜索/选择 CLI 已完成第一版，iTunes feed discovery、RSS episode selection 和 YouTube captions source 已完成第一版代码路径。
+- 真实 podcast 来源扩展仍在 MVP-1 后续；当前主线已校正为点播式单集转换，而不是订阅式多 episode 扫描。官网 episode 页面 transcript 链接解析已通过 `source.type=episode_page` 完成第一版，PodcastIndex API episode ingest 已通过 `source.type=podcast_index_api` 完成第一版，PodcastIndex 搜索/选择 CLI 已完成第一版，iTunes feed discovery、RSS episode selection 和 YouTube captions source 已完成第一版代码路径。
 - 固定中文音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 第一轮和第二轮音色校准样本已在 5090D 生成并拷回本机 ignored `workspace/runs/`；这些音频不进入 git。
 - 用户曾反馈 D 最满意；后续单男、单女、多人验证后，MVP-1 运行默认已改为 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`，D 样本只保留为历史校准记录。
-- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；已支持从已获取的 PodcastIndex episode JSON 读取 `transcripts[].url` / `transcriptUrl`；已支持 PodcastIndex API episode ingest 和搜索/选择 CLI；已支持官网 episode 页面 transcript-only ingest；DeepSeek adapt 已支持按完整 segment chunk 批量调用；TTS batch wrapper 已解决每段重复加载 CosyVoice 的主要性能问题；`sft_builtin_4role` 已提供 MVP-1 多 speaker 基线，`speaker_voices.mode: infer_once` 已补上每集一次 LLM 性别方向推断。后续重点转向真实 RSS / episode_page / podcast_index_api 多 speaker 回归和多 episode feed。授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
+- 公开 RSS 端到端 Real Run 已完成，证明给定 RSS 后可以自动读取 RSS item 内的 transcript 并生成中文 MP3/feed；已支持从已获取的 PodcastIndex episode JSON 读取 `transcripts[].url` / `transcriptUrl`；已支持 PodcastIndex API episode ingest 和搜索/选择 CLI；已支持官网 episode 页面 transcript-only ingest；DeepSeek adapt 已支持按完整 segment chunk 批量调用；TTS batch wrapper 已解决每段重复加载 CosyVoice 的主要性能问题；`sft_builtin_4role` 已提供 MVP-1 多 speaker 基线，`speaker_voices.mode: infer_once` 已补上每集一次 LLM 性别方向推断。后续重点转向点播式单集转换入口和真实 RSS / episode_page / podcast_index_api 多 speaker 回归。授权男声/中性 reference wav 比选进入 deferred voice work，不阻塞 MVP-1 来源接入。
 
 ## 如果发生分支情况
 

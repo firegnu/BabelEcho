@@ -22,7 +22,7 @@
 | --- | --- | --- |
 | MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | done |
 | MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | done |
-| MVP-1 Real Podcasts | 支持真实 podcast 来源、多说话人和多 episode feed | active |
+| MVP-1 Real Podcasts | 支持按用户指定的真实 episode 点播转换、多说话人和常见 transcript 来源 | active |
 | MVP-2 Automation | 自动扫描、批处理、状态记录和远程运维 | later |
 | Later | 授权参考音色扩展、ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
 
@@ -103,10 +103,11 @@
 - 已支持第一版 iTunes feed discovery：`babelecho itunes search --query ...` 可从 iTunes Search API 找 podcast RSS `feedUrl`，并写出 `source.type=podcast_rss`。
 - 已支持第一版 RSS episode selection：`babelecho rss episodes --feed-url ...` 可列出 feed 内 episodes，标记 transcript yes/no，并把选中 episode 写成 `source.type=podcast_rss`。
 - 已支持第一版 `source.type=youtube_captions`：用 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
-- 后续仍需做多 episode 批处理和跳过已处理 episode。
+- 下一步主线改为点播式单集转换：用户给一个 episode URL、已有 source YAML 或 transcript file，系统只转换这一集。
+- 多 episode 批处理和跳过已处理 episode 后移，不作为当前主流程。
 - Spotify 和 Apple Podcasts 页面不在 `episode_page` 范围内；YouTube 只走字幕 source，不走页面正文解析。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
-- 支持多 episode feed，跳过已处理 episode。
+- 支持点播转换的清晰失败诊断：不支持的 URL、没有公开字幕、页面/RSS 没有 transcript。
 - 支持 speaker label 解析、每集一次 LLM speaker voice 推断、可编辑 run-local `script/speaker-voices.json` 和缺失/unknown speaker 的回退策略。
 - 支持每个 podcast 的 source config 和每个 speaker 的 voice config。
 
@@ -115,7 +116,7 @@
 - 当前运行默认改为 `CosyVoice-300M-SFT`，历史 `cross_lingual_prompt.wav + speed=1.0` 只保留为校准记录，不作为部署要求。
 - 一个有公开 `podcast:transcript` 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出；三到四人节目可以用 `sft_builtin_4role` 输出可区分的固定角色。
-- 已处理 episode 不重复生成。
+- 用户指定某一期时，可以把这一期转换成中文 MP3，并可选生成播客客户端可播放的 feed item。
 
 ## MVP-2 Automation
 
@@ -157,6 +158,6 @@
 
 ## 当前最高优先级
 
-1. 在真实 RSS、episode_page 或 podcast_index_api run 上验证 `speaker_voices.mode: infer_once` 多 speaker profile。
-2. 用 iTunes -> RSS episode selection 选出有 transcript 的真实 episode，跑到 `adapt`。
-3. 支持多 episode feed，跳过已处理 episode。
+1. 实现点播式单集转换入口：用户给 episode URL / source YAML / transcript file，只转换这一集。
+2. 保留现有 adapter 合同，先支持 YouTube captions、官网 episode_page、RSS episode 和本地 transcript。
+3. 在点播式真实 run 上验证 `speaker_voices.mode: infer_once` 多 speaker profile。
