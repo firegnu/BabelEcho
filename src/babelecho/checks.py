@@ -18,6 +18,13 @@ TRANSCRIPT_ARTIFACT_PATTERNS = (
     re.compile(r"```"),
 )
 ASCII_LETTER_RE = re.compile(r"[A-Za-z]")
+CJK_RE = re.compile(r"[\u4e00-\u9fff]")
+ENGLISH_NAME_PART_RE = (
+    r"(?:[A-Z][A-Za-z'.-]*|[A-Z][a-z]+[A-Z][A-Za-z'.-]*)"
+)
+ENGLISH_PROPER_NOUN_SEQUENCE_RE = re.compile(
+    rf"\b{ENGLISH_NAME_PART_RE}(?:\s+{ENGLISH_NAME_PART_RE}){{1,4}}\b"
+)
 URL_RE = re.compile(
     r"(?:https?://)?[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?"
     r"(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?)+"
@@ -32,10 +39,17 @@ def _ascii_letter_ratio(text: str) -> float:
     return len(ASCII_LETTER_RE.findall(text)) / non_space_count
 
 
+def _text_for_english_heavy_check(text: str) -> str:
+    without_urls = URL_RE.sub("", text)
+    if not CJK_RE.search(without_urls):
+        return without_urls
+    return ENGLISH_PROPER_NOUN_SEQUENCE_RE.sub("", without_urls)
+
+
 def _check_script_text_quality(segment_id: str, text: str) -> None:
     if any(pattern.search(text) for pattern in TRANSCRIPT_ARTIFACT_PATTERNS):
         raise CheckError(f"Script segment {segment_id} contains transcript artifact")
-    text_for_english_check = URL_RE.sub("", text)
+    text_for_english_check = _text_for_english_heavy_check(text)
     ascii_letters = len(ASCII_LETTER_RE.findall(text_for_english_check))
     if ascii_letters >= 60 and _ascii_letter_ratio(text_for_english_check) >= 0.35:
         raise CheckError(f"Script segment {segment_id} is English-heavy")

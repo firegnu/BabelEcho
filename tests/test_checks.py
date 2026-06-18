@@ -169,6 +169,33 @@ def test_check_run_artifacts_allows_chinese_script_with_repeated_urls(tmp_path: 
     assert result["script_segments"] == 1
 
 
+def test_check_run_artifacts_allows_chinese_credits_with_english_names(tmp_path: Path):
+    run_paths = _write_valid_run(tmp_path)
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "check-run",
+            "language": "zh-CN",
+            "segments": [
+                {
+                    "id": "0001",
+                    "text": (
+                        "Kathy Tu 是我们的执行制作人。Kurt Kohlstedt 是我们的数字总监。"
+                        "Delaney Hall 是我们的高级编辑。团队其他成员包括 Chris Berube、"
+                        "Jayson De Leon、Emmett FitzGerald、Christopher Johnson、"
+                        "Lasha Madan、Joe Rosenberg、Kelly Prime、Jeyca Medina-Gleason，"
+                        "还有我，Roman Mars。《99% Invisible》的 logo 由 Stefan Lawrence 设计。"
+                    ),
+                }
+            ],
+        },
+    )
+
+    result = check_run_artifacts(run_paths, checks=("script",))
+
+    assert result["script_segments"] == 1
+
+
 def test_check_run_artifacts_rejects_missing_audio_segment(tmp_path: Path):
     run_paths = _write_valid_run(tmp_path)
     (run_paths.segments_dir / "0001.wav").unlink()
