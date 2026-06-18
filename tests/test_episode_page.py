@@ -148,6 +148,157 @@ def test_prefers_transcript_content_inside_transcript_article(tmp_path: Path):
     )
 
 
+def test_prefixes_cite_speaker_on_following_transcript_paragraph(tmp_path: Path):
+    transcript_page = tmp_path / "transcript.html"
+    transcript_page.write_text(
+        """<!doctype html>
+<html>
+  <body class="transcript">
+    <div class="page-content transcript-content">
+      <cite>Daniel:</cite>
+      <p>Welcome to another Practical AI episode.</p>
+      <cite>Chris:</cite>
+      <p>Hey, doing great. Glad to be here.</p>
+    </div>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+    transcript = discover_episode_page_transcript(str(transcript_page), read_local_url)
+
+    assert transcript.text == (
+        "Daniel: Welcome to another Practical AI episode.\n\n"
+        "Chris: Hey, doing great. Glad to be here."
+    )
+
+
+def test_extracts_ts_segment_transcript_instead_of_navigation(tmp_path: Path):
+    transcript_page = tmp_path / "jensen-huang-transcript.html"
+    transcript_page.write_text(
+        """<!doctype html>
+<html>
+  <body>
+    <nav>
+      <ul>
+        <li>Podcast</li>
+        <li>Contact</li>
+      </ul>
+    </nav>
+    <article>
+      <div class="ts-segment">
+        <span class="ts-name">Lex Fridman</span>
+        <span class="ts-timestamp"><a href="#0">(00:00:00)</a></span>
+        <span class="ts-text">The following is a conversation about AI.</span>
+      </div>
+      <div class="ts-segment">
+        <span class="ts-name">Jensen Huang</span>
+        <span class="ts-timestamp"><a href="#1">(00:01:20)</a></span>
+        <span class="ts-text">It is an incredible time for computing.</span>
+      </div>
+    </article>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+    transcript = discover_episode_page_transcript(str(transcript_page), read_local_url)
+
+    assert transcript.text == (
+        "Lex Fridman: The following is a conversation about AI.\n\n"
+        "Jensen Huang: It is an incredible time for computing."
+    )
+
+
+def test_extracts_transcript_section_from_episode_page(tmp_path: Path):
+    episode_page = tmp_path / "episode.html"
+    episode_page.write_text(
+        """<!doctype html>
+<html>
+  <body>
+    <article class="post tag-episode content">
+      <h1>AI Agent Episode</h1>
+      <h2>Show Notes</h2>
+      <p>These links are show notes and should not be treated as transcript.</p>
+      <h2 id="transcript">Transcript</h2>
+      <p><em>This transcript is automatically generated.</em></p>
+      <hr>
+      <h2 id="introduction">Introduction</h2>
+      <p><a href="#t0"><strong>[00:00]</strong></a> Hello and welcome back.</p>
+      <p><a href="#t1"><strong>[00:42]</strong></a><strong>Nathan Labenz:</strong> Today we are talking about agents.</p>
+    </article>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+    transcript = discover_episode_page_transcript(str(episode_page), read_local_url)
+
+    assert transcript.text == (
+        "Hello and welcome back.\n\n"
+        "Nathan Labenz: Today we are talking about agents."
+    )
+
+
+def test_prefers_same_host_transcript_link_over_external_transcript_noise(
+    tmp_path: Path,
+):
+    episode_page = tmp_path / "episode.html"
+    transcript_page = tmp_path / "transcript.html"
+    external_page = tmp_path / "external-transcript.html"
+    episode_page.write_text(
+        f"""<!doctype html>
+<html>
+  <body>
+    <article>
+      <h1>Correct Episode</h1>
+      <a href="https://joincolossus.com/episode/unrelated/?tab=transcript">Transcript</a>
+      <a href="{transcript_page.name}">Read transcript</a>
+    </article>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+    transcript_page.write_text(
+        """<!doctype html>
+<html>
+  <body>
+    <div class="transcript-content">
+      <p>Host: This is the correct transcript.</p>
+    </div>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+    external_page.write_text(
+        """<!doctype html>
+<html>
+  <body>
+    <div class="transcript-content">
+      <p>Other Host: This transcript is unrelated.</p>
+    </div>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+
+    def read_url(url: str) -> bytes:
+        if url.startswith("https://joincolossus.com/"):
+            return external_page.read_bytes()
+        return Path(url).read_bytes()
+
+    transcript = discover_episode_page_transcript(str(episode_page), read_url)
+
+    assert transcript.transcript_page_url == str(transcript_page)
+    assert transcript.text == "Host: This is the correct transcript."
+
+
 def test_fails_when_episode_page_has_no_transcript(tmp_path: Path):
     episode_page = tmp_path / "episode.html"
     episode_page.write_text(

@@ -142,6 +142,33 @@ def test_check_run_artifacts_rejects_english_heavy_script_segment(tmp_path: Path
         check_run_artifacts(run_paths, checks=("script",))
 
 
+def test_check_run_artifacts_allows_chinese_script_with_repeated_urls(tmp_path: Path):
+    run_paths = _write_valid_run(tmp_path)
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "check-run",
+            "language": "zh-CN",
+            "segments": [
+                {
+                    "id": "0001",
+                    "text": (
+                        "都会进入你的监控和告警系统。"
+                        "我鼓励你去predictionguard.com/practicalai看看我们正在做的事情。"
+                        "你可以预约我和团队的演示，我很想听听你对我们在做的事情的反馈。"
+                        "所以请访问predictionguard.com/practicalai。"
+                        "网址是predictionguard.com/practicalai。"
+                    ),
+                }
+            ],
+        },
+    )
+
+    result = check_run_artifacts(run_paths, checks=("script",))
+
+    assert result["script_segments"] == 1
+
+
 def test_check_run_artifacts_rejects_missing_audio_segment(tmp_path: Path):
     run_paths = _write_valid_run(tmp_path)
     (run_paths.segments_dir / "0001.wav").unlink()

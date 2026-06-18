@@ -100,7 +100,7 @@ babelecho episode convert \
 Supported exact inputs in the first version:
 
 - YouTube single video or YouTube Podcasts episode URLs with public captions. Playlist, channel, show, and subscription-style URLs are intentionally rejected for now.
-- Podcast episode pages with transcript text or a transcript link.
+- Podcast episode pages with transcript text, a transcript link, or a visible Transcript section.
 - Existing `--source-config` YAML.
 - Local `--transcript-file`.
 
