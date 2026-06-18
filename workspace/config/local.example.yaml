@@ -9,6 +9,11 @@ llm:
     thinking:
       type: disabled
 
+adapt:
+  mode: chunked
+  chunk_max_segments: 20
+  chunk_max_chars: 8000
+
 tts:
   provider: local_cli
   command: "tts-wrapper"

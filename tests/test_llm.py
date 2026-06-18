@@ -57,6 +57,35 @@ class FakeSpeakerGenderResponse:
         ).encode("utf-8")
 
 
+class FakeAdaptSegmentsResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "segments": [
+                                        {"id": "0002", "text": "第二段中文"},
+                                        {"id": "0001", "text": "第一段中文"},
+                                    ]
+                                },
+                                ensure_ascii=False,
+                            )
+                        }
+                    }
+                ]
+            }
+        ).encode("utf-8")
+
+
 def test_openai_compatible_client_sends_auth_and_extra_body(monkeypatch):
     requests = []
 
@@ -159,6 +188,50 @@ def test_openai_compatible_client_infers_speaker_genders_once(monkeypatch):
     assert "male/female/unknown" in prompt
     assert "ROMAN MARS" in prompt
     assert "TAYA" in prompt
+
+
+def test_openai_compatible_client_adapts_segments_in_one_json_request(monkeypatch):
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return FakeAdaptSegmentsResponse()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    monkeypatch.setattr(llm, "urlopen", fake_urlopen)
+
+    client = build_llm_client(
+        {
+            "provider": "openai_compatible",
+            "base_url": "https://api.deepseek.com",
+            "model": "deepseek-v4-pro",
+            "api_key_env": "DEEPSEEK_API_KEY",
+            "temperature": 0.2,
+            "max_tokens": 2048,
+        }
+    )
+
+    output = client.adapt_segments(
+        [
+            {"id": "0001", "speaker": "HOST", "text": "First sentence."},
+            {"id": "0002", "speaker": "GUEST", "text": "Second sentence."},
+        ]
+    )
+
+    assert output == [
+        {"id": "0002", "text": "第二段中文"},
+        {"id": "0001", "text": "第一段中文"},
+    ]
+    assert len(requests) == 1
+    request, timeout = requests[0]
+    assert request.full_url == "https://api.deepseek.com/chat/completions"
+    assert timeout == 120
+    payload = json.loads(request.data.decode("utf-8"))
+    prompt = payload["messages"][0]["content"]
+    assert "Return only JSON" in prompt
+    assert "Do not merge" in prompt
+    assert "0001" in prompt
+    assert "0002" in prompt
 
 
 def test_openai_compatible_client_requires_configured_api_key(monkeypatch):

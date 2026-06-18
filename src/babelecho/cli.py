@@ -431,7 +431,11 @@ def run_pipeline(
 
     if stage_index <= PIPELINE_STAGES.index("adapt") <= stop_index:
         def adapt_stage() -> tuple[str, dict]:
-            script_path = adapt_to_chinese(run_paths, local_config["llm"])
+            script_path = adapt_to_chinese(
+                run_paths,
+                local_config["llm"],
+                local_config.get("adapt"),
+            )
             script_check = check_run_artifacts(run_paths, checks=("script",))
             return script_path, script_check
 
@@ -679,7 +683,7 @@ def main(argv: list[str] | None = None) -> int:
         config = load_yaml(Path(args.local_config))
         require_keys(config, ["llm"])
         run_paths = create_run(args.workspace, args.run_id)
-        output = adapt_to_chinese(run_paths, config["llm"])
+        output = adapt_to_chinese(run_paths, config["llm"], config.get("adapt"))
         print(output)
         return 0
 

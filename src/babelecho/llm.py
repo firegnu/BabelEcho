@@ -10,6 +10,9 @@ class LLMClient(Protocol):
     def adapt_segment(self, text: str) -> str:
         raise NotImplementedError
 
+    def adapt_segments(self, segments: list[dict[str, Any]]) -> list[dict[str, str]]:
+        raise NotImplementedError
+
     def infer_speaker_genders(self, speakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         raise NotImplementedError
 
@@ -17,6 +20,12 @@ class LLMClient(Protocol):
 class FixtureLLMClient:
     def adapt_segment(self, text: str) -> str:
         return f"中文口播：{text}"
+
+    def adapt_segments(self, segments: list[dict[str, Any]]) -> list[dict[str, str]]:
+        return [
+            {"id": str(segment["id"]), "text": self.adapt_segment(str(segment["text"]))}
+            for segment in segments
+        ]
 
     def infer_speaker_genders(self, speakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         results = []
@@ -86,6 +95,19 @@ class OpenAICompatibleClient:
         )
         return self._chat_completion(prompt)
 
+    def adapt_segments(self, segments: list[dict[str, Any]]) -> list[dict[str, str]]:
+        prompt = (
+            "You are adapting English podcast transcript segments into natural "
+            "Simplified Chinese spoken-script text.\n"
+            "Return only JSON with shape "
+            '{"segments":[{"id":"0001","text":"中文口播正文"}]}.\n'
+            "Do not merge, split, remove, add, or reorder segment ids. "
+            "Keep each output text suitable for Chinese TTS. "
+            "Do not include explanations or markdown.\n\n"
+            f"{json.dumps({'segments': segments}, ensure_ascii=False)}"
+        )
+        return _parse_adapt_segments_response(self._chat_completion(prompt))
+
     def infer_speaker_genders(self, speakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
         prompt = (
             "You are choosing Chinese TTS voice presentation for podcast speakers.\n"
@@ -149,6 +171,23 @@ def _parse_speaker_gender_response(text: str) -> list[dict[str, Any]]:
                 "reason": str(item.get("reason", "")),
             }
         )
+    return results
+
+
+def _parse_adapt_segments_response(text: str) -> list[dict[str, str]]:
+    data = json.loads(_extract_json_object(text))
+    segments = data.get("segments")
+    if not isinstance(segments, list):
+        raise ValueError("LLM adapt response must contain a segments list")
+    results = []
+    for item in segments:
+        if not isinstance(item, dict):
+            continue
+        segment_id = item.get("id")
+        segment_text = item.get("text")
+        if segment_id is None or segment_text is None:
+            continue
+        results.append({"id": str(segment_id), "text": str(segment_text).strip()})
     return results
 
 

@@ -91,6 +91,7 @@
 - 已支持第一版 RSS feed 输入：`babelecho run --podcast-feed ...`，并用公开 feed 跑通到 `adapt`。
 - 已支持 RSS item 内的 `podcast:transcript`。
 - 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D TTS 生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
+- 已支持 `adapt.mode: chunked`：DeepSeek 改写可按完整 segment 聚合 chunk 批量调用，chunk 不切断 segment，返回按原始 id 校验和重建 `script/zh.json`，TTS 不依赖 chunk 顺序。
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - 已选定 MVP-1 单模型 TTS 规则：运行默认只部署 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`；默认规则仍可按 speaker 首次出现顺序稳定映射，启用 `speaker_voices.mode: infer_once` 后会每集最多调用一次 LLM 推断 speaker 的 `male/female/unknown` 方向，再由代码映射到具体 `voice_role`。
 - `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，不依赖额外参考 wav，也不要求部署 `CosyVoice2-0.5B`。
