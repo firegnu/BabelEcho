@@ -8,6 +8,7 @@ from .adapt import adapt_to_chinese
 from .audio import assemble_audio
 from .checks import CheckError, check_run_artifacts
 from .config import load_yaml, require_keys
+from .episode_convert import build_on_demand_source_config
 from .ingest import ingest_transcript_source
 from .itunes import build_podcast_rss_source_config, fetch_itunes_podcast_search
 from .jsonio import read_json
@@ -162,6 +163,39 @@ def build_parser() -> argparse.ArgumentParser:
     rss_episodes.add_argument("--feed-url", required=True)
     rss_episodes.add_argument("--select-index", type=int)
     rss_episodes.add_argument("--source-config-out")
+
+    episode = subparsers.add_parser(
+        "episode",
+        help="Convert one requested episode.",
+    )
+    episode_subparsers = episode.add_subparsers(
+        dest="episode_command",
+        required=True,
+    )
+    episode_convert = episode_subparsers.add_parser(
+        "convert",
+        help="Convert one exact episode input.",
+    )
+    episode_convert.add_argument("--workspace", required=True)
+    episode_convert.add_argument("--run-id", required=True)
+    episode_input = episode_convert.add_mutually_exclusive_group(required=True)
+    episode_input.add_argument("--url")
+    episode_input.add_argument("--source-config")
+    episode_input.add_argument("--transcript-file")
+    episode_convert.add_argument("--local-config", required=True)
+    episode_convert.add_argument("--title")
+    episode_convert.add_argument("--language", default="en")
+    episode_convert.add_argument("--source-config-out")
+    episode_convert.add_argument(
+        "--from-stage",
+        choices=PIPELINE_STAGES,
+        default="ingest",
+    )
+    episode_convert.add_argument(
+        "--to-stage",
+        choices=PIPELINE_STAGES,
+        default="publish",
+    )
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
@@ -383,6 +417,7 @@ def run_pipeline(
     episode_url: str | None = None,
     title: str | None = None,
     original_url: str | None = None,
+    input_info_extra: dict | None = None,
 ) -> str:
     source_config, input_info = _source_config_and_input(
         source_config_path,
@@ -392,6 +427,8 @@ def run_pipeline(
         title,
         original_url,
     )
+    if input_info_extra:
+        input_info.update(input_info_extra)
     local_config = load_yaml(Path(local_config_path))
     require_keys(local_config, ["llm", "tts", "publish"])
 
@@ -674,6 +711,51 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"source config: {args.source_config_out}")
                     else:
                         print(yaml.safe_dump(source_config, allow_unicode=True, sort_keys=False))
+                return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
+
+    if args.command == "episode":
+        try:
+            if args.episode_command == "convert":
+                source_config_path = args.source_config
+                transcript_file = args.transcript_file
+                input_info_line = None
+                input_info_extra = None
+                if args.url:
+                    source_config = build_on_demand_source_config(
+                        args.url,
+                        title=args.title,
+                        language=args.language,
+                    )
+                    run_paths = create_run(args.workspace, args.run_id)
+                    source_config_path = str(
+                        Path(args.source_config_out)
+                        if args.source_config_out
+                        else run_paths.run_dir / "source.input.yaml"
+                    )
+                    _write_yaml(source_config_path, source_config)
+                    input_info_line = f"source config: {source_config_path}"
+                    input_info_extra = {"episode_url": args.url}
+
+                output = run_pipeline(
+                    args.workspace,
+                    args.run_id,
+                    source_config_path,
+                    args.local_config,
+                    args.from_stage,
+                    args.to_stage,
+                    transcript_file,
+                    None,
+                    args.url,
+                    args.title,
+                    args.url,
+                    input_info_extra,
+                )
+                if input_info_line:
+                    print(input_info_line)
+                print(output)
                 return 0
         except Exception as error:
             print(str(error), file=sys.stderr)

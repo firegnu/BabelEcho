@@ -1058,6 +1058,118 @@ publish:
     assert status["input"]["source_config"] == str(source_config)
 
 
+def test_episode_convert_command_accepts_exact_episode_page_url(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    episode_page = tmp_path / "episode.html"
+    transcript_page = tmp_path / "transcript.html"
+    episode_page.write_text(
+        f"""
+        <html>
+          <head><title>On Demand Episode</title></head>
+          <body><a href="{transcript_page}">Transcript</a></body>
+        </html>
+        """,
+        encoding="utf-8",
+    )
+    transcript_page.write_text(
+        """
+        <html>
+          <body>
+            <main>
+              <h1>On Demand Episode Transcript</h1>
+              <p>HOST: Hello from the on demand episode.</p>
+            </main>
+          </body>
+        </html>
+        """,
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "episode",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "on-demand-page",
+            "--url",
+            str(episode_page),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "adapt",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "source config:" in result.stdout
+    assert "adapt:" in result.stdout
+    run_dir = workspace / "runs" / "on-demand-page"
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "episode_page"
+    assert source["page_url"] == str(episode_page)
+    status = read_json(run_dir / "run.json")
+    assert status["input"]["episode_url"] == str(episode_page)
+
+
+def test_episode_convert_command_rejects_unknown_episode_input(tmp_path: Path):
+    local_config = tmp_path / "local.yaml"
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "episode",
+            "convert",
+            "--workspace",
+            str(tmp_path / "workspace"),
+            "--run-id",
+            "bad-on-demand",
+            "--url",
+            "not a url",
+            "--local-config",
+            str(local_config),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Unsupported episode input: not a url" in result.stderr
+
+
 def test_run_command_stops_at_requested_stage(tmp_path: Path):
     workspace = tmp_path / "workspace"
     local_config = tmp_path / "local.yaml"

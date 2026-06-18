@@ -38,6 +38,7 @@
 - MVP-1 PodcastIndex API 输入已完成第一版：新增 `source.type=podcast_index_api`，支持 PodcastIndex API auth headers、`episodes/byid`、`episodes/byfeedid`、`episodes/byfeedurl`、`episodes/byitunesid`，并复用现有 transcript ingest；API key/secret 只从环境变量或 ignored `workspace/config/podcastindex.env` 读取。已新增 `babelecho podcast-index search` / `episodes` CLI，可搜索 feed、列 episode，并把选中 episode 写成可运行 source config；尚未做多 episode 批处理。
 - MVP-1 Episode Page Transcript Source 已完成：新增 `source.type=episode_page`，可从播客官网 episode 页面发现 transcript 链接或 transcript 正文，并保存干净 `transcript/raw.txt`；99% Invisible 真实 smoke 已通过到 `ingest`。这不包含 YouTube、Spotify、Apple Podcasts 页面，也不做 JS 渲染、ASR 或音频下载。
 - MVP-1 Discovery Adapters 第一版已完成：新增 `babelecho itunes search`，可用 iTunes Search API 找 podcast RSS `feedUrl` 并输出 `source.type=podcast_rss`；新增 `babelecho rss episodes`，可列 RSS feed 内 episodes、标记 transcript yes/no，并把选中 episode 写成带 `episode_url` 的 `source.type=podcast_rss`；新增 `source.type=youtube_captions`，用本机 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
+- MVP-1 On-demand Episode Convert 已完成第一版：新增 `babelecho episode convert`，用于自用点播式单集转换；`--url` 会把 YouTube URL 映射到 `source.type=youtube_captions`，把普通 http/https 或本地 episode 页面映射到 `source.type=episode_page`，也可直接传 `--source-config` 或 `--transcript-file` 复用现有 pipeline。该入口不做节目订阅扫描、不做多集批处理、不做 ASR。
 - MVP-1 Chunked DeepSeek Adapt 已完成：可在 local config 设置 `adapt.mode: chunked`、`chunk_max_segments`、`chunk_max_chars`，将多个完整 transcript segment 合并到一次 DeepSeek 请求；不切开单个 segment，返回必须保留原始 id，最终 `script/zh.json` 按原始 id 顺序合并，TTS 不依赖 chunk 返回顺序。chunk 结果会写入 run-local `script/adapt-chunks/` 便于排查。
 - MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 只加载一次 CosyVoice 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - MVP-1 固定音色规则已选定并实现：运行默认只用 `CosyVoice-300M-SFT` 的 `tts.voice=sft_builtin_4role`。未启用 speaker voice 推断时，0/1 个 distinct speaker 且没有显式性别标签使用 `female_a`；单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 按首次出现顺序映射到 `female_a / male_a / female_b / male_b`。
@@ -230,10 +231,9 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 
 下一步继续 MVP-1 Real Podcasts：
 
-1. 先做点播式单集转换入口：用户给 episode URL / source YAML / transcript file，只转换这一集，不做节目订阅扫描。
-2. 保留现有 adapter 合同，优先复用 YouTube captions、官网 episode_page、RSS episode 和本地 transcript。
-3. 在点播式真实 run 上验证 `speaker_voices.mode: infer_once` 的多 speaker profile，并听测 speaker 性别方向是否明显改善。
-4. 继续补真实来源的失败诊断和站点/API 边界记录。
+1. 用 `babelecho episode convert --url ...` 做真实点播式单集回归：先到 `adapt`，确认 transcript 获取和中文稿质量。
+2. 对一集真实多 speaker 内容跑到 TTS，验证 `speaker_voices.mode: infer_once` 的 speaker 性别方向和四角色映射。
+3. 继续补真实来源的失败诊断和站点/API 边界记录。
 
 不要进入：
 

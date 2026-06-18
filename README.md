@@ -14,6 +14,7 @@ The current pipeline supports:
 - Local-first execution, with a temporary DeepSeek API exception for the LLM adaptation baseline.
 - Stage-by-stage Python CLI commands.
 - One-command pipeline orchestration with `babelecho run`.
+- On-demand single episode conversion with `babelecho episode convert`.
 - Manual transcript input with `babelecho run --transcript-file`.
 - Real podcast transcript sources from RSS `podcast:transcript`, iTunes RSS feed discovery, RSS episode selection, PodcastIndex episode metadata, PodcastIndex search/feed selection, first-party episode pages with public transcript text, and YouTube public captions.
 - Chunked DeepSeek adaptation that batches complete transcript segments while preserving original segment ids and final script order.
@@ -78,6 +79,27 @@ conda create -p ./.conda/babelecho-dev python=3.12 pip setuptools wheel pytest p
 ## Running The Pipeline
 
 See [docs/backend-mvp0-runbook.md](docs/backend-mvp0-runbook.md).
+
+## On-demand Episode Convert
+
+Convert one episode by exact input:
+
+```bash
+babelecho episode convert \
+  --workspace workspace \
+  --run-id my-episode \
+  --url "https://example.com/podcast/episode" \
+  --local-config workspace/config/local.yaml
+```
+
+Supported exact inputs in the first version:
+
+- YouTube URLs with public captions.
+- Podcast episode pages with transcript text or a transcript link.
+- Existing `--source-config` YAML.
+- Local `--transcript-file`.
+
+If no transcript is available, the command fails clearly instead of falling back to ASR.
 
 The real 5090D run expects:
 
