@@ -15,6 +15,7 @@ SPEAKER_LABEL_RE = re.compile(
     r"(?:\s+[A-Z][A-Za-z0-9'.-]*){0,4}"
     r"):\s+"
 )
+STAGE_MARKER_RE = re.compile(r"\[[^\]]+\]")
 
 
 def parse_timestamp_ms(value: str) -> int:
@@ -88,13 +89,49 @@ def _segments_from_text(
     return segments
 
 
+def _is_stage_marker(text: str) -> bool:
+    return bool(STAGE_MARKER_RE.fullmatch(" ".join(text.split())))
+
+
 def parse_plain_text(content: str) -> list[dict]:
     paragraphs = [
         part.strip() for part in re.split(r"\n\s*\n", content) if part.strip()
     ]
     segments: list[dict] = []
+    last_speaker: str | None = None
+    can_inherit_speaker = False
     for paragraph in paragraphs:
-        segments.extend(_segments_from_text(len(segments) + 1, paragraph, None, None))
+        turns = _split_speaker_turns(paragraph)
+        if (
+            len(turns) == 1
+            and turns[0][0] is None
+            and last_speaker
+            and can_inherit_speaker
+            and not _is_stage_marker(turns[0][1])
+        ):
+            turns = [(last_speaker, turns[0][1])]
+
+        for speaker, segment_text in turns:
+            segments.append(
+                _segment(
+                    len(segments) + 1,
+                    segment_text,
+                    None,
+                    None,
+                    speaker,
+                )
+            )
+
+        paragraph_speakers = [speaker for speaker, _text in turns if speaker]
+        if len(turns) == 1 and paragraph_speakers:
+            last_speaker = paragraph_speakers[0]
+            can_inherit_speaker = True
+        elif paragraph_speakers:
+            last_speaker = paragraph_speakers[-1]
+            can_inherit_speaker = False
+        else:
+            last_speaker = None
+            can_inherit_speaker = False
     return segments
 
 

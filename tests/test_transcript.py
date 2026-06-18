@@ -59,6 +59,33 @@ def test_normalize_plain_text_extracts_speaker_labels(tmp_path: Path):
     ]
 
 
+def test_normalize_plain_text_inherits_single_speaker_continuations(tmp_path: Path):
+    run_paths = create_run(tmp_path, "speaker-continuation-run")
+    raw = run_paths.transcript_dir / "raw.txt"
+    raw.write_text(
+        "\n\n".join(
+            [
+                "ROMAN MARS: This is 99% Invisible.",
+                "This year marks the 15th anniversary of the show.",
+                "[AD BREAK]",
+                "VIVIAN LE: Happy birthday!",
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    data = read_json(normalize_transcript(run_paths, raw))
+
+    assert [
+        (segment["speaker"], segment["text"]) for segment in data["segments"]
+    ] == [
+        ("ROMAN MARS", "This is 99% Invisible."),
+        ("ROMAN MARS", "This year marks the 15th anniversary of the show."),
+        (None, "[AD BREAK]"),
+        ("VIVIAN LE", "Happy birthday!"),
+    ]
+
+
 def test_normalize_vtt(tmp_path: Path):
     run_paths = create_run(tmp_path, "vtt-run")
     raw = run_paths.transcript_dir / "raw.vtt"
