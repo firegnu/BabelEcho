@@ -6,7 +6,9 @@ import pytest
 from babelecho.podcast_index_api import (
     PodcastIndexCredentials,
     build_auth_headers,
+    build_episode_source_config,
     build_podcast_index_url,
+    build_podcast_search_url,
     load_podcast_index_credentials,
     select_podcast_index_episode,
 )
@@ -119,6 +121,56 @@ def test_build_url_for_episode_by_id():
     assert parsed.netloc == "api.podcastindex.org"
     assert parsed.path == "/api/1.0/episodes/byid"
     assert parse_qs(parsed.query) == {"id": ["42"], "fulltext": ["true"]}
+
+
+def test_build_url_for_podcast_search_by_term():
+    url = build_podcast_search_url(
+        {
+            "api_base_url": "http://127.0.0.1:9999/api/1.0",
+            "endpoint": "search/byterm",
+            "query": "99 percent invisible",
+            "max": 5,
+            "clean": True,
+        }
+    )
+
+    parsed = urlparse(url)
+    assert parsed.geturl().startswith("http://127.0.0.1:9999/api/1.0/search/byterm")
+    assert parse_qs(parsed.query) == {
+        "q": ["99 percent invisible"],
+        "max": ["5"],
+        "clean": ["true"],
+    }
+
+
+def test_build_episode_source_config_uses_selected_episode_guid():
+    source_config = build_episode_source_config(
+        feed_id=75075,
+        episode={
+            "guid": "episode-guid",
+            "link": "https://example.com/episode",
+            "title": "Selected Episode",
+        },
+        credentials_config={
+            "credentials_file": "workspace/config/podcastindex.env",
+            "user_agent": "BabelEcho/0.1",
+        },
+        api_base_url="http://127.0.0.1:9999/api/1.0",
+        max_episodes=20,
+    )
+
+    assert source_config == {
+        "source": {
+            "type": "podcast_index_api",
+            "api_base_url": "http://127.0.0.1:9999/api/1.0",
+            "endpoint": "episodes/byfeedid",
+            "feed_id": 75075,
+            "max_episodes": 20,
+            "episode_url": "episode-guid",
+            "credentials_file": "workspace/config/podcastindex.env",
+            "user_agent": "BabelEcho/0.1",
+        }
+    }
 
 
 def test_build_url_for_episodes_by_feed_id():

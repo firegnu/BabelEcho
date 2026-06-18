@@ -17,6 +17,10 @@ SUPPORTED_ENDPOINTS = {
     "episodes/byid",
     "episodes/byitunesid",
 }
+SUPPORTED_SEARCH_ENDPOINTS = {
+    "search/byterm",
+    "search/bytitle",
+}
 
 
 @dataclass(frozen=True)
@@ -137,6 +141,55 @@ def build_podcast_index_url(source_config: dict) -> str:
     return f"{base_url}/{endpoint}?{urlencode(query)}"
 
 
+def _bool_query_value(value: Any) -> str:
+    return "true" if bool(value) else "false"
+
+
+def build_podcast_search_url(source_config: dict) -> str:
+    endpoint = source_config.get("endpoint", "search/byterm")
+    if endpoint not in SUPPORTED_SEARCH_ENDPOINTS:
+        raise ValueError("search.endpoint must be one of search/byterm, search/bytitle")
+    query: dict[str, str] = {
+        "q": _required_config_value(source_config, "query"),
+        "max": str(int(source_config.get("max", 10))),
+    }
+    if "clean" in source_config:
+        query["clean"] = _bool_query_value(source_config["clean"])
+    if source_config.get("fulltext"):
+        query["fulltext"] = "true"
+    base_url = str(source_config.get("api_base_url") or DEFAULT_BASE_URL).rstrip("/")
+    return f"{base_url}/{endpoint}?{urlencode(query)}"
+
+
+def _fetch_podcast_index_json(url: str, source_config: dict) -> dict[str, Any]:
+    credentials = load_podcast_index_credentials(source_config)
+    request = Request(url, headers=build_auth_headers(credentials))
+    with urlopen(request, timeout=30) as response:
+        return json.loads(response.read())
+
+
+def fetch_podcast_search(source_config: dict) -> list[dict[str, Any]]:
+    payload = _fetch_podcast_index_json(
+        build_podcast_search_url(source_config),
+        source_config,
+    )
+    feeds = payload.get("feeds")
+    if not isinstance(feeds, list):
+        raise ValueError("No podcast feeds found in PodcastIndex search response")
+    return [feed for feed in feeds if isinstance(feed, dict)]
+
+
+def fetch_podcast_index_episodes(source_config: dict) -> list[dict[str, Any]]:
+    payload = _fetch_podcast_index_json(build_podcast_index_url(source_config), source_config)
+    episode = payload.get("episode")
+    if isinstance(episode, dict):
+        return [episode]
+    items = payload.get("items")
+    if not isinstance(items, list):
+        raise ValueError("No podcast episodes found in PodcastIndex API response")
+    return [item for item in items if isinstance(item, dict)]
+
+
 def _str_value(value: Any) -> str | None:
     if not isinstance(value, str):
         return None
@@ -177,12 +230,45 @@ def select_podcast_index_episode(
     raise ValueError(f"Episode not found in PodcastIndex API response: {episode_url}")
 
 
+def _episode_identifier(episode: dict[str, Any]) -> str:
+    for key in ("guid", "link", "enclosureUrl"):
+        value = _str_value(episode.get(key))
+        if value:
+            return value
+    raise ValueError("Selected episode has no guid, link, or enclosureUrl")
+
+
+def build_episode_source_config(
+    feed_id: int | str,
+    episode: dict[str, Any],
+    credentials_config: dict[str, Any],
+    api_base_url: str | None = None,
+    max_episodes: int = 10,
+) -> dict[str, Any]:
+    source: dict[str, Any] = {
+        "type": "podcast_index_api",
+        "endpoint": "episodes/byfeedid",
+        "feed_id": int(feed_id),
+        "max_episodes": int(max_episodes),
+        "episode_url": _episode_identifier(episode),
+    }
+    if api_base_url:
+        source["api_base_url"] = api_base_url
+    for key in [
+        "credentials_file",
+        "api_key_env",
+        "api_secret_env",
+        "user_agent",
+    ]:
+        value = credentials_config.get(key)
+        if value:
+            source[key] = value
+    return {"source": source}
+
+
 def fetch_podcast_index_episode(source_config: dict) -> dict[str, Any]:
-    credentials = load_podcast_index_credentials(source_config)
-    request = Request(
+    payload = _fetch_podcast_index_json(
         build_podcast_index_url(source_config),
-        headers=build_auth_headers(credentials),
+        source_config,
     )
-    with urlopen(request, timeout=30) as response:
-        payload = json.loads(response.read())
     return select_podcast_index_episode(payload, source_config.get("episode_url"))

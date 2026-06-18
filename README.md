@@ -15,6 +15,7 @@ The current pipeline supports:
 - Stage-by-stage Python CLI commands.
 - One-command pipeline orchestration with `babelecho run`.
 - Manual transcript input with `babelecho run --transcript-file`.
+- Real podcast transcript sources from RSS `podcast:transcript`, PodcastIndex episode metadata, PodcastIndex search/feed selection, and first-party episode pages with public transcript text.
 - Partial pipeline execution with `babelecho run --to-stage ...` and resume with `--from-stage ...`.
 - Chinese script preview with `babelecho script` before TTS.
 - Local terminology and pronunciation overrides before TTS with exact replacements.

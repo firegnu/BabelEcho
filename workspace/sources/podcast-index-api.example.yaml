@@ -1,5 +1,7 @@
 source:
   type: podcast_index_api
+  # You can generate this file with:
+  # babelecho podcast-index episodes --feed-id <id> --select-index <n> --source-config-out <path>
   endpoint: episodes/byid
   episode_id: 123456
   api_key_env: PODCASTINDEX_API_KEY

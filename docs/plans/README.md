@@ -72,6 +72,7 @@ docs/plans/
   - [02.04.01 Episode Page Transcript-only Ingest](./02-real-podcasts/04-episode-page-transcript-source/01-episode-page-transcript-only.md) - `done`
 - [02.05 PodcastIndex API Source](./02-real-podcasts/05-podcastindex-api-source/README.md) - `done`
   - [02.05.01 PodcastIndex API Episode Ingest](./02-real-podcasts/05-podcastindex-api-source/01-podcastindex-api-episode-ingest.md) - `done`
+  - [02.05.02 PodcastIndex Search CLI](./02-real-podcasts/05-podcastindex-api-source/02-podcastindex-search-cli.md) - `done`
 
 ### Deferred Voice Work
 

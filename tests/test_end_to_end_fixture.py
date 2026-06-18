@@ -1,8 +1,12 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import json
 import subprocess
 import sys
 from pathlib import Path
 from threading import Thread
+from urllib.parse import urlparse
+
+import yaml
 
 from babelecho.jsonio import read_json, write_json
 from babelecho.cli import run_pipeline
@@ -11,6 +15,30 @@ from babelecho.cli import run_pipeline
 def run_podcast_index_api_server(response_body: str):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
+            encoded = response_body.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, format, *args):
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
+
+
+def run_podcast_index_route_server(routes: dict[str, str]):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            response_body = routes.get(urlparse(self.path).path)
+            if response_body is None:
+                self.send_response(404)
+                self.end_headers()
+                return
             encoded = response_body.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
@@ -566,6 +594,130 @@ publish:
 
     status = read_json(run_dir / "run.json")
     assert status["input"]["source_config"] == str(source_config)
+
+
+def test_podcast_index_cli_searches_episodes_and_writes_source_config(
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    credentials_file = tmp_path / "podcastindex.env"
+    source_config_out = tmp_path / "selected-source.yaml"
+    credentials_file.write_text(
+        """
+PODCASTINDEX_API_KEY=file-key
+PODCASTINDEX_API_SECRET=file-secret
+PODCASTINDEX_USER_AGENT=BabelEchoTest/0.1
+""",
+        encoding="utf-8",
+    )
+    server = run_podcast_index_route_server(
+        {
+            "/api/1.0/search/byterm": json.dumps(
+                {
+                    "feeds": [
+                        {
+                            "id": 75075,
+                            "title": "99% Invisible",
+                            "author": "Roman Mars",
+                            "url": "https://feeds.example.com/99pi.xml",
+                            "link": "https://99percentinvisible.org",
+                        }
+                    ]
+                }
+            ),
+            "/api/1.0/episodes/byfeedid": json.dumps(
+                {
+                    "items": [
+                        {
+                            "title": "Older Episode",
+                            "guid": "older-guid",
+                            "link": "https://example.com/older",
+                        },
+                        {
+                            "title": "Selected Episode",
+                            "guid": "selected-guid",
+                            "link": "https://example.com/selected",
+                            "transcripts": [
+                                {"url": "https://example.com/transcript.txt"}
+                            ],
+                        },
+                    ]
+                }
+            ),
+        }
+    )
+
+    try:
+        search_result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "podcast-index",
+                "search",
+                "--query",
+                "99 percent invisible",
+                "--api-base-url",
+                f"http://127.0.0.1:{server.server_port}/api/1.0",
+                "--credentials-file",
+                str(credentials_file),
+                "--max",
+                "5",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+
+        assert search_result.returncode == 0, search_result.stderr
+        assert "1. 99% Invisible" in search_result.stdout
+        assert "feed_id=75075" in search_result.stdout
+
+        episodes_result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "podcast-index",
+                "episodes",
+                "--feed-id",
+                "75075",
+                "--api-base-url",
+                f"http://127.0.0.1:{server.server_port}/api/1.0",
+                "--credentials-file",
+                str(credentials_file),
+                "--max",
+                "2",
+                "--select-index",
+                "2",
+                "--source-config-out",
+                str(source_config_out),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert episodes_result.returncode == 0, episodes_result.stderr
+    assert "2. Selected Episode" in episodes_result.stdout
+    assert f"source config: {source_config_out}" in episodes_result.stdout
+    source_config = yaml.safe_load(source_config_out.read_text(encoding="utf-8"))
+    assert source_config == {
+        "source": {
+            "type": "podcast_index_api",
+            "api_base_url": f"http://127.0.0.1:{server.server_port}/api/1.0",
+            "endpoint": "episodes/byfeedid",
+            "feed_id": 75075,
+            "max_episodes": 2,
+            "episode_url": "selected-guid",
+            "credentials_file": str(credentials_file),
+        }
+    }
 
 
 def test_run_command_accepts_episode_page_source_config(tmp_path: Path):

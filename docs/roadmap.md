@@ -97,8 +97,9 @@
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中同名 speaker 复用同一角色；LLM 推断的 `male/female` 会分别进入男/女角色池，`unknown` 和推断失败会自动兜底到具体角色，不要求人工介入。
 - 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
 - 已支持 `source.type=podcast_index_api`，可用 PodcastIndex API 鉴权请求获取 episode metadata，再复用现有 transcript ingest；API credentials 只从环境变量或 ignored env 文件读取。
+- 已支持第一版 PodcastIndex 搜索/选择 CLI：`babelecho podcast-index search --query ...` 可搜索 feed，`babelecho podcast-index episodes --feed-id ... --select-index ... --source-config-out ...` 可生成现有 `source.type=podcast_index_api` 配置。
 - 已支持 `source.type=episode_page`，可从播客官网 episode 页面发现 transcript 链接或 transcript 正文，并保存为干净 `transcript/raw.txt`；99% Invisible 真实 smoke 已通过到 `ingest`。
-- 后续仍需做 PodcastIndex 搜索入口或多 episode 批处理。
+- 后续仍需做多 episode 批处理和跳过已处理 episode。
 - YouTube、Spotify、Apple Podcasts 页面不在 `episode_page` 范围内；后续如果要接，需要另列来源计划。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
@@ -153,5 +154,5 @@
 ## 当前最高优先级
 
 1. 在真实 RSS、episode_page 或 podcast_index_api run 上验证 `speaker_voices.mode: infer_once` 多 speaker profile。
-2. 支持 PodcastIndex 搜索入口，把“搜索节目/episode”接到已有 source config。
+2. 如果 credentials 可用，对 PodcastIndex 搜索/选择 CLI 做一次真实 transcript-only smoke。
 3. 支持多 episode feed，跳过已处理 episode。

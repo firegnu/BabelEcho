@@ -2,6 +2,8 @@ import argparse
 import sys
 from pathlib import Path
 
+import yaml
+
 from .adapt import adapt_to_chinese
 from .audio import assemble_audio
 from .checks import CheckError, check_run_artifacts
@@ -10,6 +12,11 @@ from .ingest import ingest_transcript_source
 from .jsonio import read_json
 from .overrides import apply_script_overrides
 from .paths import create_run
+from .podcast_index_api import (
+    build_episode_source_config,
+    fetch_podcast_index_episodes,
+    fetch_podcast_search,
+)
 from .publish import publish_episode
 from .script import preview_chinese_script
 from .speaker_voices import infer_speaker_voices, infer_speaker_voices_if_enabled
@@ -25,6 +32,14 @@ from .transcript import normalize_transcript
 
 PIPELINE_STAGES = ("ingest", "normalize", "adapt", "synthesize", "assemble", "publish")
 CHECK_NAMES = ("script", "segments", "output")
+
+
+def _add_podcast_index_auth_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument("--api-base-url")
+    parser.add_argument("--credentials-file")
+    parser.add_argument("--api-key-env", default="PODCASTINDEX_API_KEY")
+    parser.add_argument("--api-secret-env", default="PODCASTINDEX_API_SECRET")
+    parser.add_argument("--user-agent")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -81,6 +96,35 @@ def build_parser() -> argparse.ArgumentParser:
     speaker_voices.add_argument("--workspace", required=True)
     speaker_voices.add_argument("--run-id", required=True)
     speaker_voices.add_argument("--local-config", required=True)
+
+    podcast_index = subparsers.add_parser(
+        "podcast-index",
+        help="Search PodcastIndex and create source configs.",
+    )
+    podcast_index_subparsers = podcast_index.add_subparsers(
+        dest="podcast_index_command",
+        required=True,
+    )
+
+    podcast_index_search = podcast_index_subparsers.add_parser(
+        "search",
+        help="Search podcasts by term or title.",
+    )
+    podcast_index_search.add_argument("--query", required=True)
+    podcast_index_search.add_argument("--by-title", action="store_true")
+    podcast_index_search.add_argument("--max", type=int, default=10)
+    podcast_index_search.add_argument("--clean", action="store_true")
+    _add_podcast_index_auth_args(podcast_index_search)
+
+    podcast_index_episodes = podcast_index_subparsers.add_parser(
+        "episodes",
+        help="List episodes for a PodcastIndex feed.",
+    )
+    podcast_index_episodes.add_argument("--feed-id", required=True, type=int)
+    podcast_index_episodes.add_argument("--max", type=int, default=10)
+    podcast_index_episodes.add_argument("--select-index", type=int)
+    podcast_index_episodes.add_argument("--source-config-out")
+    _add_podcast_index_auth_args(podcast_index_episodes)
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
@@ -202,6 +246,64 @@ def _format_speaker_voice_result(result: dict) -> str:
     elif result.get("reason"):
         message += f" ({result['reason']})"
     return message
+
+
+def _podcast_index_api_config_from_args(args) -> dict:
+    config = {}
+    if args.api_base_url:
+        config["api_base_url"] = args.api_base_url
+    if args.credentials_file:
+        config["credentials_file"] = args.credentials_file
+    else:
+        config["api_key_env"] = args.api_key_env
+        config["api_secret_env"] = args.api_secret_env
+    if args.user_agent:
+        config["user_agent"] = args.user_agent
+    return config
+
+
+def _format_podcast_index_feeds(feeds: list[dict]) -> str:
+    lines = []
+    for index, feed in enumerate(feeds, start=1):
+        title = feed.get("title") or "<untitled>"
+        feed_id = feed.get("id") or "<missing>"
+        lines.append(f"{index}. {title} (feed_id={feed_id})")
+        if feed.get("author"):
+            lines.append(f"   author={feed['author']}")
+        if feed.get("url"):
+            lines.append(f"   feed_url={feed['url']}")
+        if feed.get("link"):
+            lines.append(f"   link={feed['link']}")
+    return "\n".join(lines)
+
+
+def _episode_has_transcript(episode: dict) -> bool:
+    transcripts = episode.get("transcripts")
+    if isinstance(transcripts, list) and transcripts:
+        return True
+    return bool(episode.get("transcriptUrl"))
+
+
+def _format_podcast_index_episodes(episodes: list[dict]) -> str:
+    lines = []
+    for index, episode in enumerate(episodes, start=1):
+        title = episode.get("title") or "<untitled>"
+        transcript = "yes" if _episode_has_transcript(episode) else "no"
+        lines.append(f"{index}. {title} (transcript={transcript})")
+        if episode.get("guid"):
+            lines.append(f"   guid={episode['guid']}")
+        if episode.get("link"):
+            lines.append(f"   link={episode['link']}")
+    return "\n".join(lines)
+
+
+def _write_yaml(path: str | Path, data: dict) -> None:
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(
+        yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
 
 
 def run_pipeline(
@@ -413,6 +515,50 @@ def main(argv: list[str] | None = None) -> int:
         result = infer_speaker_voices(run_paths, config["llm"], config.get("speaker_voices"))
         print(_format_speaker_voice_result(result))
         return 0
+
+    if args.command == "podcast-index":
+        try:
+            api_config = _podcast_index_api_config_from_args(args)
+            if args.podcast_index_command == "search":
+                search_config = {
+                    **api_config,
+                    "endpoint": "search/bytitle" if args.by_title else "search/byterm",
+                    "query": args.query,
+                    "max": args.max,
+                }
+                if args.clean:
+                    search_config["clean"] = True
+                print(_format_podcast_index_feeds(fetch_podcast_search(search_config)))
+                return 0
+
+            if args.podcast_index_command == "episodes":
+                episode_config = {
+                    **api_config,
+                    "endpoint": "episodes/byfeedid",
+                    "feed_id": args.feed_id,
+                    "max_episodes": args.max,
+                }
+                episodes = fetch_podcast_index_episodes(episode_config)
+                print(_format_podcast_index_episodes(episodes))
+                if args.select_index is not None:
+                    if args.select_index < 1 or args.select_index > len(episodes):
+                        raise ValueError(f"--select-index out of range: {args.select_index}")
+                    source_config = build_episode_source_config(
+                        feed_id=args.feed_id,
+                        episode=episodes[args.select_index - 1],
+                        credentials_config=api_config,
+                        api_base_url=args.api_base_url,
+                        max_episodes=args.max,
+                    )
+                    if args.source_config_out:
+                        _write_yaml(args.source_config_out, source_config)
+                        print(f"source config: {args.source_config_out}")
+                    else:
+                        print(yaml.safe_dump(source_config, allow_unicode=True, sort_keys=False))
+                return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
 
     if args.command == "adapt":
         config = load_yaml(Path(args.local_config))
