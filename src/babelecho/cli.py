@@ -13,6 +13,7 @@ from .itunes import build_podcast_rss_source_config, fetch_itunes_podcast_search
 from .jsonio import read_json
 from .overrides import apply_script_overrides
 from .paths import create_run
+from .podcast import build_podcast_rss_episode_source_config, fetch_podcast_episodes
 from .podcast_index_api import (
     build_episode_source_config,
     fetch_podcast_index_episodes,
@@ -145,6 +146,22 @@ def build_parser() -> argparse.ArgumentParser:
     itunes_search.add_argument("--api-base-url")
     itunes_search.add_argument("--select-index", type=int)
     itunes_search.add_argument("--source-config-out")
+
+    rss = subparsers.add_parser(
+        "rss",
+        help="List RSS feed episodes and create episode source configs.",
+    )
+    rss_subparsers = rss.add_subparsers(
+        dest="rss_command",
+        required=True,
+    )
+    rss_episodes = rss_subparsers.add_parser(
+        "episodes",
+        help="List episodes in an RSS feed.",
+    )
+    rss_episodes.add_argument("--feed-url", required=True)
+    rss_episodes.add_argument("--select-index", type=int)
+    rss_episodes.add_argument("--source-config-out")
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
@@ -328,6 +345,20 @@ def _format_itunes_results(results: list[dict]) -> str:
             lines.append(f"   feed_url={result['feed_url']}")
         if result.get("apple_url"):
             lines.append(f"   apple_url={result['apple_url']}")
+    return "\n".join(lines)
+
+
+def _format_rss_episodes(episodes: list) -> str:
+    lines = []
+    for index, episode in enumerate(episodes, start=1):
+        transcript = "yes" if episode.transcript_url else "no"
+        lines.append(f"{index}. {episode.title} (transcript={transcript})")
+        if episode.episode_url:
+            lines.append(f"   episode_url={episode.episode_url}")
+        if episode.transcript_url:
+            lines.append(f"   transcript_url={episode.transcript_url}")
+        if episode.enclosure_url:
+            lines.append(f"   enclosure_url={episode.enclosure_url}")
     return "\n".join(lines)
 
 
@@ -611,6 +642,28 @@ def main(argv: list[str] | None = None) -> int:
                         raise ValueError(f"--select-index out of range: {args.select_index}")
                     source_config = build_podcast_rss_source_config(
                         results[args.select_index - 1]
+                    )
+                    if args.source_config_out:
+                        _write_yaml(args.source_config_out, source_config)
+                        print(f"source config: {args.source_config_out}")
+                    else:
+                        print(yaml.safe_dump(source_config, allow_unicode=True, sort_keys=False))
+                return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
+
+    if args.command == "rss":
+        try:
+            if args.rss_command == "episodes":
+                episodes = fetch_podcast_episodes(args.feed_url)
+                print(_format_rss_episodes(episodes))
+                if args.select_index is not None:
+                    if args.select_index < 1 or args.select_index > len(episodes):
+                        raise ValueError(f"--select-index out of range: {args.select_index}")
+                    source_config = build_podcast_rss_episode_source_config(
+                        feed_url=args.feed_url,
+                        episode=episodes[args.select_index - 1],
                     )
                     if args.source_config_out:
                         _write_yaml(args.source_config_out, source_config)

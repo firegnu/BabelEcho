@@ -812,6 +812,70 @@ def test_itunes_cli_searches_and_writes_podcast_rss_source_config(
     }
 
 
+def test_rss_cli_lists_episodes_and_writes_source_config(tmp_path: Path):
+    feed = tmp_path / "feed.xml"
+    transcript = tmp_path / "episode.vtt"
+    source_config_out = tmp_path / "rss-source.yaml"
+    transcript.write_text(
+        "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nHello.\n",
+        encoding="utf-8",
+    )
+    feed.write_text(
+        f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Fixture Feed</title>
+    <item>
+      <title>Older Episode</title>
+      <link>https://example.com/older</link>
+    </item>
+    <item>
+      <title>Selected Episode</title>
+      <link>https://example.com/selected</link>
+      <guid>selected-guid</guid>
+      <podcast:transcript url="{transcript}" type="text/vtt" language="en" />
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "rss",
+            "episodes",
+            "--feed-url",
+            str(feed),
+            "--select-index",
+            "2",
+            "--source-config-out",
+            str(source_config_out),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "1. Older Episode (transcript=no)" in result.stdout
+    assert "2. Selected Episode (transcript=yes)" in result.stdout
+    assert f"source config: {source_config_out}" in result.stdout
+    source_config = yaml.safe_load(source_config_out.read_text(encoding="utf-8"))
+    assert source_config == {
+        "source": {
+            "type": "podcast_rss",
+            "feed_url": str(feed),
+            "episode_url": "https://example.com/selected",
+            "title": "Selected Episode",
+            "original_url": "https://example.com/selected",
+        }
+    }
+
+
 def test_run_command_accepts_youtube_captions_source_config(tmp_path: Path):
     workspace = tmp_path / "workspace"
     source_config = tmp_path / "source.yaml"

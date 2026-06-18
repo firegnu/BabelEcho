@@ -76,6 +76,7 @@ docs/plans/
 - [02.06 Discovery Adapters](./02-real-podcasts/06-discovery-adapters/README.md) - `done`
   - [02.06.01 iTunes Feed Discovery](./02-real-podcasts/06-discovery-adapters/01-itunes-feed-discovery.md) - `done`
   - [02.06.02 YouTube Captions Source](./02-real-podcasts/06-discovery-adapters/02-youtube-captions-source.md) - `done`
+  - [02.06.03 RSS Episode Selection](./02-real-podcasts/06-discovery-adapters/03-rss-episode-selection.md) - `done`
 
 ### Deferred Voice Work
 

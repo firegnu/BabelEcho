@@ -8,6 +8,10 @@ import pytest
 from babelecho.ingest import ingest_transcript_source
 from babelecho.jsonio import read_json
 from babelecho.paths import create_run
+from babelecho.podcast import (
+    build_podcast_rss_episode_source_config,
+    list_podcast_episodes,
+)
 
 
 def run_podcast_index_api_server(response_body: str):
@@ -59,6 +63,74 @@ def write_feed(path: Path, transcript_url: str | None) -> None:
 """,
         encoding="utf-8",
     )
+
+
+def test_list_podcast_episodes_reports_transcript_availability(tmp_path: Path):
+    transcript = tmp_path / "episode.vtt"
+    transcript.write_text("WEBVTT\n", encoding="utf-8")
+    feed = tmp_path / "feed.xml"
+    feed.write_text(
+        f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Example Podcast</title>
+    <item>
+      <title>First Episode</title>
+      <link>https://example.com/first</link>
+      <guid>first-guid</guid>
+      <enclosure url="https://cdn.example.com/first.mp3" type="audio/mpeg" />
+      <podcast:transcript url="{transcript}" type="text/vtt" language="en" />
+    </item>
+    <item>
+      <title>Second Episode</title>
+      <guid>second-guid</guid>
+      <enclosure url="https://cdn.example.com/second.mp3" type="audio/mpeg" />
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+
+    episodes = list_podcast_episodes(feed.read_bytes())
+
+    assert [episode.title for episode in episodes] == ["First Episode", "Second Episode"]
+    assert episodes[0].episode_url == "https://example.com/first"
+    assert episodes[0].transcript_url == str(transcript)
+    assert episodes[0].enclosure_url == "https://cdn.example.com/first.mp3"
+    assert episodes[1].episode_url == "second-guid"
+    assert episodes[1].transcript_url is None
+
+
+def test_build_podcast_rss_episode_source_config_uses_episode_url():
+    episodes = list_podcast_episodes(
+        b"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <item>
+      <title>Selected Episode</title>
+      <link>https://example.com/selected</link>
+      <podcast:transcript url="https://example.com/selected.vtt" type="text/vtt" />
+    </item>
+  </channel>
+</rss>
+"""
+    )
+
+    source_config = build_podcast_rss_episode_source_config(
+        feed_url="https://feeds.example.com/show.xml",
+        episode=episodes[0],
+    )
+
+    assert source_config == {
+        "source": {
+            "type": "podcast_rss",
+            "feed_url": "https://feeds.example.com/show.xml",
+            "episode_url": "https://example.com/selected",
+            "title": "Selected Episode",
+            "original_url": "https://example.com/selected",
+        }
+    }
 
 
 def test_ingest_podcast_rss_uses_episode_transcript(tmp_path: Path):
