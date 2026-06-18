@@ -838,7 +838,11 @@ def main(argv: list[str] | None = None) -> int:
         config = load_yaml(Path(args.local_config))
         require_keys(config, ["llm"])
         run_paths = create_run(args.workspace, args.run_id)
-        output = adapt_to_chinese(run_paths, config["llm"], config.get("adapt"))
+        try:
+            output = adapt_to_chinese(run_paths, config["llm"], config.get("adapt"))
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
         print(output)
         return 0
 

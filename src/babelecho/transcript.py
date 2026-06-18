@@ -16,7 +16,14 @@ SPEAKER_LABEL_RE = re.compile(
     r"(?:\s+[A-Z][A-Za-z0-9'.-]*){0,4}"
     r"):\s+"
 )
-STAGE_MARKER_RE = re.compile(r"\[[^\]]+\]")
+STAGE_MARKER_RE = re.compile(r"(?:\[[^\]]+\]\s*)+[.!?。！？]*")
+TRANSCRIPT_BOILERPLATE_PHRASES = (
+    "transcripts are created",
+    "may not be in their final form",
+    "may be updated or revised",
+    "authoritative record is the audio record",
+    "authoritative record of",
+)
 
 
 def parse_timestamp_ms(value: str) -> int:
@@ -102,6 +109,16 @@ def _segments_from_text(
 
 def _is_stage_marker(text: str) -> bool:
     return bool(STAGE_MARKER_RE.fullmatch(" ".join(text.split())))
+
+
+def _is_transcript_boilerplate(text: str) -> bool:
+    normalized = " ".join(text.split()).casefold()
+    if (
+        ("copyright" in normalized or "©" in text)
+        and ("all rights reserved" in normalized or "terms of use" in normalized)
+    ):
+        return True
+    return any(phrase in normalized for phrase in TRANSCRIPT_BOILERPLATE_PHRASES)
 
 
 def parse_plain_text(content: str, *, infer_speaker_labels: bool = True) -> list[dict]:
@@ -208,6 +225,16 @@ def _renumber_segments(segments: list[dict]) -> list[dict]:
     ]
 
 
+def _filter_non_spoken_segments(segments: list[dict]) -> list[dict]:
+    kept = [
+        segment
+        for segment in segments
+        if not _is_stage_marker(str(segment.get("text", "")))
+        and not _is_transcript_boilerplate(str(segment.get("text", "")))
+    ]
+    return _renumber_segments(kept)
+
+
 def _apply_youtube_start_offset(run_paths: RunPaths, segments: list[dict]) -> list[dict]:
     youtube_start_ms = _youtube_start_ms_for_run(run_paths)
     if youtube_start_ms is None:
@@ -230,6 +257,7 @@ def normalize_transcript(run_paths: RunPaths, raw_path: str | Path) -> Path:
     else:
         segments = parse_plain_text(content, infer_speaker_labels=infer_speaker_labels)
     segments = _apply_youtube_start_offset(run_paths, segments)
+    segments = _filter_non_spoken_segments(segments)
     if not segments:
         raise ValueError(f"No transcript segments parsed from {source}")
     output = {

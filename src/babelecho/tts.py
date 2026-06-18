@@ -1,4 +1,5 @@
 import math
+import re
 import subprocess
 import wave
 from pathlib import Path
@@ -8,6 +9,18 @@ from .jsonio import write_json
 
 
 DEFAULT_LOCAL_CLI_VOICE = "sft_builtin_4role"
+DOMAIN_RE = re.compile(
+    r"(?<![A-Za-z0-9@._-])"
+    r"(?P<domain>"
+    r"[A-Za-z0-9][A-Za-z0-9-]*"
+    r"(?:[.。][A-Za-z0-9][A-Za-z0-9-]*)*"
+    r"[.。][A-Za-z]{2,}"
+    r")"
+)
+MEDIA_ABBREVIATION_RE = re.compile(
+    r"(?<![A-Za-z0-9])MP\s*(?P<digit>[34三四])(?![A-Za-z0-9])",
+    re.IGNORECASE,
+)
 
 
 def write_silent_wav(
@@ -24,6 +37,19 @@ def write_silent_wav(
         handle.writeframes(b"\x00\x00" * frames)
 
 
+def prepare_tts_text(text: str) -> str:
+    def speak_domain(match: re.Match[str]) -> str:
+        return match.group("domain").replace(".", " 点 ").replace("。", " 点 ")
+
+    def speak_media_abbreviation(match: re.Match[str]) -> str:
+        digit = {"三": "3", "四": "4"}.get(match.group("digit"), match.group("digit"))
+        return f"M P {digit}"
+
+    prepared = DOMAIN_RE.sub(speak_domain, text)
+    prepared = MEDIA_ABBREVIATION_RE.sub(speak_media_abbreviation, prepared)
+    return " ".join(prepared.split())
+
+
 def synthesize_text_to_wav(text: str, output_path: Path, tts_config: dict) -> None:
     provider = tts_config.get("provider")
     if provider == "fixture":
@@ -32,7 +58,7 @@ def synthesize_text_to_wav(text: str, output_path: Path, tts_config: dict) -> No
         return
     if provider == "local_cli":
         text_file = output_path.with_suffix(".txt")
-        text_file.write_text(text, encoding="utf-8")
+        text_file.write_text(prepare_tts_text(text), encoding="utf-8")
         command = [
             tts_config["command"],
             "--text-file",
@@ -88,7 +114,7 @@ def synthesize_many_to_wav(
             text, output_path, metadata = _normalize_item(item)
             output_path.parent.mkdir(parents=True, exist_ok=True)
             text_file = output_path.with_suffix(".txt")
-            text_file.write_text(text, encoding="utf-8")
+            text_file.write_text(prepare_tts_text(text), encoding="utf-8")
             batch_item = {
                 "text_file": str(text_file),
                 "output": str(output_path),

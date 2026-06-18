@@ -3,6 +3,29 @@ from .llm import build_llm_client
 from .paths import RunPaths
 
 
+QUALITY_GATED_LLM_PROVIDERS = {"local_vllm", "openai_compatible"}
+
+
+def _require_safe_transcript_quality(run_paths: RunPaths, llm_config: dict) -> None:
+    if llm_config.get("provider") not in QUALITY_GATED_LLM_PROVIDERS:
+        return
+    if not run_paths.transcript_quality_json.exists():
+        raise ValueError(
+            "Missing transcript quality report before adapt: "
+            f"{run_paths.transcript_quality_json}"
+        )
+    report = read_json(run_paths.transcript_quality_json)
+    recommendation = report.get("recommendation")
+    if recommendation == "safe_to_adapt":
+        return
+    issues = report.get("reasons") or report.get("warnings") or []
+    issue_text = f"; issues={', '.join(issues)}" if issues else ""
+    raise ValueError(
+        "Transcript quality gate failed before adapt: "
+        f"recommendation={recommendation or 'unknown'}{issue_text}"
+    )
+
+
 def _chunk_segments(
     segments: list[dict],
     max_segments: int,
@@ -143,6 +166,7 @@ def adapt_to_chinese(
     adapt_config: dict | None = None,
 ) -> str:
     transcript = read_json(run_paths.normalized_transcript_json)
+    _require_safe_transcript_quality(run_paths, llm_config)
     config = adapt_config or {}
     if config.get("mode") == "chunked":
         segments = _adapt_segments_in_chunks(

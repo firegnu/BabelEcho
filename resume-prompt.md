@@ -43,6 +43,7 @@
 - MVP-1 On-demand Episode Convert 已完成第一版：新增 `babelecho episode convert`，用于自用点播式单集转换；`--url` 会把 YouTube URL 映射到 `source.type=youtube_captions`，把普通 http/https 或本地 episode 页面映射到 `source.type=episode_page`，也可直接传 `--source-config` 或 `--transcript-file` 复用现有 pipeline。该入口不做节目订阅扫描、不做多集批处理、不做 ASR。真实入口 smoke `on-demand-99pi-karaoke-fixture-20260618` 已用 99% Invisible `Karaoke Videos` URL 跑到 `adapt`，解析到 150 段 normalized/script；该 smoke 使用 fixture local config，未调用 DeepSeek 或 TTS。5090D 真实 full-chain run `on-demand-99pi-karaoke-real-20260618` 已成功：同一 URL 经 chunked DeepSeek、`speaker_voices.mode: infer_once`、`sft_builtin_4role` TTS、assemble/publish 全链路完成；150 段、7 个 speaker 推断、最终 MP3 约 `1904.3s`，已拷回本机 ignored `workspace/runs/on-demand-99pi-karaoke-real-20260618/output/audio.mp3` 便于试听。
 - MVP-1 YouTube 单链接 pre-DeepSeek 清洗和质量门槛第一版已完成：新增 `docs/plans/02-real-podcasts/10-YouTube单链接点播转换计划.md`，`babelecho episode convert --url ... --to-stage normalize` 对单个 YouTube 视频或 YouTube Podcasts 单集 URL 写出 `transcript/raw.vtt`、`transcript/cleaned.vtt`、`transcript/candidates.json`、`transcript/normalized.json` 和 `transcript/quality.json`；会合并碎 cue、解码 `&nbsp;` 等 HTML entities、清理 inline timing / `<c>` caption markup、移除 `>>` speaker arrows，并处理 rolling captions 的重复 overlap；会拒绝 playlist/channel/show 类 URL。YouTube captions 在 normalize 阶段关闭 speaker label 推断，避免 `AI:` / `API:` 等技术词误识别为主持人；其他来源 speaker label 解析不变。带 `t=` / `start=` 的 URL 会记录 `youtube_start_ms`，CLI 输出 `start offset:`，raw/cleaned 字幕保留整条原始字幕，`normalized.json` 裁剪到请求起点之后；YouTube 标题会通过独立 metadata 调用写入 source metadata，用户传入 `--title` 时用户标题优先。quality report 是 deterministic advisory，不调用 LLM，推荐值为 `safe_to_adapt` / `inspect_first` / `reject`，并记录 segment 数、字符长度、speaker 数、dirty markup、HTML entity 和重复度指标。DeepSeek chunked adapt prompt 已收紧：必须按输入 id 一对一返回，可清理字幕格式噪声和无意义口头填充，但要保留事实、数字、人名、问题、因果和有意义强调；chunk 少 id 时会重试，429/5xx/URL tunnel 临时错误也会重试。`babelecho check --checks script` 已新增中文脚本 QA，会在 TTS 前拦截 `>>`、`WEBVTT`、caption markup、HTML entity、时间轴残留和明显整段英文残留。当前本地 smoke config `workspace/config/local-deepseek-chunked-smoke.yaml` 已从 5 段一组调到 12 段一组，减少长视频请求数；该文件是 ignored local runtime config。真实本地 smoke `youtube-pre-deepseek-ai-engineering-20260618` 使用近期 LLM/agent 相关 YouTube 单集 URL 跑到 `normalize`：normalized 48 段、平均约 219 字符、speaker_count=0、quality=`safe_to_adapt`，未调用 DeepSeek/TTS；另测 `youtube-pre-deepseek-claude-second-brain-20260618` 和 `youtube-pre-deepseek-code-with-claude-20260618`，quality 均为 `safe_to_adapt`，dirty markup/entity 均为 0，无 speaker 误判，未进入 DeepSeek。用户 URL `https://www.youtube.com/watch?v=yAI8osNcMNw&t=1521s` 已重跑到 `normalize`、`adapt` 和 5090D TTS：标题为 `特朗普记者会谈美伊备忘录，感谢习近平普京｜新闻特写20260618`，start offset 1521s，normalized 223 段，quality=`safe_to_adapt`，DeepSeek adapt 生成 223 段 `script/zh.json`，脚本通过 `babelecho check --checks script`；新增 `speaker_voices.default_voice_role` 用于无 speaker 的 YouTube run 手动指定默认声线，该 run 使用 `male_a` 完整 TTS 成功，manifest 223 段全部 `male_a`，最终 MP3 为 `22050 Hz` mono，约 `2602.8s`，约 `40 MB`，已拷回本机 ignored `workspace/runs/youtube-user-yai8osncmnw-start1521-20260618/output/audio.mp3`。
 - 近期 agent 主题 YouTube 端到端样本 `youtube-agent-skills-briefing-20260619` 已完成：标题 `AI Research Briefing 18062026: Auditing Agent Skills, Financial Reasoning, and Jailbreak Safety`，normalized 28 段，quality=`safe_to_adapt`，DeepSeek adapt 和 script QA 通过，5090D TTS 默认 `female_a`，最终 MP3 为 `22050 Hz` mono，约 `543.8s`，约 `8.3 MB`；用户试听反馈“听起来很不错”。
+- 2026-06-19 三个标准播客 full-chain 样本（Practical AI、Radiolab、99% Invisible）用户试听反馈达到预期；试听暴露的 `[掌声]` / 片头音乐、版权/转写说明、`predictionguard。com` 和 `MP三` 已做第一轮清理：`normalize` 丢弃纯舞台提示和常见免责声明，DeepSeek adapt prompt 增加清理约束，`local_cli` TTS 写 `.txt` 前规范化域名点号和 `MP3` / `MP4` 读法。真实广告口播、制作名单、复杂 URL 仍按后续样本窄规则处理。
 - YouTube 单链接探索已先收口；官网 episode page 标准播客页面解析也完成第一轮真实 normalize 验证。下一步继续标准播客点播来源对接：YouTube Podcasts 单集、iTunes/RSS feed 和 PodcastIndex episode 的真实 URL 验证。继续遵守当前边界：用户给一个 URL 就转换一集；订阅扫描、多 episode 批处理、RSS/PodcastIndex 多 candidate 扩展仍后移。
 - MVP-1 Chunked DeepSeek Adapt 已完成：可在 local config 设置 `adapt.mode: chunked`、`chunk_max_segments`、`chunk_max_chars`，将多个完整 transcript segment 合并到一次 DeepSeek 请求；不切开单个 segment，返回必须保留原始 id，最终 `script/zh.json` 按原始 id 顺序合并，TTS 不依赖 chunk 返回顺序。chunk 结果会写入 run-local `script/adapt-chunks/` 便于排查。
 - MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 按本批次需要延迟加载 300M SFT 和/或 CosyVoice2 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
@@ -59,6 +60,7 @@
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
 - Python 环境必须使用项目内 .conda/babelecho-dev，不要使用 base env。
 - 真实 runtime config、workspace/runs、生成音频、模型缓存、本地配置和 API key 不要提交。
+- 5090D 真实验证的详细流程、命令模板、DeepSeek 前置质量门禁和代表样本记录见 `docs/5090D远程测试流程.md`。
 ```
 
 ## 当前执行位置
@@ -177,20 +179,21 @@ MVP-0.5 self-use acceptance 已在 5090D 上完成：
 1. `HANDOFF.md`
 2. `docs/roadmap.md`
 3. `docs/plans/README.md`
-4. `docs/plans/01-backend-mvp0/01-local-llm-adapt.md`
-5. `docs/plans/01-backend-mvp0/03-local-tts.md`
-6. `src/babelecho/transcript.py`
-7. `tests/test_transcript.py`
-8. `src/babelecho/llm.py`
-9. `tests/test_llm.py`
-10. `tools/cosyvoice_tts_wrapper.py`
-11. `src/babelecho/cli.py`
-12. `src/babelecho/status.py`
-13. `src/babelecho/overrides.py`
-14. `tests/test_end_to_end_fixture.py`
-15. `tests/test_overrides.py`
-16. `workspace/config/local.example.yaml`
-17. `workspace/config/overrides.example.yaml`
+4. `docs/5090D远程测试流程.md`
+5. `docs/plans/01-backend-mvp0/01-local-llm-adapt.md`
+6. `docs/plans/01-backend-mvp0/03-local-tts.md`
+7. `src/babelecho/transcript.py`
+8. `tests/test_transcript.py`
+9. `src/babelecho/llm.py`
+10. `tests/test_llm.py`
+11. `tools/cosyvoice_tts_wrapper.py`
+12. `src/babelecho/cli.py`
+13. `src/babelecho/status.py`
+14. `src/babelecho/overrides.py`
+15. `tests/test_end_to_end_fixture.py`
+16. `tests/test_overrides.py`
+17. `workspace/config/local.example.yaml`
+18. `workspace/config/overrides.example.yaml`
 
 ## 当前项目事实
 

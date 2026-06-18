@@ -8,6 +8,22 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
+ADAPT_CLEANUP_INSTRUCTIONS = (
+    "Clean transcript artifacts such as subtitle arrows, timing residue, "
+    "HTML or caption markup, duplicated rolling-caption residue, and "
+    "meaningless filler disfluencies. "
+    "Drop non-spoken stage directions such as [music], [applause], and "
+    "[laughter]; do not translate them into Chinese narration. "
+    "Remove transcript boilerplate such as copyright notices, terms-of-use "
+    "text, and rush transcript disclaimers when they are not episode content. "
+    "Normalize URLs and domains for Chinese TTS readability; do not turn "
+    "domain dots into Chinese full stops, and prefer spoken dot wording such "
+    "as example 点 com. "
+    "Write media abbreviations in TTS-friendly Latin letters and digits, "
+    "for example MP3 as M P 3 and MP4 as M P 4. "
+)
+
+
 class LLMClient(Protocol):
     def adapt_segment(self, text: str) -> str:
         raise NotImplementedError
@@ -103,6 +119,8 @@ class OpenAICompatibleClient:
     def adapt_segment(self, text: str) -> str:
         prompt = (
             "请把下面英文播客片段改写成自然、适合口播的简体中文。"
+            "清理字幕噪声、舞台提示、版权或转写免责声明；"
+            "URL 和域名要适合中文 TTS 朗读，MP3/MP4 等缩写要避免被读成中文数字。"
             "只输出中文正文，不要解释。\n\n"
             f"{text}"
         )
@@ -119,9 +137,7 @@ class OpenAICompatibleClient:
             "Do not merge, split, remove, add, or reorder segment ids. "
             "If an input segment is a fragment or continuation, still return one "
             "Chinese spoken-script fragment for that exact id. "
-            "Clean transcript artifacts such as subtitle arrows, timing residue, "
-            "HTML or caption markup, duplicated rolling-caption residue, and "
-            "meaningless filler disfluencies. "
+            f"{ADAPT_CLEANUP_INSTRUCTIONS}"
             "Preserve factual content, named entities, numbers, claims, questions, "
             "causal links, and meaningful emphasis. "
             "Do not summarize across segments. "

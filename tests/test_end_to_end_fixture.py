@@ -1512,3 +1512,125 @@ def test_check_command_reports_script_failures(tmp_path: Path):
 
     assert result.returncode == 1
     assert "empty text" in result.stderr
+
+
+def test_adapt_command_blocks_real_llm_when_quality_rejects(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    run_dir = workspace / "runs" / "bad-quality-adapt"
+    local_config = tmp_path / "local.yaml"
+    (run_dir / "transcript").mkdir(parents=True)
+    write_json(
+        run_dir / "transcript" / "normalized.json",
+        {
+            "episode_id": "bad-quality-adapt",
+            "language": "en",
+            "segments": [
+                {
+                    "id": "0001",
+                    "start_ms": None,
+                    "end_ms": None,
+                    "speaker": None,
+                    "text": "Too short.",
+                    "source": "transcript",
+                }
+            ],
+        },
+    )
+    write_json(
+        run_dir / "transcript" / "quality.json",
+        {
+            "recommendation": "reject",
+            "reasons": ["too_short"],
+            "warnings": [],
+            "metrics": {"segment_count": 1, "total_chars": 10},
+        },
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: openai_compatible
+  base_url: "http://127.0.0.1:9/v1"
+  model: "deepseek-chat"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "adapt",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "bad-quality-adapt",
+            "--local-config",
+            str(local_config),
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 1
+    assert "Transcript quality gate failed before adapt" in result.stderr
+    assert "recommendation=reject" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_run_command_stops_before_real_llm_when_quality_rejects(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    transcript = tmp_path / "short.txt"
+    transcript.write_text("Too short for a real LLM request.", encoding="utf-8")
+    local_config.write_text(
+        """
+llm:
+  provider: openai_compatible
+  base_url: "http://127.0.0.1:9/v1"
+  model: "deepseek-chat"
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "quality-gated-run",
+            "--transcript-file",
+            str(transcript),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "adapt",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    run_dir = workspace / "runs" / "quality-gated-run"
+    status = read_json(run_dir / "run.json")
+    quality = read_json(run_dir / "transcript" / "quality.json")
+    assert result.returncode == 1
+    assert "Transcript quality gate failed before adapt" in result.stderr
+    assert quality["recommendation"] == "reject"
+    assert status["status"] == "failed"
+    assert status["failed_stage"] == "adapt"
+    assert [stage["status"] for stage in status["stages"][:3]] == [
+        "succeeded",
+        "succeeded",
+        "failed",
+    ]
+    assert not (run_dir / "script" / "zh.json").exists()

@@ -77,6 +77,28 @@ def test_local_cli_tts_forwards_voice_calibration_options(monkeypatch, tmp_path:
     assert output_path.with_suffix(".txt").read_text(encoding="utf-8") == "中文口播：欢迎。"
 
 
+def test_local_cli_tts_prepares_urls_and_media_abbreviations(monkeypatch, tmp_path: Path):
+    output_path = tmp_path / "segment.wav"
+
+    def fake_run(_command, check):
+        assert check is True
+
+    monkeypatch.setattr("babelecho.tts.subprocess.run", fake_run)
+
+    synthesize_text_to_wav(
+        "请访问predictionguard。com了解更多，也可以看99pi.org。这个文件来自MP三分享。",
+        output_path,
+        {
+            "provider": "local_cli",
+            "command": "tts-wrapper",
+        },
+    )
+
+    assert output_path.with_suffix(".txt").read_text(encoding="utf-8") == (
+        "请访问predictionguard 点 com了解更多，也可以看99pi 点 org。这个文件来自M P 3分享。"
+    )
+
+
 def test_local_cli_tts_batches_segments_in_one_wrapper_call(monkeypatch, tmp_path: Path):
     calls = []
     first_output = tmp_path / "segments" / "0001.wav"
@@ -91,7 +113,7 @@ def test_local_cli_tts_batches_segments_in_one_wrapper_call(monkeypatch, tmp_pat
     synthesize_many_to_wav(
         [
             ("第一段中文。", first_output),
-            ("第二段中文。", second_output),
+            ("第二段来自MP三，见example.com。", second_output),
         ],
         batch_path,
         {
@@ -123,7 +145,9 @@ def test_local_cli_tts_batches_segments_in_one_wrapper_call(monkeypatch, tmp_pat
         )
     ]
     assert first_output.with_suffix(".txt").read_text(encoding="utf-8") == "第一段中文。"
-    assert second_output.with_suffix(".txt").read_text(encoding="utf-8") == "第二段中文。"
+    assert second_output.with_suffix(".txt").read_text(encoding="utf-8") == (
+        "第二段来自M P 3，见example 点 com。"
+    )
     assert read_json(batch_path) == {
         "items": [
             {"text_file": str(first_output.with_suffix(".txt")), "output": str(first_output)},

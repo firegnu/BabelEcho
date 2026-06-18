@@ -81,8 +81,41 @@ def test_normalize_plain_text_inherits_single_speaker_continuations(tmp_path: Pa
     ] == [
         ("ROMAN MARS", "This is 99% Invisible."),
         ("ROMAN MARS", "This year marks the 15th anniversary of the show."),
-        (None, "[AD BREAK]"),
         ("VIVIAN LE", "Happy birthday!"),
+    ]
+
+
+def test_normalize_drops_stage_cues_and_transcript_boilerplate(tmp_path: Path):
+    run_paths = create_run(tmp_path, "boilerplate-run")
+    raw = run_paths.transcript_dir / "raw.txt"
+    raw.write_text(
+        "\n\n".join(
+            [
+                "JAD ABUMRAD: This story starts with a scientist.",
+                "[APPLAUSE]",
+                "[Radiolab theme music].",
+                "BRANDON: The idea of RNA changed how I saw biology.",
+                (
+                    "Copyright © 2024 New York Public Radio. All rights reserved. "
+                    "Visit our website terms of use for more information."
+                ),
+                (
+                    "Transcripts are created on a rush deadline and may not be in "
+                    "their final form. The authoritative record is the audio record."
+                ),
+            ]
+        ),
+        encoding="utf-8",
+    )
+
+    data = read_json(normalize_transcript(run_paths, raw))
+
+    assert [segment["id"] for segment in data["segments"]] == ["0001", "0002"]
+    assert [
+        (segment["speaker"], segment["text"]) for segment in data["segments"]
+    ] == [
+        ("JAD ABUMRAD", "This story starts with a scientist."),
+        ("BRANDON", "The idea of RNA changed how I saw biology."),
     ]
 
 
@@ -183,3 +216,24 @@ This is after the requested start time.
         "This overlaps the requested start time.",
         "This is after the requested start time.",
     ]
+
+
+def test_normalize_timed_text_drops_stage_cue_segments(tmp_path: Path):
+    run_paths = create_run(tmp_path, "timed-stage-run")
+    raw = run_paths.transcript_dir / "raw.vtt"
+    raw.write_text(
+        """WEBVTT
+
+00:00:00.000 --> 00:00:01.000
+[MUSIC]
+
+00:00:01.200 --> 00:00:04.000
+The actual episode starts here.
+""",
+        encoding="utf-8",
+    )
+
+    data = read_json(normalize_transcript(run_paths, raw))
+
+    assert [segment["id"] for segment in data["segments"]] == ["0001"]
+    assert data["segments"][0]["text"] == "The actual episode starts here."

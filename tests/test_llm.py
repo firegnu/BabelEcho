@@ -261,6 +261,10 @@ def test_openai_compatible_client_adapts_segments_in_one_json_request(monkeypatc
     assert "Do not merge" in prompt
     assert "Return exactly 2 segments" in prompt
     assert "Clean transcript artifacts" in prompt
+    assert "stage directions" in prompt
+    assert "copyright" in prompt
+    assert "URLs and domains" in prompt
+    assert "MP3" in prompt
     assert "Preserve factual content" in prompt
     assert "0001" in prompt
     assert "0002" in prompt

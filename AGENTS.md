@@ -65,12 +65,15 @@ The preferred collaboration loop is:
 MacBook implements and pushes -> 5090D pulls and runs -> user shares logs -> MacBook fixes and pushes
 ```
 
+Detailed remote validation commands, expected runtime paths, DeepSeek pre-adapt quality gate, artifact checks, and representative full-chain samples are documented in `docs/5090D远程测试流程.md`.
+
 Do not assume SSH access to the 5090D machine.
 
 ## Important Docs
 
 - `README.md`
 - `HANDOFF.md`
+- `docs/5090D远程测试流程.md`
 - `docs/architecture.md`
 - `docs/backend-mvp.md`
 - `docs/backend-mvp0-tech-stack.md`

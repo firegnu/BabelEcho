@@ -291,3 +291,57 @@ def test_adapt_to_chinese_retries_chunk_when_client_parse_fails(
         "中文 0001",
         "中文 0002",
     ]
+
+
+def test_adapt_to_chinese_blocks_real_llm_when_quality_rejects(
+    tmp_path: Path,
+    monkeypatch,
+):
+    run_paths = create_run(tmp_path, "quality-gated-adapt-run")
+    write_json(
+        run_paths.normalized_transcript_json,
+        {
+            "episode_id": "quality-gated-adapt-run",
+            "language": "en",
+            "segments": [
+                {
+                    "id": "0001",
+                    "start_ms": None,
+                    "end_ms": None,
+                    "speaker": None,
+                    "text": "Too short.",
+                    "source": "transcript",
+                }
+            ],
+        },
+    )
+    write_json(
+        run_paths.transcript_quality_json,
+        {
+            "recommendation": "reject",
+            "reasons": ["too_short"],
+            "warnings": [],
+            "metrics": {"segment_count": 1, "total_chars": 10},
+        },
+    )
+
+    def fail_build_client(_config: dict):
+        raise AssertionError("quality gate should run before building the LLM client")
+
+    monkeypatch.setattr("babelecho.adapt.build_llm_client", fail_build_client)
+
+    try:
+        adapt_to_chinese(
+            run_paths,
+            {
+                "provider": "openai_compatible",
+                "base_url": "http://127.0.0.1:9/v1",
+                "model": "deepseek-chat",
+            },
+        )
+    except ValueError as error:
+        assert "Transcript quality gate failed before adapt" in str(error)
+        assert "recommendation=reject" in str(error)
+        assert "too_short" in str(error)
+    else:
+        raise AssertionError("rejected transcript should not reach adapt")
