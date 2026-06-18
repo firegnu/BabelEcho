@@ -1,0 +1,7 @@
+source:
+  type: youtube_captions
+  url: "https://www.youtube.com/watch?v=example"
+  title: "Example YouTube Episode"
+  language: "en"
+  # Keep this as yt-dlp unless you need an absolute path on a host.
+  yt_dlp_command: "yt-dlp"

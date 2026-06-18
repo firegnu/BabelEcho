@@ -99,8 +99,10 @@
 - 已支持 `source.type=podcast_index_api`，可用 PodcastIndex API 鉴权请求获取 episode metadata，再复用现有 transcript ingest；API credentials 只从环境变量或 ignored env 文件读取。
 - 已支持第一版 PodcastIndex 搜索/选择 CLI：`babelecho podcast-index search --query ...` 可搜索 feed，`babelecho podcast-index episodes --feed-id ... --select-index ... --source-config-out ...` 可生成现有 `source.type=podcast_index_api` 配置。
 - 已支持 `source.type=episode_page`，可从播客官网 episode 页面发现 transcript 链接或 transcript 正文，并保存为干净 `transcript/raw.txt`；99% Invisible 真实 smoke 已通过到 `ingest`。
+- 已支持第一版 iTunes feed discovery：`babelecho itunes search --query ...` 可从 iTunes Search API 找 podcast RSS `feedUrl`，并写出 `source.type=podcast_rss`。
+- 已支持第一版 `source.type=youtube_captions`：用 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
 - 后续仍需做多 episode 批处理和跳过已处理 episode。
-- YouTube、Spotify、Apple Podcasts 页面不在 `episode_page` 范围内；后续如果要接，需要另列来源计划。
+- Spotify 和 Apple Podcasts 页面不在 `episode_page` 范围内；YouTube 只走字幕 source，不走页面正文解析。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
 - 支持 speaker label 解析、每集一次 LLM speaker voice 推断、可编辑 run-local `script/speaker-voices.json` 和缺失/unknown speaker 的回退策略。
@@ -154,5 +156,5 @@
 ## 当前最高优先级
 
 1. 在真实 RSS、episode_page 或 podcast_index_api run 上验证 `speaker_voices.mode: infer_once` 多 speaker profile。
-2. 如果 credentials 可用，对 PodcastIndex 搜索/选择 CLI 做一次真实 transcript-only smoke。
+2. 对 iTunes feed discovery 和 YouTube captions source 做更多真实来源 smoke。
 3. 支持多 episode feed，跳过已处理 episode。

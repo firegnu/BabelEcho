@@ -15,7 +15,7 @@ The current pipeline supports:
 - Stage-by-stage Python CLI commands.
 - One-command pipeline orchestration with `babelecho run`.
 - Manual transcript input with `babelecho run --transcript-file`.
-- Real podcast transcript sources from RSS `podcast:transcript`, PodcastIndex episode metadata, PodcastIndex search/feed selection, and first-party episode pages with public transcript text.
+- Real podcast transcript sources from RSS `podcast:transcript`, iTunes RSS feed discovery, PodcastIndex episode metadata, PodcastIndex search/feed selection, first-party episode pages with public transcript text, and YouTube public captions.
 - Partial pipeline execution with `babelecho run --to-stage ...` and resume with `--from-stage ...`.
 - Chinese script preview with `babelecho script` before TTS.
 - Local terminology and pronunciation overrides before TTS with exact replacements.
@@ -61,6 +61,7 @@ workspace/
   config/local.example.yaml
   config/overrides.example.yaml
   sources/hardcoded.example.yaml
+  sources/youtube-captions.example.yaml
 ```
 
 ## Local Test Setup

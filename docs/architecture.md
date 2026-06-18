@@ -34,7 +34,8 @@ macOS App / Any Podcast Client
 输入：
 
 - RSS feed URL
-- Apple Podcasts / Spotify / YouTube 等平台链接
+- iTunes / Apple Podcasts 等可反查 RSS 的发现入口
+- YouTube 公开视频字幕入口
 - 单集 URL
 - 手动导入的 transcript
 - 后续可能支持批量节目订阅列表
@@ -57,6 +58,19 @@ macOS App / Any Podcast Client
 - 不要求 App 知道任何转换任务状态。
 
 来源层调研见：[source-ingestion-research.md](./source-ingestion-research.md)。
+
+### 来源发现 Adapter
+
+MVP-1 的来源扩展采用内部 adapter 设计，而不是一开始做动态第三方插件加载系统。
+
+每个 adapter 只负责一种外部入口，并输出标准 `source` YAML 或标准 transcript raw 文件：
+
+- RSS / iTunes feed discovery -> `source.type=podcast_rss`
+- PodcastIndex API / search -> `source.type=podcast_index_api`
+- Episode page transcript -> `source.type=episode_page`
+- YouTube public captions -> `source.type=youtube_captions`
+
+这样后续插入新入口时，只需要新增一个 adapter 模块和一层 CLI，不改 `normalize -> adapt -> synthesize -> assemble -> publish` 主链路。
 
 ## 2. 发布产物层
 

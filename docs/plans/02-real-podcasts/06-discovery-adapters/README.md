@@ -1,0 +1,62 @@
+# 02.06 Discovery Adapters
+
+状态：`done`
+
+日期：2026-06-18
+
+父计划：`02-real-podcasts`
+
+## 目标
+
+把真实来源发现入口做成可插拔的内部 adapter：每个 adapter 负责一种外部发现方式，输出 BabelEcho 已有的标准 `source` YAML，后续 transcript、翻译、TTS 和合成不关心来源来自哪里。
+
+```text
+discovery adapter -> source YAML -> ingest -> normalize -> adapt -> synthesize -> assemble -> publish
+```
+
+## 架构边界
+
+- Adapter 是内部 Python 模块，不是第三方插件加载系统。
+- 每个 adapter 都只做一个外部入口：
+  - iTunes：节目搜索，拿 RSS `feedUrl`，输出 `source.type=podcast_rss`。
+  - YouTube：公开视频字幕获取，输出 `source.type=youtube_captions` 或直接写 run transcript。
+- CLI 是薄层，只调用 adapter 并打印/写 source config。
+- Pipeline 后段不增加来源特化逻辑。
+
+## 范围
+
+In:
+
+- iTunes Search API：无需 API key，支持搜索 podcast show，并把选择结果写成 RSS source config。
+- YouTube captions：用本机 `yt-dlp` 只下载公开字幕/自动字幕，不下载视频。
+- 每个入口都有 fixture 测试和真实 smoke 记录。
+- 文档记录官方 API/工具边界。
+
+Out:
+
+- 不做 Spotify。
+- 不做 YouTube 音频下载。
+- 不做 ASR。
+- 不做 YouTube OAuth、cookies 或私有视频字幕。
+- 不做通用第三方插件加载框架。
+
+## 子计划
+
+| 编号 | 文件 | 状态 | 目标 |
+| --- | --- | --- | --- |
+| 02.06.01 | [01-itunes-feed-discovery.md](./01-itunes-feed-discovery.md) | `done` | iTunes 搜索节目并输出 RSS source config |
+| 02.06.02 | [02-youtube-captions-source.md](./02-youtube-captions-source.md) | `done` | YouTube 公开视频字幕作为 transcript source |
+
+## 验收标准
+
+- `babelecho itunes search --query ...` 能列出节目和 `feed_url`。
+- `babelecho itunes search --query ... --select-index ... --source-config-out ...` 能生成可给 `babelecho run --source-config ...` 使用的 `podcast_rss` YAML。
+- `babelecho run --source-config <youtube-source.yaml> --to-stage adapt` 能从 fixture YouTube subtitle source 走到中文脚本。
+- 真实 YouTube smoke 只拉字幕，不下载音频，不调用 LLM/TTS。
+- 代码和文档不引入真实密钥或本地私有配置。
+
+## 完成记录
+
+- 已新增 `src/babelecho/itunes.py` 和 `babelecho itunes search`。
+- 已新增 `src/babelecho/youtube.py` 和 `source.type=youtube_captions` ingest。
+- iTunes 输出标准 `source.type=podcast_rss`；YouTube 输出标准 transcript raw 文件并继续复用 normalize/adapt。

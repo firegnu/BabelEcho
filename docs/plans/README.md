@@ -73,6 +73,9 @@ docs/plans/
 - [02.05 PodcastIndex API Source](./02-real-podcasts/05-podcastindex-api-source/README.md) - `done`
   - [02.05.01 PodcastIndex API Episode Ingest](./02-real-podcasts/05-podcastindex-api-source/01-podcastindex-api-episode-ingest.md) - `done`
   - [02.05.02 PodcastIndex Search CLI](./02-real-podcasts/05-podcastindex-api-source/02-podcastindex-search-cli.md) - `done`
+- [02.06 Discovery Adapters](./02-real-podcasts/06-discovery-adapters/README.md) - `done`
+  - [02.06.01 iTunes Feed Discovery](./02-real-podcasts/06-discovery-adapters/01-itunes-feed-discovery.md) - `done`
+  - [02.06.02 YouTube Captions Source](./02-real-podcasts/06-discovery-adapters/02-youtube-captions-source.md) - `done`
 
 ### Deferred Voice Work
 

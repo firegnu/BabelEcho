@@ -55,6 +55,30 @@ def run_podcast_index_route_server(routes: dict[str, str]):
     return server
 
 
+def run_route_server(routes: dict[str, str]):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            response_body = routes.get(urlparse(self.path).path)
+            if response_body is None:
+                self.send_response(404)
+                self.end_headers()
+                return
+            encoded = response_body.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, format, *args):
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
+
+
 def test_end_to_end_fixture_pipeline(tmp_path: Path):
     workspace = tmp_path / "workspace"
     source_config = tmp_path / "source.yaml"
@@ -718,6 +742,160 @@ PODCASTINDEX_USER_AGENT=BabelEchoTest/0.1
             "credentials_file": str(credentials_file),
         }
     }
+
+
+def test_itunes_cli_searches_and_writes_podcast_rss_source_config(
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    source_config_out = tmp_path / "itunes-source.yaml"
+    server = run_route_server(
+        {
+            "/search": json.dumps(
+                {
+                    "results": [
+                        {
+                            "wrapperType": "track",
+                            "kind": "podcast",
+                            "collectionName": "99% Invisible",
+                            "artistName": "Roman Mars",
+                            "feedUrl": "https://feeds.example.com/99pi.xml",
+                            "collectionViewUrl": "https://podcasts.apple.com/us/podcast/99pi",
+                        }
+                    ]
+                }
+            )
+        }
+    )
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "itunes",
+                "search",
+                "--query",
+                "99 percent invisible",
+                "--api-base-url",
+                f"http://127.0.0.1:{server.server_port}/search",
+                "--max",
+                "5",
+                "--select-index",
+                "1",
+                "--source-config-out",
+                str(source_config_out),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert result.returncode == 0, result.stderr
+    assert "1. 99% Invisible" in result.stdout
+    assert "feed_url=https://feeds.example.com/99pi.xml" in result.stdout
+    assert f"source config: {source_config_out}" in result.stdout
+    source_config = yaml.safe_load(source_config_out.read_text(encoding="utf-8"))
+    assert source_config == {
+        "source": {
+            "type": "podcast_rss",
+            "feed_url": "https://feeds.example.com/99pi.xml",
+            "title": "99% Invisible",
+            "original_url": "https://podcasts.apple.com/us/podcast/99pi",
+        }
+    }
+
+
+def test_run_command_accepts_youtube_captions_source_config(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    source_config = tmp_path / "source.yaml"
+    local_config = tmp_path / "local.yaml"
+    fake_yt_dlp = tmp_path / "fake-yt-dlp"
+    fake_yt_dlp.write_text(
+        """#!/bin/sh
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    shift
+    out="$1"
+  fi
+  shift
+done
+file="${out%\\.%(ext)s}.en.vtt"
+cat > "$file" <<'VTT'
+WEBVTT
+
+00:00:00.000 --> 00:00:03.000
+Welcome to the YouTube episode.
+VTT
+""",
+        encoding="utf-8",
+    )
+    fake_yt_dlp.chmod(0o755)
+    source_config.write_text(
+        f"""
+source:
+  type: youtube_captions
+  url: "https://www.youtube.com/watch?v=fixture"
+  title: "YouTube Fixture Episode"
+  language: en
+  yt_dlp_command: "{fake_yt_dlp}"
+""",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "youtube-demo",
+            "--source-config",
+            str(source_config),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "adapt",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    run_dir = workspace / "runs" / "youtube-demo"
+    assert result.returncode == 0, result.stderr
+    assert "adapt:" in result.stdout
+    assert (run_dir / "transcript" / "raw.vtt").exists()
+    assert (run_dir / "script" / "zh.json").exists()
+
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "youtube_captions"
+    assert source["youtube_url"] == "https://www.youtube.com/watch?v=fixture"
+    assert source["youtube_language"] == "en"
+    assert source["youtube_subtitle_file"] == "raw.vtt"
+    assert source["title"] == "YouTube Fixture Episode"
+    assert source["raw_transcript"] == "transcript/raw.vtt"
 
 
 def test_run_command_accepts_episode_page_source_config(tmp_path: Path):

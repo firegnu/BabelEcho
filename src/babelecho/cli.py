@@ -9,6 +9,7 @@ from .audio import assemble_audio
 from .checks import CheckError, check_run_artifacts
 from .config import load_yaml, require_keys
 from .ingest import ingest_transcript_source
+from .itunes import build_podcast_rss_source_config, fetch_itunes_podcast_search
 from .jsonio import read_json
 from .overrides import apply_script_overrides
 from .paths import create_run
@@ -125,6 +126,25 @@ def build_parser() -> argparse.ArgumentParser:
     podcast_index_episodes.add_argument("--select-index", type=int)
     podcast_index_episodes.add_argument("--source-config-out")
     _add_podcast_index_auth_args(podcast_index_episodes)
+
+    itunes = subparsers.add_parser(
+        "itunes",
+        help="Search iTunes podcasts and create RSS source configs.",
+    )
+    itunes_subparsers = itunes.add_subparsers(
+        dest="itunes_command",
+        required=True,
+    )
+    itunes_search = itunes_subparsers.add_parser(
+        "search",
+        help="Search iTunes podcast shows.",
+    )
+    itunes_search.add_argument("--query", required=True)
+    itunes_search.add_argument("--country", default="US")
+    itunes_search.add_argument("--max", type=int, default=10)
+    itunes_search.add_argument("--api-base-url")
+    itunes_search.add_argument("--select-index", type=int)
+    itunes_search.add_argument("--source-config-out")
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
@@ -294,6 +314,20 @@ def _format_podcast_index_episodes(episodes: list[dict]) -> str:
             lines.append(f"   guid={episode['guid']}")
         if episode.get("link"):
             lines.append(f"   link={episode['link']}")
+    return "\n".join(lines)
+
+
+def _format_itunes_results(results: list[dict]) -> str:
+    lines = []
+    for index, result in enumerate(results, start=1):
+        title = result.get("title") or "<untitled>"
+        lines.append(f"{index}. {title}")
+        if result.get("artist"):
+            lines.append(f"   artist={result['artist']}")
+        if result.get("feed_url"):
+            lines.append(f"   feed_url={result['feed_url']}")
+        if result.get("apple_url"):
+            lines.append(f"   apple_url={result['apple_url']}")
     return "\n".join(lines)
 
 
@@ -549,6 +583,34 @@ def main(argv: list[str] | None = None) -> int:
                         credentials_config=api_config,
                         api_base_url=args.api_base_url,
                         max_episodes=args.max,
+                    )
+                    if args.source_config_out:
+                        _write_yaml(args.source_config_out, source_config)
+                        print(f"source config: {args.source_config_out}")
+                    else:
+                        print(yaml.safe_dump(source_config, allow_unicode=True, sort_keys=False))
+                return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
+
+    if args.command == "itunes":
+        try:
+            if args.itunes_command == "search":
+                search_config = {
+                    "query": args.query,
+                    "country": args.country,
+                    "max": args.max,
+                }
+                if args.api_base_url:
+                    search_config["api_base_url"] = args.api_base_url
+                results = fetch_itunes_podcast_search(search_config)
+                print(_format_itunes_results(results))
+                if args.select_index is not None:
+                    if args.select_index < 1 or args.select_index > len(results):
+                        raise ValueError(f"--select-index out of range: {args.select_index}")
+                    source_config = build_podcast_rss_source_config(
+                        results[args.select_index - 1]
                     )
                     if args.source_config_out:
                         _write_yaml(args.source_config_out, source_config)

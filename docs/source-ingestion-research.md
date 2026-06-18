@@ -52,7 +52,7 @@
 2. App 解析成内部 canonical episode：
    - 优先定位 RSS feed 和 RSS item。
    - Apple Podcasts / Spotify 链接只作为发现入口，尽量反查对应 RSS。
-   - YouTube 保留为 YouTube source，不伪装成 podcast RSS。
+   - YouTube 保留为 YouTube source，不伪装成 podcast RSS；第一版只拉公开字幕，不下载音频。
    - 手动 transcript 直接创建本地 episode record。
 
 3. 内容获取优先级：
@@ -76,7 +76,7 @@ MVP 建议只支持：
 3. 用户手动导入 transcript。
 4. 在没有 transcript 时，从 RSS `enclosure` 音频 fallback 到自行转写。
 
-暂不把 Spotify 和 YouTube 作为主来源。它们可以后续作为链接解析和发现入口接入。
+暂不把 Spotify 作为主来源。YouTube 可以作为字幕-only 特殊入口接入：只处理公开字幕或自动字幕，不下载音频，不做 ASR fallback。
 
 ## 需要在产品上明确的边界
 
@@ -90,9 +90,11 @@ MVP 建议只支持：
 - [RSS 2.0 Specification](https://www.rssboard.org/rss-specification)：RSS `enclosure` 是 episode 媒体文件入口，包含 `url`、`length`、`type`。
 - [Podcast Namespace `podcast:transcript`](https://github.com/Podcastindex-org/podcast-namespace/blob/main/docs/tags/transcript.md)：标准 transcript 标签，支持多种格式和语言属性。
 - [PodcastIndex API](https://podcastindex-org.github.io/docs-api/)：episode 数据包含 `enclosureUrl`、`transcriptUrl`、`transcripts` 等字段。
+- [Apple iTunes Search API](https://performance-partners.apple.com/search-api)：无需 API key，可按 `media=podcast` / `entity=podcast` 搜索 podcast show，并返回 RSS `feedUrl`。
 - [Apple Podcasts Transcripts](https://podcasters.apple.com/support/5316-transcripts-on-apple-podcasts)：Apple 会自动生成 transcripts，也支持创作者通过 RSS transcript tag 提供 transcript，但主要面向 Apple Podcasts App / Podcasts Connect。
 - [Spotify Get Episode API](https://developer.spotify.com/documentation/web-api/reference/get-an-episode)：Spotify Web API 主要提供 metadata，且政策说明 Spotify content 不可下载。
-- [YouTube Captions Download API](https://developers.google.com/youtube/v3/docs/captions/download)：官方 captions 下载需要有编辑视频的权限，不能作为任意视频 transcript 抓取方案。
+- [YouTube Captions Download API](https://developers.google.com/youtube/v3/docs/captions/download)：官方 captions 下载需要有编辑视频的权限，不能作为任意公开视频 transcript 抓取方案；BabelEcho 第一版 YouTube source 因此使用本机 `yt-dlp` 只拉公开视频公开字幕。
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp)：支持 `--skip-download`、`--write-subs`、`--write-auto-subs` 等字幕-only 获取参数。
 
 ## 下一步讨论
 

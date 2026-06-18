@@ -37,6 +37,7 @@
 - MVP-1 PodcastIndex episode JSON 输入已完成第一步：新增 `source.type=podcast_index_episode`，`babelecho run --source-config ...` 可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
 - MVP-1 PodcastIndex API 输入已完成第一版：新增 `source.type=podcast_index_api`，支持 PodcastIndex API auth headers、`episodes/byid`、`episodes/byfeedid`、`episodes/byfeedurl`、`episodes/byitunesid`，并复用现有 transcript ingest；API key/secret 只从环境变量或 ignored `workspace/config/podcastindex.env` 读取。已新增 `babelecho podcast-index search` / `episodes` CLI，可搜索 feed、列 episode，并把选中 episode 写成可运行 source config；尚未做多 episode 批处理。
 - MVP-1 Episode Page Transcript Source 已完成：新增 `source.type=episode_page`，可从播客官网 episode 页面发现 transcript 链接或 transcript 正文，并保存干净 `transcript/raw.txt`；99% Invisible 真实 smoke 已通过到 `ingest`。这不包含 YouTube、Spotify、Apple Podcasts 页面，也不做 JS 渲染、ASR 或音频下载。
+- MVP-1 Discovery Adapters 第一版已完成：新增 `babelecho itunes search`，可用 iTunes Search API 找 podcast RSS `feedUrl` 并输出 `source.type=podcast_rss`；新增 `source.type=youtube_captions`，用本机 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
 - MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 只加载一次 CosyVoice 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - MVP-1 固定音色规则已选定并实现：运行默认只用 `CosyVoice-300M-SFT` 的 `tts.voice=sft_builtin_4role`。未启用 speaker voice 推断时，0/1 个 distinct speaker 且没有显式性别标签使用 `female_a`；单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 按首次出现顺序映射到 `female_a / male_a / female_b / male_b`。
 - MVP-1 speaker voice 推断已完成第一版：可在 local config 启用 `speaker_voices.mode: infer_once`，`run`/`synthesize` 会在 TTS 前每集最多调用一次 LLM，根据 speaker 名称和少量上下文推断 `male/female/unknown`，写入 ignored run-local `script/speaker-voices.json`，再由代码稳定映射到 `female_a/male_a/female_b/male_b`。`confidence` 只用于人工复核提示，不阻塞；`unknown` 也会自动获得具体 voice role。若推断失败或文件无效，回退到旧的首次出现规则。
@@ -229,8 +230,9 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 下一步继续 MVP-1 Real Podcasts：
 
 1. 在真实 RSS、episode_page 或 podcast_index_api run 上验证 `speaker_voices.mode: infer_once` 的多 speaker profile，并听测 speaker 性别方向是否明显改善。
-2. 支持多 episode feed，跳过已处理 episode。
-3. 继续补真实来源的失败诊断和站点/API 边界记录。
+2. 继续验证 iTunes feed discovery 和 YouTube captions source 的真实来源 smoke。
+3. 支持多 episode feed，跳过已处理 episode。
+4. 继续补真实来源的失败诊断和站点/API 边界记录。
 
 不要进入：
 
@@ -261,7 +263,7 @@ MVP-0.5 acceptance 已满足：
 仍然保留到后续阶段：
 
 - 真实 RSS / episode_page / podcast_index_api 上的 `speaker_voices.mode: infer_once` 多 speaker profile 仍需真实回归；每个 podcast 的 source config 和批处理仍未做。
-- 真实 podcast 来源扩展和多 episode feed 仍在 MVP-1 后续；官网 episode 页面 transcript 链接解析已通过 `source.type=episode_page` 完成第一版，PodcastIndex API episode ingest 已通过 `source.type=podcast_index_api` 完成第一版，PodcastIndex 搜索/选择 CLI 已完成第一版。
+- 真实 podcast 来源扩展和多 episode feed 仍在 MVP-1 后续；官网 episode 页面 transcript 链接解析已通过 `source.type=episode_page` 完成第一版，PodcastIndex API episode ingest 已通过 `source.type=podcast_index_api` 完成第一版，PodcastIndex 搜索/选择 CLI 已完成第一版，iTunes feed discovery 和 YouTube captions source 已完成第一版代码路径。
 - 固定中文音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 第一轮和第二轮音色校准样本已在 5090D 生成并拷回本机 ignored `workspace/runs/`；这些音频不进入 git。
 - 用户曾反馈 D 最满意；后续单男、单女、多人验证后，MVP-1 运行默认已改为 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`，D 样本只保留为历史校准记录。

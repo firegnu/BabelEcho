@@ -8,6 +8,7 @@ from .jsonio import write_json
 from .paths import RunPaths
 from .podcast import discover_podcast_index_transcript, discover_podcast_transcript
 from .podcast_index_api import fetch_podcast_index_episode
+from .youtube import fetch_youtube_captions
 
 
 TRANSCRIPT_EXTENSIONS = {
@@ -100,10 +101,27 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
             "page_url": transcript.page_url,
             "transcript_page_url": transcript.transcript_page_url,
         }
+    elif source_type == "youtube_captions":
+        captions = fetch_youtube_captions(
+            source_config,
+            run_paths.run_dir / "tmp" / "youtube-captions",
+        )
+        transcript_source = str(captions.path)
+        source_key = "youtube_subtitle_source"
+        raw_content = captions.path.read_bytes()
+        raw_filename = TRANSCRIPT_EXTENSIONS.get(captions.path.suffix.lower(), "raw.vtt")
+        source_config = {
+            **source_config,
+            "original_url": source_config.get("original_url") or source_config.get("url"),
+            "youtube_url": source_config.get("url"),
+            "youtube_language": captions.language,
+            "youtube_subtitle_file": raw_filename,
+        }
     else:
         raise ValueError(
             "BabelEcho supports source.type=transcript_url, transcript_file, "
-            "podcast_rss, podcast_index_episode, podcast_index_api, or episode_page"
+            "podcast_rss, podcast_index_episode, podcast_index_api, episode_page, "
+            "or youtube_captions"
         )
     if not transcript_source:
         raise ValueError(f"source.{source_key} is required")
@@ -125,6 +143,12 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
         "itunes_id": source_config.get("itunes_id"),
         "raw_transcript": str(raw_path.relative_to(run_paths.run_dir)),
     }
+    if source_config.get("youtube_url") is not None:
+        source_payload["youtube_url"] = source_config.get("youtube_url")
+    if source_config.get("youtube_language") is not None:
+        source_payload["youtube_language"] = source_config.get("youtube_language")
+    if source_config.get("youtube_subtitle_file") is not None:
+        source_payload["youtube_subtitle_file"] = source_config.get("youtube_subtitle_file")
     if source_config.get("page_url") is not None:
         source_payload["page_url"] = source_config.get("page_url")
     if source_config.get("transcript_page_url") is not None:
