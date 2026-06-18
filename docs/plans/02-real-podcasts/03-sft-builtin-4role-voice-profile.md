@@ -135,7 +135,8 @@ speed=1.1
 - `local_cli` 可以把 `cosyvoice_repo` 和 `model_dir` 传给 wrapper。
 - `sft_builtin_4role` 不会把 `COSYVOICE_MODEL_DIR` 用作 SFT 角色模型；未显式传 `--model-dir` 时 SFT 角色默认使用 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT`。
 - wrapper 支持 `sft_builtin_4role` 内部混合路由：`male_a` 调用 `AutoModel.inference_cross_lingual`，默认 `CosyVoice2-0.5B` / `cross_lingual_prompt.wav` / `speed=1.1`；`female_a / female_b / male_b` 调用 `CosyVoice.inference_sft`。
-- 5090D 历史 wrapper smoke 已通过：四个 SFT 角色均可生成 `22050 Hz`、mono wav；最终混合路由还需用代码路径跑一次真实预览。
+- 5090D 历史 wrapper smoke 已通过：四个 SFT 角色均可生成 `22050 Hz`、mono wav。
+- 5090D 最终混合代码路径预览已通过：`four-role-hybrid-code-preview-20260618-1736` 使用正式 `synthesize -> assemble`，manifest 和 batch roles 均为 `female_a / male_a / female_b / male_b`，最终 MP3 为 `22050 Hz`、mono、约 `17.7s`；产物已拷回本机 ignored `workspace/runs/four-role-hybrid-code-preview-20260618-1736/output/audio.mp3`。
 
 试听样本保存在 ignored runtime 路径：
 
