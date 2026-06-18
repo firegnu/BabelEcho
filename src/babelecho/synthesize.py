@@ -1,5 +1,6 @@
 from .jsonio import read_json, write_json
 from .paths import RunPaths
+from .speaker_voices import load_speaker_voice_roles
 from .tts import synthesize_many_to_wav
 
 
@@ -53,7 +54,7 @@ def _effective_tts_config(segments: list[dict], tts_config: dict) -> dict:
     return _select_sft_voice(effective_config)
 
 
-def _voice_roles_for_segments(segments: list[dict], tts_config: dict) -> list[str | None]:
+def _auto_voice_roles_for_segments(segments: list[dict], tts_config: dict) -> list[str | None]:
     if tts_config.get("voice") != "sft_builtin_4role":
         return [None] * len(segments)
 
@@ -71,12 +72,37 @@ def _voice_roles_for_segments(segments: list[dict], tts_config: dict) -> list[st
     return roles
 
 
-def synthesize_segments(run_paths: RunPaths, tts_config: dict) -> str:
+def _voice_roles_for_segments(
+    segments: list[dict],
+    tts_config: dict,
+    speaker_voice_roles: dict[str, str] | None = None,
+) -> list[str | None]:
+    roles = _auto_voice_roles_for_segments(segments, tts_config)
+    if tts_config.get("voice") != "sft_builtin_4role" or not speaker_voice_roles:
+        return roles
+    return [
+        speaker_voice_roles.get(str(segment.get("speaker")), role)
+        if segment.get("speaker") is not None
+        else role
+        for segment, role in zip(segments, roles, strict=True)
+    ]
+
+
+def synthesize_segments(
+    run_paths: RunPaths,
+    tts_config: dict,
+    speaker_voice_config: dict | None = None,
+) -> str:
     script = read_json(run_paths.chinese_script_json)
     effective_tts_config = _effective_tts_config(script["segments"], tts_config)
     manifest_segments = []
     tts_items = []
-    voice_roles = _voice_roles_for_segments(script["segments"], effective_tts_config)
+    speaker_voice_roles = load_speaker_voice_roles(run_paths, speaker_voice_config)
+    voice_roles = _voice_roles_for_segments(
+        script["segments"],
+        effective_tts_config,
+        speaker_voice_roles,
+    )
     for segment, voice_role in zip(script["segments"], voice_roles, strict=True):
         audio_path = run_paths.segments_dir / f"{segment['id']}.wav"
         manifest_segment = {

@@ -216,6 +216,61 @@ def test_sft_builtin_4role_profile_assigns_stable_roles(monkeypatch, tmp_path: P
     ]
 
 
+def test_sft_builtin_4role_uses_speaker_voice_file_before_auto_order(monkeypatch, tmp_path: Path):
+    run_paths = create_run(tmp_path, "speaker-voice-override-run")
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "speaker-voice-override-run",
+            "language": "zh-CN",
+            "segments": [
+                {"id": "0001", "source_segment_ids": ["0001"], "speaker": "ROMAN MARS", "text": "罗曼。"},
+                {"id": "0002", "source_segment_ids": ["0002"], "speaker": "VIVIAN LE", "text": "薇薇安。"},
+                {"id": "0003", "source_segment_ids": ["0003"], "speaker": "TAYA", "text": "泰雅。"},
+            ],
+        },
+    )
+    write_json(
+        run_paths.script_dir / "speaker-voices.json",
+        {
+            "speaker_voices": {
+                "ROMAN MARS": "male_a",
+                "VIVIAN LE": "female_a",
+                "TAYA": "female_b",
+            }
+        },
+    )
+    captured = {}
+
+    def fake_synthesize_many_to_wav(items, batch_path, tts_config):
+        captured["items"] = items
+        captured["batch_path"] = batch_path
+        captured["tts_config"] = tts_config
+        for item in items:
+            item["output_path"].parent.mkdir(parents=True, exist_ok=True)
+            item["output_path"].write_bytes(b"wav")
+
+    monkeypatch.setattr("babelecho.synthesize.synthesize_many_to_wav", fake_synthesize_many_to_wav)
+
+    manifest_path = synthesize_segments(
+        run_paths,
+        {"provider": "local_cli", "voice": "sft_builtin_4role"},
+        {"mode": "infer_once"},
+    )
+
+    assert [item["voice_role"] for item in captured["items"]] == [
+        "male_a",
+        "female_a",
+        "female_b",
+    ]
+    manifest = read_json(manifest_path)
+    assert [segment["voice_role"] for segment in manifest["segments"]] == [
+        "male_a",
+        "female_a",
+        "female_b",
+    ]
+
+
 def test_multi_speaker_script_auto_selects_sft_builtin_4role(monkeypatch, tmp_path: Path):
     run_paths = create_run(tmp_path, "auto-multi-speaker-run")
     write_json(

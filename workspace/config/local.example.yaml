@@ -32,5 +32,13 @@ tts:
 # overrides:
 #   path: "workspace/config/overrides.yaml"
 
+# Optional. When enabled, BabelEcho calls the configured LLM once per episode
+# before TTS to infer speaker gender direction, then writes an editable
+# run-local mapping at workspace/runs/<run-id>/script/speaker-voices.json.
+# Low confidence does not block the run; unknown speakers still get a concrete
+# fallback voice_role.
+# speaker_voices:
+#   mode: infer_once
+
 publish:
   base_url: "https://example.com/babelecho"

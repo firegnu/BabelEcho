@@ -12,6 +12,7 @@ from .overrides import apply_script_overrides
 from .paths import create_run
 from .publish import publish_episode
 from .script import preview_chinese_script
+from .speaker_voices import infer_speaker_voices, infer_speaker_voices_if_enabled
 from .status import (
     init_run_status,
     mark_run_succeeded,
@@ -75,6 +76,11 @@ def build_parser() -> argparse.ArgumentParser:
     overrides.add_argument("--workspace", required=True)
     overrides.add_argument("--run-id", required=True)
     overrides.add_argument("--local-config", required=True)
+
+    speaker_voices = subparsers.add_parser("speaker-voices", help="Infer speaker voice roles once.")
+    speaker_voices.add_argument("--workspace", required=True)
+    speaker_voices.add_argument("--run-id", required=True)
+    speaker_voices.add_argument("--local-config", required=True)
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
     run.add_argument("--workspace", required=True)
@@ -189,6 +195,15 @@ def _run_stage(status: dict, run_paths, stage_name: str, action):
     return result
 
 
+def _format_speaker_voice_result(result: dict) -> str:
+    message = f"speaker voices: {result['status']} {result['path']}"
+    if result.get("error"):
+        message += f" ({result['error']}; fallback automatic roles)"
+    elif result.get("reason"):
+        message += f" ({result['reason']})"
+    return message
+
+
 def run_pipeline(
     workspace: str,
     run_id: str,
@@ -258,18 +273,25 @@ def run_pipeline(
         outputs.append(f"check script: {script_check['script_segments']} segments")
 
     if stage_index <= PIPELINE_STAGES.index("synthesize") <= stop_index:
-        def synthesize_stage() -> tuple[dict, str, dict]:
+        def synthesize_stage() -> tuple[dict | None, dict, str, dict]:
+            speaker_voice_result = infer_speaker_voices_if_enabled(run_paths, local_config)
             override_result = apply_script_overrides(run_paths, local_config.get("overrides"))
-            manifest_path = synthesize_segments(run_paths, local_config["tts"])
+            manifest_path = synthesize_segments(
+                run_paths,
+                local_config["tts"],
+                local_config.get("speaker_voices"),
+            )
             segment_check = check_run_artifacts(run_paths, checks=("segments",))
-            return override_result, manifest_path, segment_check
+            return speaker_voice_result, override_result, manifest_path, segment_check
 
-        override_result, manifest_path, segment_check = _run_stage(
+        speaker_voice_result, override_result, manifest_path, segment_check = _run_stage(
             status,
             run_paths,
             "synthesize",
             synthesize_stage,
         )
+        if speaker_voice_result:
+            outputs.append(_format_speaker_voice_result(speaker_voice_result))
         if override_result["rules"]:
             outputs.append(
                 "overrides: "
@@ -377,8 +399,19 @@ def main(argv: list[str] | None = None) -> int:
         config = load_yaml(Path(args.local_config))
         require_keys(config, ["tts"])
         run_paths = create_run(args.workspace, args.run_id)
-        output = synthesize_segments(run_paths, config["tts"])
+        speaker_voice_result = infer_speaker_voices_if_enabled(run_paths, config)
+        if speaker_voice_result:
+            print(_format_speaker_voice_result(speaker_voice_result))
+        output = synthesize_segments(run_paths, config["tts"], config.get("speaker_voices"))
         print(output)
+        return 0
+
+    if args.command == "speaker-voices":
+        config = load_yaml(Path(args.local_config))
+        require_keys(config, ["llm"])
+        run_paths = create_run(args.workspace, args.run_id)
+        result = infer_speaker_voices(run_paths, config["llm"], config.get("speaker_voices"))
+        print(_format_speaker_voice_result(result))
         return 0
 
     if args.command == "adapt":

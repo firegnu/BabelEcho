@@ -5,6 +5,7 @@ from pathlib import Path
 from threading import Thread
 
 from babelecho.jsonio import read_json, write_json
+from babelecho.cli import run_pipeline
 
 
 def run_podcast_index_api_server(response_body: str):
@@ -258,6 +259,60 @@ publish:
         "succeeded",
         "succeeded",
         "succeeded",
+    ]
+
+
+def test_run_pipeline_infers_speaker_voices_once_before_synthesize(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    transcript = tmp_path / "conversation.txt"
+    transcript.write_text(
+        """
+MaleHost: Welcome to the show.
+
+FemaleGuest: Happy to be here.
+
+NeutralGuest: I have a question.
+""".strip(),
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+speaker_voices:
+  mode: infer_once
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    output = run_pipeline(
+        workspace=str(workspace),
+        run_id="speaker-voice-demo",
+        source_config_path=None,
+        local_config_path=str(local_config),
+        from_stage="ingest",
+        to_stage="synthesize",
+        transcript_file=str(transcript),
+    )
+
+    run_dir = workspace / "runs" / "speaker-voice-demo"
+    speaker_voices = read_json(run_dir / "script" / "speaker-voices.json")
+    manifest = read_json(run_dir / "segments" / "manifest.json")
+    assert "speaker voices: created" in output
+    assert speaker_voices["speaker_voices"] == {
+        "MaleHost": "male_a",
+        "FemaleGuest": "female_a",
+        "NeutralGuest": "female_b",
+    }
+    assert [segment["voice_role"] for segment in manifest["segments"]] == [
+        "male_a",
+        "female_a",
+        "female_b",
     ]
 
 

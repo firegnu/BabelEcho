@@ -19,6 +19,44 @@ class FakeResponse:
         ).encode("utf-8")
 
 
+class FakeSpeakerGenderResponse:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc, traceback):
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps(
+            {
+                "choices": [
+                    {
+                        "message": {
+                            "content": json.dumps(
+                                {
+                                    "speakers": [
+                                        {
+                                            "speaker": "ROMAN MARS",
+                                            "gender": "male",
+                                            "confidence": 0.95,
+                                            "reason": "public host knowledge",
+                                        },
+                                        {
+                                            "speaker": "TAYA",
+                                            "gender": "unknown",
+                                            "confidence": 0.2,
+                                            "reason": "insufficient evidence",
+                                        },
+                                    ]
+                                }
+                            )
+                        }
+                    }
+                ]
+            }
+        ).encode("utf-8")
+
+
 def test_openai_compatible_client_sends_auth_and_extra_body(monkeypatch):
     requests = []
 
@@ -58,6 +96,69 @@ def test_openai_compatible_client_sends_auth_and_extra_body(monkeypatch):
     assert payload["thinking"] == {"type": "disabled"}
     assert payload["messages"][0]["role"] == "user"
     assert "Today we talk about local-first AI." in payload["messages"][0]["content"]
+
+
+def test_openai_compatible_client_infers_speaker_genders_once(monkeypatch):
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return FakeSpeakerGenderResponse()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    monkeypatch.setattr(llm, "urlopen", fake_urlopen)
+
+    client = build_llm_client(
+        {
+            "provider": "openai_compatible",
+            "base_url": "https://api.deepseek.com",
+            "model": "deepseek-v4-pro",
+            "api_key_env": "DEEPSEEK_API_KEY",
+            "temperature": 0.1,
+            "max_tokens": 1024,
+        }
+    )
+
+    output = client.infer_speaker_genders(
+        [
+            {
+                "speaker": "ROMAN MARS",
+                "segment_count": 13,
+                "samples": ["Welcome to 99% Invisible. I'm Roman Mars."],
+            },
+            {
+                "speaker": "TAYA",
+                "segment_count": 1,
+                "samples": ["A short question."],
+            },
+        ]
+    )
+
+    assert output == [
+        {
+            "speaker": "ROMAN MARS",
+            "gender": "male",
+            "confidence": 0.95,
+            "reason": "public host knowledge",
+        },
+        {
+            "speaker": "TAYA",
+            "gender": "unknown",
+            "confidence": 0.2,
+            "reason": "insufficient evidence",
+        },
+    ]
+    assert len(requests) == 1
+    request, timeout = requests[0]
+    assert request.full_url == "https://api.deepseek.com/chat/completions"
+    assert timeout == 120
+    payload = json.loads(request.data.decode("utf-8"))
+    assert payload["temperature"] == 0.1
+    assert payload["max_tokens"] == 1024
+    prompt = payload["messages"][0]["content"]
+    assert "male/female/unknown" in prompt
+    assert "ROMAN MARS" in prompt
+    assert "TAYA" in prompt
 
 
 def test_openai_compatible_client_requires_configured_api_key(monkeypatch):

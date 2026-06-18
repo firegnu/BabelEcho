@@ -10,10 +10,34 @@ class LLMClient(Protocol):
     def adapt_segment(self, text: str) -> str:
         raise NotImplementedError
 
+    def infer_speaker_genders(self, speakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        raise NotImplementedError
+
 
 class FixtureLLMClient:
     def adapt_segment(self, text: str) -> str:
         return f"中文口播：{text}"
+
+    def infer_speaker_genders(self, speakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        results = []
+        for speaker in speakers:
+            speaker_name = str(speaker["speaker"])
+            speaker_key = speaker_name.casefold()
+            if any(marker in speaker_key for marker in ("female", "woman", "女")):
+                gender = "female"
+            elif any(marker in speaker_key for marker in ("male", "man", "男")):
+                gender = "male"
+            else:
+                gender = "unknown"
+            results.append(
+                {
+                    "speaker": speaker_name,
+                    "gender": gender,
+                    "confidence": 1.0 if gender != "unknown" else 0.0,
+                    "reason": "fixture name marker" if gender != "unknown" else "fixture unknown",
+                }
+            )
+        return results
 
 
 class OpenAICompatibleClient:
@@ -33,12 +57,7 @@ class OpenAICompatibleClient:
         self.api_key = api_key
         self.extra_body = extra_body or {}
 
-    def adapt_segment(self, text: str) -> str:
-        prompt = (
-            "请把下面英文播客片段改写成自然、适合口播的简体中文。"
-            "只输出中文正文，不要解释。\n\n"
-            f"{text}"
-        )
+    def _chat_completion(self, prompt: str) -> str:
         payload = {
             "model": self.model,
             "messages": [{"role": "user", "content": prompt}],
@@ -59,9 +78,78 @@ class OpenAICompatibleClient:
             body = json.loads(response.read().decode("utf-8"))
         return body["choices"][0]["message"]["content"].strip()
 
+    def adapt_segment(self, text: str) -> str:
+        prompt = (
+            "请把下面英文播客片段改写成自然、适合口播的简体中文。"
+            "只输出中文正文，不要解释。\n\n"
+            f"{text}"
+        )
+        return self._chat_completion(prompt)
+
+    def infer_speaker_genders(self, speakers: list[dict[str, Any]]) -> list[dict[str, Any]]:
+        prompt = (
+            "You are choosing Chinese TTS voice presentation for podcast speakers.\n"
+            "Classify each speaker as male/female/unknown for TTS voice selection only. "
+            "Do not claim or verify real identity gender.\n"
+            "Use evidence in this priority: explicit titles/pronouns or bio in samples, "
+            "well-known public host knowledge, then name and context. "
+            "If evidence is weak or ambiguous, use unknown. "
+            "Return only JSON with shape "
+            '{"speakers":[{"speaker":"NAME","gender":"male|female|unknown",'
+            '"confidence":0.0,"reason":"short evidence"}]}.\n\n'
+            f"{json.dumps({'speakers': speakers}, ensure_ascii=False)}"
+        )
+        return _parse_speaker_gender_response(self._chat_completion(prompt))
+
 
 class VLLMClient(OpenAICompatibleClient):
     pass
+
+
+def _extract_json_object(text: str) -> str:
+    cleaned = text.strip()
+    if cleaned.startswith("```"):
+        lines = cleaned.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].startswith("```"):
+            lines = lines[:-1]
+        cleaned = "\n".join(lines).strip()
+    start = cleaned.find("{")
+    end = cleaned.rfind("}")
+    if start == -1 or end == -1 or end < start:
+        raise ValueError("LLM speaker gender response did not contain a JSON object")
+    return cleaned[start:end + 1]
+
+
+def _parse_speaker_gender_response(text: str) -> list[dict[str, Any]]:
+    data = json.loads(_extract_json_object(text))
+    speakers = data.get("speakers")
+    if not isinstance(speakers, list):
+        raise ValueError("LLM speaker gender response must contain a speakers list")
+    results = []
+    for item in speakers:
+        if not isinstance(item, dict):
+            continue
+        speaker = item.get("speaker")
+        if speaker is None:
+            continue
+        gender = str(item.get("gender", "unknown")).casefold()
+        if gender not in {"male", "female", "unknown"}:
+            gender = "unknown"
+        try:
+            confidence = float(item.get("confidence", 0.0))
+        except (TypeError, ValueError):
+            confidence = 0.0
+        results.append(
+            {
+                "speaker": str(speaker),
+                "gender": gender,
+                "confidence": confidence,
+                "reason": str(item.get("reason", "")),
+            }
+        )
+    return results
 
 
 def read_env_file_value(path: str, key: str) -> str:
