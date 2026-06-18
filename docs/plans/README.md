@@ -64,7 +64,7 @@ docs/plans/
 
 ### MVP-1 Real Podcasts
 
-- Fixed Chinese voice baseline - `done`: current route is `sft_builtin_4role` with `male_a` on CosyVoice2 cross-lingual speed `1.1` and the other roles on 300M SFT.
+- Fixed Chinese voice baseline - `done`: current route is `sft_builtin_4role` with `male_a` on CosyVoice2 cross-lingual speed `1.1` and the other roles on 300M SFT. Later voice expansion should prefer fine-tuning 300M SFT to add multiple Chinese male/female fixed roles.
 - [02.01 Real Podcast Transcript Source Input](./02-real-podcasts/01-real-podcast-transcript-source.md) - `done`
 - [02.02 Public RSS End-to-End Real Run](./02-real-podcasts/02-public-rss-real-run.md) - `done`
 - [02.03 SFT Built-in 4-role Voice Profile](./02-real-podcasts/03-sft-builtin-4role-voice-profile.md) - `done`

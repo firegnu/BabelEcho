@@ -6,6 +6,8 @@ MVP-0 and MVP-0.5 are complete. MVP-1 now uses a fixed `sft_builtin_4role` voice
 
 Current validation track: use DeepSeek API for the LLM adaptation baseline, then use the 5090D for local Chinese TTS. This is a temporary hybrid path to validate script quality and audio synthesis before replacing the cloud LLM with a local model.
 
+Later voice expansion should prefer fine-tuning `CosyVoice-300M-SFT` to add multiple stable Chinese male/female fixed roles. This is separate from original-host voice cloning and does not change the current MVP-1 routing until a tuned model is explicitly selected and validated.
+
 ## Current Scope
 
 The current pipeline supports:

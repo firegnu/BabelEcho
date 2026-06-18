@@ -95,6 +95,11 @@ For `male_a`, the wrapper defaults to
 The SFT profile intentionally does not reuse `COSYVOICE_MODEL_DIR` from the
 launcher for the SFT roles.
 
+Later voice expansion should prefer fine-tuning `CosyVoice-300M-SFT` to add
+multiple stable Chinese male/female fixed roles. That does not change the
+current MVP-1 runtime route unless a tuned model is explicitly selected and
+validated by listening tests.
+
 For `local_cli` synthesis, BabelEcho writes a `segments/tts-batch.json` file and
 starts the wrapper once per `synthesize` stage. The wrapper lazily loads the
 needed backend model or models, then loops over the segment text files to write

@@ -214,6 +214,8 @@ MVP-0 不做 voice clone，但 `speaker` 字段保留，MVP-1 已可以按 speak
 
 真实多人播客不能长期用同一个固定中文声音读完整集。MVP-1 当前规则是：运行默认使用 `sft_builtin_4role` 固定角色 profile；可启用 `speaker_voices.mode: infer_once` 在每集 TTS 前最多调用一次 LLM，根据 speaker 名称和少量上下文推断 `male/female/unknown` 方向，再由代码稳定映射到 `female_a / male_a / female_b / male_b` 四个固定角色。`confidence` 只用于人工复核提示，不阻塞；`unknown` 也会自动获得具体角色。渲染 backend 现在是本地双模型：`male_a` 使用 `CosyVoice2-0.5B` 的 `cross_lingual` 路线、`cross_lingual_prompt.wav` 和 `speed=1.1`，其余 `female_a / female_b / male_b` 继续使用 `CosyVoice-300M-SFT`。未启用推断、推断失败或映射文件无效时，回退到相同的首次出现顺序映射。
 
+后续固定音色扩展优先微调 `CosyVoice-300M-SFT`，增加多个中文男声和中文女声。该工作不改变当前 MVP-1 默认路由，也不是原主播 voice clone；微调后的声音需要试听验收后再替换或新增固定 role。
+
 ### 05_assemble
 
 职责：

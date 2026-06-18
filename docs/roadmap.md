@@ -24,7 +24,7 @@
 | MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | done |
 | MVP-1 Real Podcasts | 支持按用户指定的真实 episode 点播转换、多说话人和常见 transcript 来源 | active |
 | MVP-2 Automation | 自动扫描、批处理、状态记录和远程运维 | later |
-| Later | 授权参考音色扩展、ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
+| Later | 微调 `CosyVoice-300M-SFT` 扩展多个中文男声/女声、授权参考音色扩展、ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
 
 ## MVP-0 Acceptance
 
@@ -34,7 +34,7 @@
 
 - Fixture 全链路：`ingest -> normalize -> adapt -> synthesize -> assemble -> publish`。
 - DeepSeek API 生成自然中文口播稿。
-- 5090D 本地 TTS 生成真实中文 wav/MP3；MVP-1 当前运行默认已切到 `CosyVoice-300M-SFT`。
+- 5090D 本地 TTS 生成真实中文 wav/MP3；MVP-1 当前运行默认是混合本地渲染：`male_a` 走 CosyVoice2，其余角色走 `CosyVoice-300M-SFT`。
 - Transcript parser 已解析并清洗真实 speaker label，例如 `Host:`、`Nick Hague:`；label 写入 `segment["speaker"]`，不再留在 `segment["text"]` 中被 TTS 朗读。
 - NASA 真实 transcript 样本已在 5090D 上重新跑通 `normalize -> adapt -> synthesize -> assemble -> publish`。
 - `nasa-crew9-real-smoke` 验证结果：normalized/script/manifest 都是 9 段；中文脚本 label 扫描无 `主持人：` / `尼克·黑格：` 朗读式标签；最终 MP3 为 `24000 Hz`、mono、约 `361.1s`。
@@ -95,6 +95,7 @@
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - 已选定 MVP-1 固定角色 TTS 规则：默认规则仍可按 speaker 首次出现顺序稳定映射，启用 `speaker_voices.mode: infer_once` 后会每集最多调用一次 LLM 推断 speaker 的 `male/female/unknown` 方向，再由代码映射到具体 `voice_role`。
 - `sft_builtin_4role` 现在是混合本地渲染：`female_a -> 300M SFT 中文女`、`male_a -> CosyVoice2 cross_lingual speed 1.1`、`female_b -> 300M SFT 英文女`、`male_b -> 300M SFT 英文男`；它不做原主播 voice clone。
+- 2026-06-18 的 Practical AI `Model Context Protocol Deep Dive` 点播实跑已通过完整路径：来源 transcript -> chunked DeepSeek -> 每集一次 speaker role 推断 -> 混合本地 TTS -> MP3/RSS；用户试听反馈“基本还可以”。当前规则继续沿用，不再为 MVP-1 阻塞音色实验。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中同名 speaker 复用同一角色；LLM 推断的 `male/female` 会分别进入男/女角色池，`unknown` 和推断失败会自动兜底到具体角色，不要求人工介入。
 - 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
 - 已支持 `source.type=podcast_index_api`，可用 PodcastIndex API 鉴权请求获取 episode metadata，再复用现有 transcript ingest；API credentials 只从环境变量或 ignored env 文件读取。
@@ -148,6 +149,7 @@
 这些能力有价值，但不应该阻塞自用版本：
 
 - 后续固定音色扩展：先明确替换或新增哪个固定 role；它是固定音色扩展，不是原主播 voice clone。
+- 微调 `CosyVoice-300M-SFT`，目标是增加多个可长期使用的中文男声和中文女声，逐步减少当前借用 `英文女` / `英文男` speaker id 作为中文角色的临时性，并在试听确认后再决定是否替换现有 `male_a` CosyVoice2 路线。
 - 本地 LLM 替代 DeepSeek。
 - ASR fallback，用于没有 transcript 的 episode。
 - 原主播 voice clone。
@@ -158,6 +160,6 @@
 
 ## 当前最高优先级
 
-1. 听测 `on-demand-99pi-karaoke-real-20260618`，确认多 speaker 四角色实际听感。
-2. 继续补点播入口的真实失败诊断和站点/API 边界记录。
-3. 后续再做搜索式 episode 选择，保持点播转换为主入口。
+1. 继续以点播式单集转换为主入口，补真实失败诊断和站点/API 边界记录。
+2. 后续再做搜索式 episode 选择，保持用户指定某一期后才转换。
+3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。

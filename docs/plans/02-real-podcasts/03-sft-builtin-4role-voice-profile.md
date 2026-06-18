@@ -42,6 +42,7 @@
 - 路线 2，即 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker，说中文时区分度最大。
 - 全部内置 speaker 筛选不适合作为主方案，因为 `日语男 / 粤语女 / 韩语女` 语种感明显。
 - 只用 `中文女 / 中文男` 后处理拆四角色可以勉强分开，但听感不如四个内置 speaker。
+- 后续音色扩展优先微调 `CosyVoice-300M-SFT`，增加多个中文男声和中文女声；这属于固定角色音色扩展，不是原主播 voice clone。微调结果需试听确认后再决定是否替换当前 `male_a` CosyVoice2 或 `female_b/male_b` SFT 角色。
 
 ## 范围
 
@@ -137,6 +138,7 @@ speed=1.1
 - wrapper 支持 `sft_builtin_4role` 内部混合路由：`male_a` 调用 `AutoModel.inference_cross_lingual`，默认 `CosyVoice2-0.5B` / `cross_lingual_prompt.wav` / `speed=1.1`；`female_a / female_b / male_b` 调用 `CosyVoice.inference_sft`。
 - 5090D 历史 wrapper smoke 已通过：四个 SFT 角色均可生成 `22050 Hz`、mono wav。
 - 5090D 最终混合代码路径预览已通过：`four-role-hybrid-code-preview-20260618-1736` 使用正式 `synthesize -> assemble`，manifest 和 batch roles 均为 `female_a / male_a / female_b / male_b`，最终 MP3 为 `22050 Hz`、mono、约 `17.7s`；产物已拷回本机 ignored `workspace/runs/four-role-hybrid-code-preview-20260618-1736/output/audio.mp3`。
+- 5090D Practical AI 全路径实跑已通过：`llm-practicalai-mcp-real-20260618` 使用 `speaker_voices.mode: infer_once` 推断 `Jerod -> male_a`、`Daniel -> male_b`、`Chris -> male_a`，manifest 共 101 段，最终 MP3 为 `22050 Hz`、mono、约 `1819.5s`；用户试听反馈基本可接受。
 
 试听样本保存在 ignored runtime 路径：
 
