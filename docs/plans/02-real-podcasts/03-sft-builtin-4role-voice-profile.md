@@ -60,6 +60,7 @@ In:
 - batch manifest item 记录每段 `voice_role`。
 - wrapper 对 `sft_builtin_4role` 使用 `CosyVoice.inference_sft`，并对各段做固定响度处理。
 - 真实点播 run 中 `male_a` 作为男一偏低沉；当前男声优先顺序改为 `male_b -> male_a`。
+- 5090D 短预览 `male-role-swap-preview-20260618` 已真实生成 `male_b / male_a / male_b / male_a`，输出 MP3 为 `17.728435s`。
 
 Out:
 
