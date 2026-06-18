@@ -1,6 +1,6 @@
 # 02.04.01 Episode Page Transcript-only Ingest 计划
 
-状态：`ready`
+状态：`done`
 
 日期：2026-06-18
 
@@ -263,6 +263,12 @@ ssh my-5090d-host 'cd /home/th5090d/Develop/personal_project/BabelEcho && git pu
 - 真实 99% Invisible episode 页面 transcript-only smoke 成功。
 - `babelecho run --source-config "$tmpdir/source.yaml" --to-stage adapt` 可复用现有后续 pipeline。
 - 全量测试通过。
+
+## 验收记录
+
+- 本地 focused 测试：`tests/test_episode_page.py tests/test_podcast.py tests/test_end_to_end_fixture.py` 通过。
+- 真实 99% Invisible smoke：`https://99percentinvisible.org/episode/641-99pi-anniversary-special-15-for-15/` 通过到 `ingest`，`raw.txt` 约 48KB，从 `ROMAN MARS:` 开始。
+- 抓取层对 HTTP/HTTPS 请求使用显式 `User-Agent`，避免被真实站点拒绝默认 `Python-urllib` 请求。
 
 ## 风险和分支处理
 

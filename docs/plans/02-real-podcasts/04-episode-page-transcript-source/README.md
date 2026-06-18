@@ -1,6 +1,6 @@
 # 02.04 Episode Page Transcript Source 大计划
 
-状态：`ready`
+状态：`done`
 
 日期：2026-06-18
 
@@ -56,7 +56,7 @@ Out:
 
 | 编号 | 文件 | 状态 | 目标 |
 | --- | --- | --- | --- |
-| 02.04.01 | [01-episode-page-transcript-only.md](./01-episode-page-transcript-only.md) | `ready` | 从 episode 页面找到 transcript 并只跑到 `ingest` / `adapt` 前 |
+| 02.04.01 | [01-episode-page-transcript-only.md](./01-episode-page-transcript-only.md) | `done` | 从 episode 页面找到 transcript 并只跑到 `ingest` / `adapt` 前 |
 
 ## 设计边界
 
@@ -72,3 +72,9 @@ Out:
 - `babelecho run --source-config "$tmpdir/source.yaml" --to-stage adapt` 可以继续复用现有 normalize/adapt。
 - 找不到 transcript 时有清晰错误。
 - 全量测试通过。
+
+## 完成记录
+
+- `source.type=episode_page` 已接入 `ingest`，输出 `transcript/raw.txt` 和 `source.json` 的 `page_url` / `transcript_page_url`。
+- 真实 99% Invisible smoke 已通过到 `ingest`：`raw.txt` 约 48KB，从 `ROMAN MARS:` transcript 正文开始，后续阶段按 `--to-stage ingest` 标记为 `skipped`。
+- 当前仍不处理 YouTube、Spotify、Apple Podcasts 页面，不做 JS 渲染、ASR 或音频下载。

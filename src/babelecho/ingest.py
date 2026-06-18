@@ -1,8 +1,9 @@
 import json
 from pathlib import Path
 from urllib.parse import urlparse
-from urllib.request import urlopen
+from urllib.request import Request, urlopen
 
+from .episode_page import discover_episode_page_transcript
 from .jsonio import write_json
 from .paths import RunPaths
 from .podcast import discover_podcast_index_transcript, discover_podcast_transcript
@@ -26,13 +27,16 @@ def _target_name(transcript_url: str) -> str:
 def _read_source(transcript_url: str) -> bytes:
     parsed = urlparse(transcript_url)
     if parsed.scheme in {"http", "https"}:
-        with urlopen(transcript_url, timeout=30) as response:
+        request = Request(transcript_url, headers={"User-Agent": "BabelEcho/0.1"})
+        with urlopen(request, timeout=30) as response:
             return response.read()
     return Path(transcript_url).read_bytes()
 
 
 def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
     source_type = source_config.get("type")
+    raw_content: bytes | None = None
+    raw_filename: str | None = None
     if source_type == "transcript_url":
         transcript_source = source_config.get("transcript_url")
         source_key = "transcript_url"
@@ -68,29 +72,47 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
             "original_url": source_config.get("original_url") or transcript.episode_url,
             "transcript_url": transcript.transcript_url,
         }
+    elif source_type == "episode_page":
+        page_url = source_config.get("page_url")
+        if not page_url:
+            raise ValueError("source.page_url is required")
+        transcript = discover_episode_page_transcript(page_url, _read_source)
+        transcript_source = transcript.transcript_page_url
+        source_key = "transcript_page_url"
+        raw_content = transcript.text.encode("utf-8")
+        raw_filename = "raw.txt"
+        source_config = {
+            **source_config,
+            "title": source_config.get("title") or transcript.title,
+            "original_url": source_config.get("original_url") or transcript.page_url,
+            "page_url": transcript.page_url,
+            "transcript_page_url": transcript.transcript_page_url,
+        }
     else:
         raise ValueError(
             "BabelEcho supports source.type=transcript_url, transcript_file, "
-            "podcast_rss, or podcast_index_episode"
+            "podcast_rss, podcast_index_episode, or episode_page"
         )
     if not transcript_source:
         raise ValueError(f"source.{source_key} is required")
 
-    raw_path = run_paths.transcript_dir / _target_name(transcript_source)
-    raw_path.write_bytes(_read_source(transcript_source))
+    raw_path = run_paths.transcript_dir / (raw_filename or _target_name(transcript_source))
+    raw_path.write_bytes(raw_content if raw_content is not None else _read_source(transcript_source))
 
-    write_json(
-        run_paths.source_json,
-        {
-            "run_id": run_paths.run_id,
-            "source_type": source_type,
-            "title": source_config.get("title", "Untitled Episode"),
-            "original_url": source_config.get("original_url"),
-            "feed_url": source_config.get("feed_url"),
-            "episode_url": source_config.get("episode_url"),
-            "episode_json": source_config.get("episode_json"),
-            source_key: transcript_source,
-            "raw_transcript": str(raw_path.relative_to(run_paths.run_dir)),
-        },
-    )
+    source_payload = {
+        "run_id": run_paths.run_id,
+        "source_type": source_type,
+        "title": source_config.get("title", "Untitled Episode"),
+        "original_url": source_config.get("original_url"),
+        "feed_url": source_config.get("feed_url"),
+        "episode_url": source_config.get("episode_url"),
+        "episode_json": source_config.get("episode_json"),
+        "raw_transcript": str(raw_path.relative_to(run_paths.run_dir)),
+    }
+    if source_config.get("page_url") is not None:
+        source_payload["page_url"] = source_config.get("page_url")
+    if source_config.get("transcript_page_url") is not None:
+        source_payload["transcript_page_url"] = source_config.get("transcript_page_url")
+    source_payload[source_key] = transcript_source
+    write_json(run_paths.source_json, source_payload)
     return raw_path

@@ -68,8 +68,8 @@ docs/plans/
 - [02.01 Real Podcast Transcript Source Input](./02-real-podcasts/01-real-podcast-transcript-source.md) - `done`
 - [02.02 Public RSS End-to-End Real Run](./02-real-podcasts/02-public-rss-real-run.md) - `done`
 - [02.03 SFT Built-in 4-role Voice Profile](./02-real-podcasts/03-sft-builtin-4role-voice-profile.md) - `done`
-- [02.04 Episode Page Transcript Source](./02-real-podcasts/04-episode-page-transcript-source/README.md) - `ready`
-  - [02.04.01 Episode Page Transcript-only Ingest](./02-real-podcasts/04-episode-page-transcript-source/01-episode-page-transcript-only.md) - `ready`
+- [02.04 Episode Page Transcript Source](./02-real-podcasts/04-episode-page-transcript-source/README.md) - `done`
+  - [02.04.01 Episode Page Transcript-only Ingest](./02-real-podcasts/04-episode-page-transcript-source/01-episode-page-transcript-only.md) - `done`
 
 ### Deferred Voice Work
 

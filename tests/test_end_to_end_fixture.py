@@ -395,6 +395,102 @@ publish:
     assert status["input"]["source_config"] == str(source_config)
 
 
+def test_run_command_accepts_episode_page_source_config(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    source_config = tmp_path / "source.yaml"
+    local_config = tmp_path / "local.yaml"
+    episode_page = tmp_path / "episode.html"
+    transcript_page = tmp_path / "transcript.html"
+    episode_page.write_text(
+        """<!doctype html>
+<html>
+  <body>
+    <article>
+      <h1>Episode Page Flow</h1>
+      <a href="transcript.html">Transcript</a>
+    </article>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+    transcript_page.write_text(
+        """<!doctype html>
+<html>
+  <body>
+    <nav>Navigation text</nav>
+    <div class="transcript-content">
+      <p>Host: Welcome to the episode page flow.</p>
+      <p>Guest: The transcript should be clean.</p>
+    </div>
+  </body>
+</html>
+""",
+        encoding="utf-8",
+    )
+    source_config.write_text(
+        f"""
+source:
+  type: episode_page
+  page_url: "{episode_page}"
+""",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "run",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "episode-page-flow",
+            "--source-config",
+            str(source_config),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "adapt",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    run_dir = workspace / "runs" / "episode-page-flow"
+    raw_text = (run_dir / "transcript" / "raw.txt").read_text(encoding="utf-8")
+    assert result.returncode == 0, result.stderr
+    assert "ingest:" in result.stdout
+    assert "normalize:" in result.stdout
+    assert "adapt:" in result.stdout
+    assert "<p>" not in raw_text
+    assert "<div>" not in raw_text
+    assert "Navigation text" not in raw_text
+    assert (run_dir / "script" / "zh.json").exists()
+
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "episode_page"
+    assert source["page_url"] == str(episode_page)
+    assert source["transcript_page_url"] == str(transcript_page)
+    assert source["title"] == "Episode Page Flow"
+
+    status = read_json(run_dir / "run.json")
+    assert status["input"]["source_config"] == str(source_config)
+
+
 def test_run_command_stops_at_requested_stage(tmp_path: Path):
     workspace = tmp_path / "workspace"
     local_config = tmp_path / "local.yaml"
