@@ -105,8 +105,8 @@ def _adapt_segments_in_chunks(
         ]
         last_error: ValueError | None = None
         for _attempt in range(retry_attempts):
-            adapted_segments = client.adapt_segments(payload)
             try:
+                adapted_segments = client.adapt_segments(payload)
                 chunk_result = _validate_chunk_response(chunk, adapted_segments, index)
                 break
             except ValueError as error:
