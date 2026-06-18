@@ -29,7 +29,11 @@ tts:
 # - 2+ distinct speakers: stable first-appearance mapping.
 # Rendering backends:
 # female_a=CosyVoice-300M-SFT/中文女
-# male_a=CosyVoice2-0.5B/cross_lingual_prompt.wav/speed=1.1
+# male_a=CosyVoice2-0.5B/cross_lingual/speed=1.1
+#   Uses ignored local calm prompt asset
+#   workspace/config/tts-assets/male_a_cosyvoice2_calm_prompt.wav when present,
+#   otherwise falls back to CosyVoice asset/cross_lingual_prompt.wav.
+#   Applies male_a-only text smoothing before CosyVoice2 synthesis.
 # female_b=CosyVoice-300M-SFT/英文女
 # male_b=CosyVoice-300M-SFT/英文男
 # Later fixed-role expansion should prefer a fine-tuned 300M SFT model with

@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -11,6 +12,10 @@ from pathlib import Path
 DEFAULT_PROMPT_TEXT = "希望你以后能够做的比我还好呦。"
 DEFAULT_VOICE = "sft_builtin_4role"
 MALE_A_COSYVOICE2_SPEED = 1.1
+REPO_ROOT = Path(__file__).resolve().parents[1]
+MALE_A_COSYVOICE2_CALM_PROMPT_WAV = (
+    REPO_ROOT / "workspace" / "config" / "tts-assets" / "male_a_cosyvoice2_calm_prompt.wav"
+)
 SUPPORTED_VOICES = {"default-zh", "sft_builtin_4role"}
 SUPPORTED_SFT_BUILTIN_4ROLE_ROLES = {
     "female_a",
@@ -29,6 +34,14 @@ SFT_ROLE_FILTERS = {
     "male_b": "highpass=f=70,loudnorm=I=-19:TP=-1.5:LRA=8:linear=false",
 }
 MALE_A_COSYVOICE2_FILTER = "loudnorm=I=-18.5:TP=-1.2:LRA=8:linear=false"
+MALE_A_TEXT_SMOOTHING_REPLACEMENTS = (
+    ("解释得非常棒", "解释得很清楚"),
+    ("解释得很棒", "解释得很清楚"),
+    ("非常非常", "很"),
+    ("非常", "很"),
+    ("特别", "比较"),
+    ("一下子就", ""),
+)
 
 
 @dataclass(frozen=True)
@@ -74,6 +87,22 @@ def _required_path(name: str, value: str | None) -> Path:
     if not value:
         raise ValueError(f"{name} is required")
     return Path(value)
+
+
+def _default_male_a_prompt_wav(cosyvoice_repo: Path) -> Path:
+    if MALE_A_COSYVOICE2_CALM_PROMPT_WAV.exists():
+        return MALE_A_COSYVOICE2_CALM_PROMPT_WAV
+    return cosyvoice_repo / "asset" / "cross_lingual_prompt.wav"
+
+
+def _smooth_male_a_text(text: str) -> str:
+    smoothed = text.strip()
+    for old, new in MALE_A_TEXT_SMOOTHING_REPLACEMENTS:
+        smoothed = smoothed.replace(old, new)
+    smoothed = smoothed.replace("，没错，", "。没错，")
+    smoothed = re.sub(r"[!！]+", "。", smoothed)
+    smoothed = re.sub(r"。{2,}", "。", smoothed)
+    return re.sub(r"\s+", " ", smoothed).strip()
 
 
 def resolve_config(args: argparse.Namespace) -> WrapperConfig:
@@ -125,7 +154,7 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
     )
     male_a_prompt_wav = Path(
         os.environ.get("COSYVOICE_MALE_A_PROMPT_WAV")
-        or cosyvoice_repo / "asset" / "cross_lingual_prompt.wav"
+        or _default_male_a_prompt_wav(cosyvoice_repo)
     )
     return WrapperConfig(
         voice=args.voice,
@@ -205,7 +234,7 @@ def _synthesize_one(
             if config.male_a_prompt_wav is None:
                 raise ValueError("male_a_prompt_wav is required for male_a")
             outputs = model.inference_cross_lingual(
-                text,
+                _smooth_male_a_text(text),
                 str(config.male_a_prompt_wav),
                 stream=False,
                 speed=config.male_a_speed,

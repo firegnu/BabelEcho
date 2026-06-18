@@ -2,7 +2,7 @@
 
 BabelEcho is a local-first pipeline for converting English podcast transcripts into Chinese podcast audio.
 
-MVP-0 and MVP-0.5 are complete. MVP-1 now uses a fixed `sft_builtin_4role` voice-role profile: single-speaker scripts use `female_a` by default, explicit `male`/`男` labels use `male_a`, explicit `female`/`女` labels use `female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping across `female_a / male_a / female_b / male_b`. Rendering is hybrid local TTS: `male_a` uses `CosyVoice2-0.5B` cross-lingual synthesis at speed `1.1`, while `female_a`, `female_b`, and `male_b` use `CosyVoice-300M-SFT`. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
+MVP-0 and MVP-0.5 are complete. MVP-1 now uses a fixed `sft_builtin_4role` voice-role profile: single-speaker scripts use `female_a` by default, explicit `male`/`男` labels use `male_a`, explicit `female`/`女` labels use `female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping across `female_a / male_a / female_b / male_b`. Rendering is hybrid local TTS: `male_a` uses `CosyVoice2-0.5B` cross-lingual synthesis at speed `1.1`, with a local calm prompt asset and male_a-only text smoothing when available, while `female_a`, `female_b`, and `male_b` use `CosyVoice-300M-SFT`. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
 
 Current validation track: use DeepSeek API for the LLM adaptation baseline, then use the 5090D for local Chinese TTS. This is a temporary hybrid path to validate script quality and audio synthesis before replacing the cloud LLM with a local model.
 

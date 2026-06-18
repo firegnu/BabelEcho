@@ -59,6 +59,30 @@ def test_resolve_config_defaults_to_sft_builtin_4role(monkeypatch, tmp_path: Pat
     assert config.model_dir == Path("/opt/CosyVoice/pretrained_models/CosyVoice-300M-SFT")
 
 
+def test_resolve_config_uses_local_male_a_calm_prompt_when_available(
+    monkeypatch, tmp_path: Path
+):
+    wrapper = load_wrapper()
+    calm_prompt = tmp_path / "workspace/config/tts-assets/male_a_cosyvoice2_calm_prompt.wav"
+    calm_prompt.parent.mkdir(parents=True)
+    calm_prompt.write_bytes(b"fake wav")
+    monkeypatch.setattr(wrapper, "MALE_A_COSYVOICE2_CALM_PROMPT_WAV", calm_prompt)
+    monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
+    monkeypatch.delenv("COSYVOICE_MALE_A_PROMPT_WAV", raising=False)
+    args = wrapper.parse_args(
+        [
+            "--batch-file",
+            str(tmp_path / "tts-batch.json"),
+            "--voice",
+            "sft_builtin_4role",
+        ]
+    )
+
+    config = wrapper.resolve_config(args)
+
+    assert config.male_a_prompt_wav == calm_prompt
+
+
 def test_resolve_config_accepts_cross_lingual_voice_options(monkeypatch, tmp_path: Path):
     wrapper = load_wrapper()
     monkeypatch.setenv("COSYVOICE_REPO", "/opt/CosyVoice")
@@ -314,10 +338,132 @@ def test_synthesize_batch_reuses_model_for_multiple_outputs(monkeypatch, tmp_pat
     ]
 
 
+def test_synthesize_sft_builtin_4role_smooths_text_only_for_male_a(
+    monkeypatch, tmp_path: Path
+):
+    wrapper = load_wrapper()
+    monkeypatch.setattr(
+        wrapper,
+        "MALE_A_COSYVOICE2_CALM_PROMPT_WAV",
+        tmp_path / "missing-calm-prompt.wav",
+    )
+    male_a_text = tmp_path / "0001.txt"
+    male_b_text = tmp_path / "0002.txt"
+    male_a_output = tmp_path / "0001.wav"
+    male_b_output = tmp_path / "0002.wav"
+    batch_file = tmp_path / "tts-batch.json"
+    male_a_text.write_text("它有了一个协议，没错，这个过渡非常自然！", encoding="utf-8")
+    male_b_text.write_text("第二段非常自然！", encoding="utf-8")
+    batch_file.write_text(
+        json.dumps(
+            {
+                "items": [
+                    {
+                        "text_file": str(male_a_text),
+                        "output": str(male_a_output),
+                        "voice_role": "male_a",
+                    },
+                    {
+                        "text_file": str(male_b_text),
+                        "output": str(male_b_output),
+                        "voice_role": "male_b",
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    cosyvoice_repo = tmp_path / "CosyVoice"
+    sft_calls = []
+    cross_lingual_calls = []
+
+    class FakeAutoModel:
+        sample_rate = 24_000
+
+        def __init__(self, model_dir):
+            self.model_dir = model_dir
+
+        def inference_cross_lingual(self, text, prompt_wav, stream, speed):
+            cross_lingual_calls.append((text, prompt_wav, stream, speed))
+            return [{"tts_speech": FakeTensor()}]
+
+    class FakeCosyVoice:
+        sample_rate = 22_050
+
+        def __init__(self, model_dir):
+            self.model_dir = model_dir
+
+        def inference_sft(self, text, speaker, stream, speed):
+            sft_calls.append((text, speaker, stream, speed))
+            return [{"tts_speech": FakeTensor()}]
+
+    class FakeTensor:
+        def cpu(self):
+            return self
+
+    fake_torch = type(
+        "FakeTorch",
+        (),
+        {"cat": staticmethod(lambda chunks, dim: chunks[0])},
+    )
+
+    saved = []
+    fake_torchaudio = type(
+        "FakeTorchaudio",
+        (),
+        {"save": staticmethod(lambda path, audio, sample_rate: saved.append((path, audio, sample_rate)))},
+    )
+
+    monkeypatch.setenv("COSYVOICE_REPO", str(cosyvoice_repo))
+    monkeypatch.delenv("COSYVOICE_MODEL_DIR", raising=False)
+    monkeypatch.setitem(__import__("sys").modules, "torch", fake_torch)
+    monkeypatch.setitem(__import__("sys").modules, "torchaudio", fake_torchaudio)
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "cosyvoice.cli.cosyvoice",
+        type(
+            "FakeCosyVoiceModule",
+            (),
+            {"AutoModel": FakeAutoModel, "CosyVoice": FakeCosyVoice},
+        ),
+    )
+    monkeypatch.setattr(wrapper.subprocess, "run", lambda command, check: None)
+
+    config = wrapper.resolve_config(
+        wrapper.parse_args(
+            [
+                "--batch-file",
+                str(batch_file),
+                "--voice",
+                "sft_builtin_4role",
+                "--speed",
+                "1.0",
+            ]
+        )
+    )
+
+    wrapper.synthesize(config)
+
+    assert cross_lingual_calls == [
+        (
+            "它有了一个协议。没错，这个过渡很自然。",
+            str(cosyvoice_repo / "asset" / "cross_lingual_prompt.wav"),
+            False,
+            1.1,
+        )
+    ]
+    assert sft_calls == [("第二段非常自然！", "英文男", False, 1.0)]
+
+
 def test_synthesize_sft_builtin_4role_routes_male_a_to_cosyvoice2(
     monkeypatch, tmp_path: Path
 ):
     wrapper = load_wrapper()
+    monkeypatch.setattr(
+        wrapper,
+        "MALE_A_COSYVOICE2_CALM_PROMPT_WAV",
+        tmp_path / "missing-calm-prompt.wav",
+    )
     male_a_text = tmp_path / "0001.txt"
     male_b_text = tmp_path / "0002.txt"
     male_a_output = tmp_path / "0001.wav"

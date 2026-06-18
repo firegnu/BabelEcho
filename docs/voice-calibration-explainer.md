@@ -13,12 +13,12 @@ MVP-1 当前固定角色路由已经更新：
 
 ```text
 female_a -> CosyVoice-300M-SFT / 中文女
-male_a   -> CosyVoice2-0.5B / cross_lingual_prompt.wav / speed=1.1
+male_a   -> CosyVoice2-0.5B / calm prompt asset if present, fallback cross_lingual_prompt.wav / speed=1.1 / male_a-only text smoothing
 female_b -> CosyVoice-300M-SFT / 英文女
 male_b   -> CosyVoice-300M-SFT / 英文男
 ```
 
-本文下方记录的是历史 CosyVoice2 单固定音色校准。当前 `male_a` 继续使用 `cross_lingual_prompt.wav`，但速度已经按后续试听结论改为 `1.1`；其他角色不使用这一路。
+本文下方记录的是历史 CosyVoice2 单固定音色校准。当前 `male_a` 继续使用 CosyVoice2 cross-lingual 路线和 speed `1.1`；5090D 上如果存在 ignored runtime asset `workspace/config/tts-assets/male_a_cosyvoice2_calm_prompt.wav`，会优先使用它，否则回退到内置 `cross_lingual_prompt.wav`。`male_a` 还会在 wrapper 内做专用文本平稳化；其他三个角色不使用这一路，也不经过该文本平稳化。
 
 历史试听样本：
 

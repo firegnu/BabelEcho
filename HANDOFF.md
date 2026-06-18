@@ -2,7 +2,7 @@
 
 ## 1. 会话摘要
 
-本次会话围绕 BabelEcho 的 MVP-0 后端骨架、acceptance、MVP-0.5 自用流程、MVP-1 真实来源和 TTS 路由推进：当前混合验证路径是 LLM adaptation 使用 DeepSeek API，TTS 使用 5090D 本地混合路由。运行默认仍是 `tts.voice=sft_builtin_4role`，其中 `male_a` 使用 `CosyVoice2-0.5B cross_lingual + speed=1.1`，`female_a / female_b / male_b` 使用 `CosyVoice-300M-SFT`。MVP-0 / MVP-0.5 均已完成，MVP-1 点播式单集转换已跑通真实全路径。
+本次会话围绕 BabelEcho 的 MVP-0 后端骨架、acceptance、MVP-0.5 自用流程、MVP-1 真实来源和 TTS 路由推进：当前混合验证路径是 LLM adaptation 使用 DeepSeek API，TTS 使用 5090D 本地混合路由。运行默认仍是 `tts.voice=sft_builtin_4role`，其中 `male_a` 使用 `CosyVoice2-0.5B cross_lingual + speed=1.1`，优先使用本地 calm prompt asset 并做 `male_a` 专用文本平稳化；`female_a / female_b / male_b` 使用 `CosyVoice-300M-SFT`。MVP-0 / MVP-0.5 均已完成，MVP-1 点播式单集转换已跑通真实全路径。
 
 ## 2. 完成的工作
 
@@ -138,7 +138,7 @@
   - TTS 执行效率优化已完成：`local_cli` synthesis 会写 `segments/tts-batch.json` 并一次启动 wrapper，wrapper 只加载一次 CosyVoice 后循环生成 wav；旧单段 `--text-file --output` wrapper 调用仍保留。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
   - 真实 transcript 中的段首和段内 speaker label 已有基础解析/清洗，但后续真实来源仍需要更多样本回归。
   - MVP-1 固定音色规则已实现：运行默认使用 `tts.voice=sft_builtin_4role` 固定角色 profile。0/1 个 distinct speaker 且没有显式性别标签时使用 `female_a`；单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 按首次出现顺序映射到 `female_a / male_a / female_b / male_b`。
-  - `sft_builtin_4role` 当前是混合本地渲染：`female_a -> CosyVoice-300M-SFT / 中文女`，`male_a -> CosyVoice2 cross_lingual / cross_lingual_prompt.wav / speed=1.1`，`female_b -> CosyVoice-300M-SFT / 英文女`，`male_b -> CosyVoice-300M-SFT / 英文男`；同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
+  - `sft_builtin_4role` 当前是混合本地渲染：`female_a -> CosyVoice-300M-SFT / 中文女`，`male_a -> CosyVoice2 cross_lingual / calm prompt if present, fallback cross_lingual_prompt.wav / speed=1.1 / text smoothing`，`female_b -> CosyVoice-300M-SFT / 英文女`，`male_b -> CosyVoice-300M-SFT / 英文男`；同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
   - `sft_builtin_4role` 不做原主播 voice clone。5090D 历史 wrapper smoke 已验证四个 SFT 角色真实 wav 输出为 `22050 Hz` mono；最终混合 `male_a` 代码路径也已验证。
   - 2026-06-18 Practical AI `Model Context Protocol Deep Dive` 全路径 run `llm-practicalai-mcp-real-20260618` 已完成：101 段，DeepSeek chunk 6 次，speaker 推断一次，`Jerod -> male_a`、`Daniel -> male_b`、`Chris -> male_a`，最终 MP3 为 `22050 Hz` mono、约 `1819.5s`；用户试听反馈基本可接受。
 - 多人多音色已作为 MVP-1 固定 profile 落地；不要把它回填到 MVP-0.5。

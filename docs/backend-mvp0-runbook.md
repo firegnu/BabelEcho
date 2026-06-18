@@ -67,7 +67,10 @@ uses hybrid local rendering:
 - 1 distinct speaker labeled with `female` or `女`: use `female_a`.
 - 2+ distinct speakers: use first-appearance mapping across the four roles.
 - Render `male_a` with `CosyVoice2-0.5B` cross-lingual synthesis,
-  `cross_lingual_prompt.wav`, and speed `1.1`.
+  speed `1.1`, the ignored calm prompt asset
+  `workspace/config/tts-assets/male_a_cosyvoice2_calm_prompt.wav` when present,
+  and a male_a-only text smoothing pass. If the calm prompt asset is missing,
+  the wrapper falls back to `<cosyvoice_repo>/asset/cross_lingual_prompt.wav`.
 - Render `female_a`, `female_b`, and `male_b` with `CosyVoice-300M-SFT`.
 
 The profile is equivalent to this effective config:
@@ -91,6 +94,8 @@ If `model_dir` is not set, the wrapper defaults to
 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for the SFT roles.
 For `male_a`, the wrapper defaults to
 `<cosyvoice_repo>/pretrained_models/CosyVoice2-0.5B` and
+`workspace/config/tts-assets/male_a_cosyvoice2_calm_prompt.wav` when that
+ignored runtime asset exists; otherwise it uses
 `<cosyvoice_repo>/asset/cross_lingual_prompt.wav`.
 The SFT profile intentionally does not reuse `COSYVOICE_MODEL_DIR` from the
 launcher for the SFT roles.

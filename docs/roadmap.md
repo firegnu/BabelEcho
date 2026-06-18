@@ -84,7 +84,7 @@
 
 需要做：
 
-- 运行默认使用 `sft_builtin_4role` 固定角色 profile；`male_a` 渲染走 `CosyVoice2-0.5B cross_lingual speed=1.1`，`female_a / female_b / male_b` 渲染走 `CosyVoice-300M-SFT`。
+- 运行默认使用 `sft_builtin_4role` 固定角色 profile；`male_a` 渲染走 `CosyVoice2-0.5B cross_lingual speed=1.1`，优先使用本地 calm prompt asset 并做 `male_a` 专用文本平稳化；`female_a / female_b / male_b` 渲染走 `CosyVoice-300M-SFT`。
 - 固定音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
 - 历史 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0` 样本只保留为校准记录；当前固定使用 speed `1.1` 作为 `male_a` 路线，不再围绕 CosyVoice 内置的两个 wav 反复微调。
 - 后续如需新固定音色，优先明确替换哪个固定 role，不阻塞真实 podcast 来源接入。
@@ -94,7 +94,7 @@
 - 已支持 `adapt.mode: chunked`：DeepSeek 改写可按完整 segment 聚合 chunk 批量调用，chunk 不切断 segment，返回按原始 id 校验和重建 `script/zh.json`，TTS 不依赖 chunk 顺序。
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - 已选定 MVP-1 固定角色 TTS 规则：默认规则仍可按 speaker 首次出现顺序稳定映射，启用 `speaker_voices.mode: infer_once` 后会每集最多调用一次 LLM 推断 speaker 的 `male/female/unknown` 方向，再由代码映射到具体 `voice_role`。
-- `sft_builtin_4role` 现在是混合本地渲染：`female_a -> 300M SFT 中文女`、`male_a -> CosyVoice2 cross_lingual speed 1.1`、`female_b -> 300M SFT 英文女`、`male_b -> 300M SFT 英文男`；它不做原主播 voice clone。
+- `sft_builtin_4role` 现在是混合本地渲染：`female_a -> 300M SFT 中文女`、`male_a -> CosyVoice2 cross_lingual speed 1.1 + calm prompt if present + text smoothing`、`female_b -> 300M SFT 英文女`、`male_b -> 300M SFT 英文男`；它不做原主播 voice clone。
 - 2026-06-18 的 Practical AI `Model Context Protocol Deep Dive` 点播实跑已通过完整路径：来源 transcript -> chunked DeepSeek -> 每集一次 speaker role 推断 -> 混合本地 TTS -> MP3/RSS；用户试听反馈“基本还可以”。当前规则继续沿用，不再为 MVP-1 阻塞音色实验。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中同名 speaker 复用同一角色；LLM 推断的 `male/female` 会分别进入男/女角色池，`unknown` 和推断失败会自动兜底到具体角色，不要求人工介入。
 - 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
@@ -115,7 +115,7 @@
 
 验收标准：
 
-- 当前运行默认使用 `sft_builtin_4role` 固定角色 profile；`male_a` 用 `CosyVoice2 cross_lingual speed=1.1`，其余角色用 `CosyVoice-300M-SFT`。
+- 当前运行默认使用 `sft_builtin_4role` 固定角色 profile；`male_a` 用 `CosyVoice2 cross_lingual speed=1.1`、本地 calm prompt asset 和专用文本平稳化，其余角色用 `CosyVoice-300M-SFT`。
 - 一个有公开 `podcast:transcript` 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出；三到四人节目可以用 `sft_builtin_4role` 输出可区分的固定角色。
 - 用户指定某一期时，可以把这一期转换成中文 MP3，并可选生成播客客户端可播放的 feed item；99% Invisible `Karaoke Videos` 已通过 `episode convert --url` 在 5090D 跑完整真实链路。

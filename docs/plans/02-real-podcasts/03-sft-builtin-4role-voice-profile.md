@@ -12,14 +12,14 @@
 
 ```text
 0/1 speaker without explicit gender marker -> female_a -> CosyVoice-300M-SFT
-1 speaker labeled male/男 -> male_a -> CosyVoice2 cross_lingual speed 1.1
+1 speaker labeled male/男 -> male_a -> CosyVoice2 cross_lingual speed 1.1, calm prompt if present, text smoothing
 1 speaker labeled female/女 -> female_a -> CosyVoice-300M-SFT
 2+ speakers -> stable voice role -> role-specific local TTS backend -> wav segment
 ```
 
 ## 结论
 
-已选定 `sft_builtin_4role` 作为 MVP-1 固定角色 profile。它不做原主播 voice clone；角色分配仍稳定使用 `female_a / male_a / female_b / male_b`，但渲染 backend 已改为混合本地模型：`male_a` 使用 `CosyVoice2-0.5B` 的 `cross_lingual` 路线、`cross_lingual_prompt.wav` 和 `speed=1.1`，其余三个角色继续使用 `CosyVoice-300M-SFT`。
+已选定 `sft_builtin_4role` 作为 MVP-1 固定角色 profile。它不做原主播 voice clone；角色分配仍稳定使用 `female_a / male_a / female_b / male_b`，但渲染 backend 已改为混合本地模型：`male_a` 使用 `CosyVoice2-0.5B` 的 `cross_lingual` 路线、`speed=1.1`、ignored runtime calm prompt asset if present，并做 `male_a` 专用文本平稳化；其余三个角色继续使用 `CosyVoice-300M-SFT`。
 
 最终规则：
 
@@ -33,7 +33,7 @@
 | Voice role | Rendering backend | 用途 |
 | --- | --- | --- |
 | `female_a` | `CosyVoice-300M-SFT` / `中文女` | 第 1 个 speaker |
-| `male_a` | `CosyVoice2-0.5B` / `cross_lingual` / `speed=1.1` | 第 2 个 speaker 或显式男声 |
+| `male_a` | `CosyVoice2-0.5B` / `cross_lingual` / `speed=1.1` / calm prompt if present / text smoothing | 第 2 个 speaker 或显式男声 |
 | `female_b` | `CosyVoice-300M-SFT` / `英文女` | 第 3 个 speaker |
 | `male_b` | `CosyVoice-300M-SFT` / `英文男` | 第 4 个 speaker |
 
@@ -104,7 +104,8 @@ tts:
 
 ```text
 <cosyvoice_repo>/pretrained_models/CosyVoice2-0.5B
-<cosyvoice_repo>/asset/cross_lingual_prompt.wav
+workspace/config/tts-assets/male_a_cosyvoice2_calm_prompt.wav if present
+<cosyvoice_repo>/asset/cross_lingual_prompt.wav fallback
 speed=1.1
 ```
 
@@ -135,7 +136,7 @@ speed=1.1
 - `tts-batch.json` 每个 item 写入 `voice_role`。
 - `local_cli` 可以把 `cosyvoice_repo` 和 `model_dir` 传给 wrapper。
 - `sft_builtin_4role` 不会把 `COSYVOICE_MODEL_DIR` 用作 SFT 角色模型；未显式传 `--model-dir` 时 SFT 角色默认使用 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT`。
-- wrapper 支持 `sft_builtin_4role` 内部混合路由：`male_a` 调用 `AutoModel.inference_cross_lingual`，默认 `CosyVoice2-0.5B` / `cross_lingual_prompt.wav` / `speed=1.1`；`female_a / female_b / male_b` 调用 `CosyVoice.inference_sft`。
+- wrapper 支持 `sft_builtin_4role` 内部混合路由：`male_a` 调用 `AutoModel.inference_cross_lingual`，默认 `CosyVoice2-0.5B` / calm prompt if present, fallback `cross_lingual_prompt.wav` / `speed=1.1`，并做 `male_a` 专用文本平稳化；`female_a / female_b / male_b` 调用 `CosyVoice.inference_sft`，不经过这段逻辑。
 - 5090D 历史 wrapper smoke 已通过：四个 SFT 角色均可生成 `22050 Hz`、mono wav。
 - 5090D 最终混合代码路径预览已通过：`four-role-hybrid-code-preview-20260618-1736` 使用正式 `synthesize -> assemble`，manifest 和 batch roles 均为 `female_a / male_a / female_b / male_b`，最终 MP3 为 `22050 Hz`、mono、约 `17.7s`；产物已拷回本机 ignored `workspace/runs/four-role-hybrid-code-preview-20260618-1736/output/audio.mp3`。
 - 5090D Practical AI 全路径实跑已通过：`llm-practicalai-mcp-real-20260618` 使用 `speaker_voices.mode: infer_once` 推断 `Jerod -> male_a`、`Daniel -> male_b`、`Chris -> male_a`，manifest 共 101 段，最终 MP3 为 `22050 Hz`、mono、约 `1819.5s`；用户试听反馈基本可接受。
