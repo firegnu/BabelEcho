@@ -69,3 +69,4 @@ Out:
 - `--source-config` 和 `--transcript-file` 继续复用现有 pipeline。
 - 本地 full pytest 通过：`111 passed`。
 - 真实入口 smoke：`on-demand-99pi-karaoke-fixture-20260618` 使用 `https://99percentinvisible.org/episode/670-karaoke-videos/` 和 fixture local config 跑到 `adapt`；成功解析 transcript 页面 `.../transcript`，生成 150 段 `transcript/normalized.json` 和 150 段 `script/zh.json`。该 smoke 未调用 DeepSeek 或 TTS。
+- 5090D 真实 full-chain run：`on-demand-99pi-karaoke-real-20260618` 使用同一 99% Invisible URL，经 `episode convert --url`、chunked DeepSeek adapt、`speaker_voices.mode: infer_once`、`sft_builtin_4role` TTS、assemble 和 publish 全链路成功。产物：150 段 script/manifest，8 个 adapt chunk，7 个 speaker 推断，最终 `output/audio.mp3` 为 `22050 Hz` mono，约 `1904.3s`，约 `30.5 MB`。本机已拷回 ignored `workspace/runs/on-demand-99pi-karaoke-real-20260618/` 便于试听。

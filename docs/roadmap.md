@@ -116,7 +116,7 @@
 - 当前运行默认改为 `CosyVoice-300M-SFT`，历史 `cross_lingual_prompt.wav + speed=1.0` 只保留为校准记录，不作为部署要求。
 - 一个有公开 `podcast:transcript` 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出；三到四人节目可以用 `sft_builtin_4role` 输出可区分的固定角色。
-- 用户指定某一期时，可以把这一期转换成中文 MP3，并可选生成播客客户端可播放的 feed item。
+- 用户指定某一期时，可以把这一期转换成中文 MP3，并可选生成播客客户端可播放的 feed item；99% Invisible `Karaoke Videos` 已通过 `episode convert --url` 在 5090D 跑完整真实链路。
 
 ## MVP-2 Automation
 
@@ -158,6 +158,6 @@
 
 ## 当前最高优先级
 
-1. 以 `babelecho episode convert --url ...` 作为默认入口，做真实点播式单集回归。
-2. 对一集真实多 speaker 内容跑到 TTS，验证 `speaker_voices.mode: infer_once` 多 speaker profile。
-3. 继续补点播入口的真实失败诊断和站点/API 边界记录。
+1. 听测 `on-demand-99pi-karaoke-real-20260618`，确认多 speaker 四角色实际听感。
+2. 继续补点播入口的真实失败诊断和站点/API 边界记录。
+3. 后续再做搜索式 episode 选择，保持点播转换为主入口。
