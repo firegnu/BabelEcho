@@ -54,6 +54,9 @@ tts:
 # fallback voice_role.
 # speaker_voices:
 #   mode: infer_once
+#   # Optional manual override for scripts with no speaker labels, such as many
+#   # YouTube caption runs. Does not override named speaker mappings.
+#   # default_voice_role: "male_a"
 
 publish:
   base_url: "https://example.com/babelecho"

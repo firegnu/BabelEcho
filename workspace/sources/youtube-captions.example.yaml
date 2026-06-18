@@ -3,5 +3,7 @@ source:
   url: "https://www.youtube.com/watch?v=example"
   title: "Example YouTube Episode"
   language: "en"
+  # Use a single video / episode URL. Playlist, channel, show, and subscription
+  # URLs are intentionally not supported in the current point-in-time flow.
   # Keep this as yt-dlp unless you need an absolute path on a host.
   yt_dlp_command: "yt-dlp"

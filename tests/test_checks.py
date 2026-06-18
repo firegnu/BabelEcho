@@ -99,6 +99,49 @@ def test_check_run_artifacts_rejects_long_script_segment(tmp_path: Path):
         check_run_artifacts(run_paths, checks=("script",), max_script_chars=120)
 
 
+def test_check_run_artifacts_rejects_script_transcript_artifacts(tmp_path: Path):
+    run_paths = _write_valid_run(tmp_path)
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "check-run",
+            "language": "zh-CN",
+            "segments": [
+                {
+                    "id": "0001",
+                    "text": ">> 谢谢您，总统先生。WEBVTT",
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(CheckError, match="transcript artifact"):
+        check_run_artifacts(run_paths, checks=("script",))
+
+
+def test_check_run_artifacts_rejects_english_heavy_script_segment(tmp_path: Path):
+    run_paths = _write_valid_run(tmp_path)
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "check-run",
+            "language": "zh-CN",
+            "segments": [
+                {
+                    "id": "0001",
+                    "text": (
+                        "This segment accidentally remained in English instead "
+                        "of being adapted into Chinese spoken-script text."
+                    ),
+                }
+            ],
+        },
+    )
+
+    with pytest.raises(CheckError, match="English-heavy"):
+        check_run_artifacts(run_paths, checks=("script",))
+
+
 def test_check_run_artifacts_rejects_missing_audio_segment(tmp_path: Path):
     run_paths = _write_valid_run(tmp_path)
     (run_paths.segments_dir / "0001.wav").unlink()

@@ -90,6 +90,17 @@ This profile maps script speakers by first appearance to `female_a`, `male_a`,
 the 300M SFT speaker ids `中文女`, `英文女`, and `英文男`; `male_a` is backed by
 the CosyVoice2 cross-lingual reference path chosen in the speed `1.1` preview.
 It is fixed-role synthesis, not original-host voice cloning.
+For scripts with no speaker labels, such as many YouTube caption runs, set
+`speaker_voices.default_voice_role` to force the run-level default before ASR or
+voiceprint-based speaker detection exists:
+
+```yaml
+speaker_voices:
+  default_voice_role: "male_a"
+```
+
+This override only applies when the script has zero named speakers; it does not
+replace existing `speaker -> voice_role` mappings.
 If `model_dir` is not set, the wrapper defaults to
 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for the SFT roles.
 For `male_a`, the wrapper defaults to

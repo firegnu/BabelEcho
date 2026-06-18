@@ -8,7 +8,9 @@ from .jsonio import write_json
 from .paths import RunPaths
 from .podcast import discover_podcast_index_transcript, discover_podcast_transcript
 from .podcast_index_api import fetch_podcast_index_episode
-from .youtube import fetch_youtube_captions
+from .transcript_cleaning import clean_timed_transcript_file
+from .transcript_candidates import build_youtube_candidate, write_candidates_json
+from .youtube import fetch_youtube_captions, parse_youtube_start_ms
 
 
 TRANSCRIPT_EXTENSIONS = {
@@ -39,6 +41,10 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
     source_type = source_config.get("type")
     raw_content: bytes | None = None
     raw_filename: str | None = None
+    youtube_candidate_language: str | None = None
+    youtube_candidate_source_url: str | None = None
+    youtube_start_ms: int | None = None
+    normalized_transcript_source: str | None = None
     if source_type == "transcript_url":
         transcript_source = source_config.get("transcript_url")
         source_key = "transcript_url"
@@ -102,21 +108,45 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
             "transcript_page_url": transcript.transcript_page_url,
         }
     elif source_type == "youtube_captions":
-        captions = fetch_youtube_captions(
-            source_config,
-            run_paths.run_dir / "tmp" / "youtube-captions",
-        )
+        youtube_candidate_source_url = source_config.get("url")
+        try:
+            captions = fetch_youtube_captions(
+                source_config,
+                run_paths.run_dir / "tmp" / "youtube-captions",
+            )
+        except ValueError as error:
+            write_candidates_json(
+                run_paths,
+                [
+                    build_youtube_candidate(
+                        run_paths,
+                        source_url=youtube_candidate_source_url,
+                        raw_path=None,
+                        language=str(source_config.get("language") or "en"),
+                        selected=False,
+                        rejection_reason=str(error),
+                    )
+                ],
+            )
+            raise
         transcript_source = str(captions.path)
         source_key = "youtube_subtitle_source"
         raw_content = captions.path.read_bytes()
         raw_filename = TRANSCRIPT_EXTENSIONS.get(captions.path.suffix.lower(), "raw.vtt")
+        youtube_candidate_language = captions.language
+        youtube_start_ms = source_config.get("youtube_start_ms")
+        if youtube_start_ms is None and youtube_candidate_source_url:
+            youtube_start_ms = parse_youtube_start_ms(str(youtube_candidate_source_url))
         source_config = {
             **source_config,
+            "title": source_config.get("title") or captions.title,
             "original_url": source_config.get("original_url") or source_config.get("url"),
             "youtube_url": source_config.get("url"),
             "youtube_language": captions.language,
             "youtube_subtitle_file": raw_filename,
         }
+        if youtube_start_ms is not None:
+            source_config["youtube_start_ms"] = youtube_start_ms
     else:
         raise ValueError(
             "BabelEcho supports source.type=transcript_url, transcript_file, "
@@ -128,11 +158,28 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
 
     raw_path = run_paths.transcript_dir / (raw_filename or _target_name(transcript_source))
     raw_path.write_bytes(raw_content if raw_content is not None else _read_source(transcript_source))
+    if source_type == "youtube_captions":
+        cleaned_path = run_paths.transcript_dir / f"cleaned{raw_path.suffix.lower()}"
+        clean_timed_transcript_file(raw_path, cleaned_path)
+        normalized_transcript_source = str(cleaned_path.relative_to(run_paths.run_dir))
+        write_candidates_json(
+            run_paths,
+            [
+                build_youtube_candidate(
+                    run_paths,
+                    source_url=youtube_candidate_source_url,
+                    raw_path=raw_path,
+                    language=youtube_candidate_language,
+                    selected=True,
+                    cleaned_path=cleaned_path,
+                )
+            ],
+        )
 
     source_payload = {
         "run_id": run_paths.run_id,
         "source_type": source_type,
-        "title": source_config.get("title", "Untitled Episode"),
+        "title": source_config.get("title") or "Untitled Episode",
         "original_url": source_config.get("original_url"),
         "feed_url": source_config.get("feed_url"),
         "episode_url": source_config.get("episode_url"),
@@ -149,10 +196,14 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
         source_payload["youtube_language"] = source_config.get("youtube_language")
     if source_config.get("youtube_subtitle_file") is not None:
         source_payload["youtube_subtitle_file"] = source_config.get("youtube_subtitle_file")
+    if source_config.get("youtube_start_ms") is not None:
+        source_payload["youtube_start_ms"] = source_config.get("youtube_start_ms")
     if source_config.get("page_url") is not None:
         source_payload["page_url"] = source_config.get("page_url")
     if source_config.get("transcript_page_url") is not None:
         source_payload["transcript_page_url"] = source_config.get("transcript_page_url")
+    if normalized_transcript_source is not None:
+        source_payload["normalized_transcript_source"] = normalized_transcript_source
     source_payload[source_key] = transcript_source
     write_json(run_paths.source_json, source_payload)
     return raw_path

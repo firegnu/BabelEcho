@@ -80,6 +80,8 @@ docs/plans/
 - [02.07 Chunked DeepSeek Adapt](./02-real-podcasts/07-chunked-adapt.md) - `done`
 - [02.08 On-demand Episode Convert](./02-real-podcasts/08-on-demand-episode-convert.md) - `done`
 - [02.09 Transcript Candidate Cleaning](./02-real-podcasts/09-transcript-candidate-cleaning.md) - `planned`
+- [02.10 YouTube 单链接点播转换计划](./02-real-podcasts/10-YouTube单链接点播转换计划.md) - `done`
+- Next focus - `active`: standard podcast on-demand sources, starting from one user-provided URL at a time: YouTube Podcasts episode URLs, iTunes/RSS feeds, PodcastIndex episodes, and podcast website episode pages. Subscription scanning and multi-episode batch processing stay in MVP-2.
 
 ### Deferred Voice Work
 

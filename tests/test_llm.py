@@ -1,4 +1,5 @@
 import json
+from urllib.error import URLError
 
 import pytest
 
@@ -127,6 +128,34 @@ def test_openai_compatible_client_sends_auth_and_extra_body(monkeypatch):
     assert "Today we talk about local-first AI." in payload["messages"][0]["content"]
 
 
+def test_openai_compatible_client_retries_transient_url_errors(monkeypatch):
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        if len(requests) == 1:
+            raise URLError("Tunnel connection failed: 503 Service Unavailable")
+        return FakeResponse()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    monkeypatch.setattr(llm, "urlopen", fake_urlopen)
+    monkeypatch.setattr(llm, "sleep", lambda _seconds: None)
+
+    client = build_llm_client(
+        {
+            "provider": "openai_compatible",
+            "base_url": "https://api.deepseek.com",
+            "model": "deepseek-v4-pro",
+            "api_key_env": "DEEPSEEK_API_KEY",
+        }
+    )
+
+    output = client.adapt_segment("Retry this request.")
+
+    assert output == "这是一段自然的中文口播稿。"
+    assert len(requests) == 2
+
+
 def test_openai_compatible_client_infers_speaker_genders_once(monkeypatch):
     requests = []
 
@@ -230,6 +259,9 @@ def test_openai_compatible_client_adapts_segments_in_one_json_request(monkeypatc
     prompt = payload["messages"][0]["content"]
     assert "Return only JSON" in prompt
     assert "Do not merge" in prompt
+    assert "Return exactly 2 segments" in prompt
+    assert "Clean transcript artifacts" in prompt
+    assert "Preserve factual content" in prompt
     assert "0001" in prompt
     assert "0002" in prompt
 

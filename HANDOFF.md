@@ -127,11 +127,11 @@
 
 - MVP-0 acceptance 已完成：完整 transcript 到中文 MP3，再到静态 RSS/episode artifacts 的真实路径已经跑通。
 - MVP-0.5 Self-use 已完成：手动导入 transcript 后，可以生成私有中文 podcast feed，并已完成真实自用回归。
-- 下一阶段是 MVP-1 Real Podcasts，目标是开始处理真实 podcast 来源和常见访谈节目。
+- 下一阶段仍是 MVP-1 Real Podcasts；YouTube 单链接探索已先收口，下一步转向标准播客点播来源对接，包括 YouTube Podcasts 单集、RSS/iTunes feed、PodcastIndex episode 和官网 episode 页面。
 - MVP-1 后续优先任务：
-  1. 执行 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`，解决 transcript candidates、评分、清洗、YouTube captions 合并和 HTML speaker 保留。
-  2. 保持点播式单集转换为主入口，先提高“用户指定某一期后能拿到干净 transcript”的成功率，再做搜索式 episode 选择。
-  3. PodcastIndex API 上的真实多 speaker 回归仍可后补；多 episode feed、跳过已处理 episode 后移到 MVP-2。
+  1. 保持点播式单集转换为主入口，先处理用户提供的单个标准播客 URL。
+  2. 对 YouTube Podcasts、iTunes/RSS、PodcastIndex 和官网 episode 页面做候选发现、transcript 质量验证和失败诊断。
+  3. `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md` 中的 HTML speaker 修复、RSS 多 candidate、PodcastIndex 多 candidate 可作为下一轮拆解来源；订阅扫描、多 episode feed、跳过已处理 episode 后移到 MVP-2。
 - 当前真实能力已经包括 DeepSeek 生成中文口播稿和 5090D 本地 TTS 合成 wav，但仍不是完整产品：
   - 来源已新增第一版 RSS feed 输入：`source.type=podcast_rss` 和 `babelecho run --podcast-feed ...`，只支持 RSS item 内的 `podcast:transcript`；公开 RSS smoke 使用 `https://feeds.transistor.fm/podcasting-advice` 跑到 `adapt`，fixture script 共 74 段，未调用 DeepSeek。还没有接 Apple Podcasts、Spotify、YouTube 页面解析。
   - 公开 RSS 端到端 Real Run 已完成：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 `#030: When Should You Monetize Your Podcast?`，经 RSS transcript -> DeepSeek -> 5090D TTS -> assemble -> publish 成功；script/manifest 75 段，最终 MP3 约 `840.8s`，产物已拷回本机 ignored `workspace/runs/mvp1-real-rss-monetize-20260617/`。
@@ -209,8 +209,8 @@
 
 ## 6. 下一步建议
 
-1. 执行 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`。
-2. 继续保持点播式单集转换为主入口，优先提升 transcript 获取与清洗成功率。
+1. 继续保持点播式单集转换为主入口，下一步接标准播客来源：YouTube Podcasts 单集、iTunes/RSS、PodcastIndex 和官网 episode 页面。
+2. 先用用户给的单个 URL 做 transcript candidate、清洗质量和失败诊断验证，再决定是否进入 DeepSeek/TTS。
 3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、训练/试听样本和验收标准，不影响当前 MVP-1 默认规则。
 4. 仍不要同时推进 ASR、voice clone、App 或后台服务。
 

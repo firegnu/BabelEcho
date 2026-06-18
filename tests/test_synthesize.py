@@ -357,6 +357,84 @@ def test_single_unspecified_speaker_auto_selects_sft_female_default(monkeypatch,
     assert [item["voice_role"] for item in captured["items"]] == ["female_a", "female_a"]
 
 
+def test_no_speaker_script_can_use_configured_default_voice_role(monkeypatch, tmp_path: Path):
+    run_paths = create_run(tmp_path, "no-speaker-default-voice-run")
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "no-speaker-default-voice-run",
+            "language": "zh-CN",
+            "segments": [
+                {"id": "0001", "source_segment_ids": ["0001"], "speaker": None, "text": "第一段。"},
+                {"id": "0002", "source_segment_ids": ["0002"], "speaker": None, "text": "第二段。"},
+            ],
+        },
+    )
+    captured = {}
+
+    def fake_synthesize_many_to_wav(items, batch_path, tts_config):
+        captured["items"] = items
+        for item in items:
+            output_path = item["output_path"] if isinstance(item, dict) else item[1]
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"wav")
+
+    monkeypatch.setattr("babelecho.synthesize.synthesize_many_to_wav", fake_synthesize_many_to_wav)
+
+    manifest_path = synthesize_segments(
+        run_paths,
+        {
+            "provider": "local_cli",
+            "command": "tts-wrapper",
+            "voice": "sft_builtin_4role",
+        },
+        {"default_voice_role": "male_a"},
+    )
+
+    assert [item["voice_role"] for item in captured["items"]] == ["male_a", "male_a"]
+    manifest = read_json(manifest_path)
+    assert [segment["voice_role"] for segment in manifest["segments"]] == ["male_a", "male_a"]
+
+
+def test_default_voice_role_does_not_override_existing_speaker_rules(monkeypatch, tmp_path: Path):
+    run_paths = create_run(tmp_path, "speaker-default-voice-ignore-run")
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "speaker-default-voice-ignore-run",
+            "language": "zh-CN",
+            "segments": [
+                {"id": "0001", "source_segment_ids": ["0001"], "speaker": "Solo", "text": "第一段。"},
+                {"id": "0002", "source_segment_ids": ["0002"], "speaker": "Solo", "text": "第二段。"},
+            ],
+        },
+    )
+    captured = {}
+
+    def fake_synthesize_many_to_wav(items, batch_path, tts_config):
+        captured["items"] = items
+        for item in items:
+            output_path = item["output_path"] if isinstance(item, dict) else item[1]
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            output_path.write_bytes(b"wav")
+
+    monkeypatch.setattr("babelecho.synthesize.synthesize_many_to_wav", fake_synthesize_many_to_wav)
+
+    manifest_path = synthesize_segments(
+        run_paths,
+        {
+            "provider": "local_cli",
+            "command": "tts-wrapper",
+            "voice": "sft_builtin_4role",
+        },
+        {"default_voice_role": "male_a"},
+    )
+
+    assert [item["voice_role"] for item in captured["items"]] == ["female_a", "female_a"]
+    manifest = read_json(manifest_path)
+    assert [segment["voice_role"] for segment in manifest["segments"]] == ["female_a", "female_a"]
+
+
 def test_single_explicit_male_speaker_auto_selects_sft_male_voice(monkeypatch, tmp_path: Path):
     run_paths = create_run(tmp_path, "auto-single-male-speaker-run")
     write_json(

@@ -2,7 +2,9 @@ import json
 import os
 import shlex
 from pathlib import Path
+from time import sleep
 from typing import Any, Protocol
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 
@@ -83,8 +85,19 @@ class OpenAICompatibleClient:
             headers=headers,
             method="POST",
         )
-        with urlopen(request, timeout=120) as response:
-            body = json.loads(response.read().decode("utf-8"))
+        for attempt in range(3):
+            try:
+                with urlopen(request, timeout=120) as response:
+                    body = json.loads(response.read().decode("utf-8"))
+                break
+            except HTTPError as error:
+                if error.code not in {429, 500, 502, 503, 504} or attempt == 2:
+                    raise
+                sleep(2 * (attempt + 1))
+            except URLError:
+                if attempt == 2:
+                    raise
+                sleep(2 * (attempt + 1))
         return body["choices"][0]["message"]["content"].strip()
 
     def adapt_segment(self, text: str) -> str:
@@ -96,12 +109,22 @@ class OpenAICompatibleClient:
         return self._chat_completion(prompt)
 
     def adapt_segments(self, segments: list[dict[str, Any]]) -> list[dict[str, str]]:
+        expected_count = len(segments)
         prompt = (
             "You are adapting English podcast transcript segments into natural "
             "Simplified Chinese spoken-script text.\n"
             "Return only JSON with shape "
             '{"segments":[{"id":"0001","text":"中文口播正文"}]}.\n'
+            f"Return exactly {expected_count} segments, one output item for each input id. "
             "Do not merge, split, remove, add, or reorder segment ids. "
+            "If an input segment is a fragment or continuation, still return one "
+            "Chinese spoken-script fragment for that exact id. "
+            "Clean transcript artifacts such as subtitle arrows, timing residue, "
+            "HTML or caption markup, duplicated rolling-caption residue, and "
+            "meaningless filler disfluencies. "
+            "Preserve factual content, named entities, numbers, claims, questions, "
+            "causal links, and meaningful emphasis. "
+            "Do not summarize across segments. "
             "Keep each output text suitable for Chinese TTS. "
             "Do not include explanations or markdown.\n\n"
             f"{json.dumps({'segments': segments}, ensure_ascii=False)}"

@@ -128,6 +128,7 @@ speed=1.1
 已覆盖：
 
 - 0/1 个 speaker 且没有显式性别标签时使用 `sft_builtin_4role` / `female_a`。
+- 没有任何 speaker 标签时，可用 `speaker_voices.default_voice_role` 手动指定默认 `voice_role`；该配置只在 `speaker_count == 0` 时生效。
 - 单个 speaker 标签包含 `male` / `男` 时使用 `sft_builtin_4role` / `male_a`。
 - 单个 speaker 标签包含 `female` / `女` 时使用 `sft_builtin_4role` / `female_a`。
 - 2 个及以上 speaker 会使用 `sft_builtin_4role` 的四角色映射。

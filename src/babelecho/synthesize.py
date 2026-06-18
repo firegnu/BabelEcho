@@ -5,6 +5,7 @@ from .tts import synthesize_many_to_wav
 
 
 SFT_BUILTIN_4ROLE_SEQUENCE = ["female_a", "male_a", "female_b", "male_b"]
+SFT_BUILTIN_4ROLE_SET = set(SFT_BUILTIN_4ROLE_SEQUENCE)
 SINGLE_SPEAKER_KEYS = {"mode", "prompt_text", "prompt_wav"}
 FEMALE_SPEAKER_MARKERS = ("female", "woman", "女")
 MALE_SPEAKER_MARKERS = ("male", "man", "男")
@@ -54,9 +55,29 @@ def _effective_tts_config(segments: list[dict], tts_config: dict) -> dict:
     return _select_sft_voice(effective_config)
 
 
-def _auto_voice_roles_for_segments(segments: list[dict], tts_config: dict) -> list[str | None]:
+def _default_voice_role(speaker_voice_config: dict | None) -> str | None:
+    if not isinstance(speaker_voice_config, dict):
+        return None
+    role = speaker_voice_config.get("default_voice_role")
+    if role is None:
+        return None
+    role = str(role)
+    if role not in SFT_BUILTIN_4ROLE_SET:
+        allowed = ", ".join(SFT_BUILTIN_4ROLE_SEQUENCE)
+        raise ValueError(f"speaker_voices.default_voice_role must be one of: {allowed}")
+    return role
+
+
+def _auto_voice_roles_for_segments(
+    segments: list[dict],
+    tts_config: dict,
+    default_voice_role: str | None = None,
+) -> list[str | None]:
     if tts_config.get("voice") != "sft_builtin_4role":
         return [None] * len(segments)
+
+    if _speaker_count(segments) == 0 and default_voice_role is not None:
+        return [default_voice_role] * len(segments)
 
     if _speaker_count(segments) <= 1:
         return [_single_speaker_role(segments)] * len(segments)
@@ -76,8 +97,9 @@ def _voice_roles_for_segments(
     segments: list[dict],
     tts_config: dict,
     speaker_voice_roles: dict[str, str] | None = None,
+    default_voice_role: str | None = None,
 ) -> list[str | None]:
-    roles = _auto_voice_roles_for_segments(segments, tts_config)
+    roles = _auto_voice_roles_for_segments(segments, tts_config, default_voice_role)
     if tts_config.get("voice") != "sft_builtin_4role" or not speaker_voice_roles:
         return roles
     return [
@@ -98,10 +120,12 @@ def synthesize_segments(
     manifest_segments = []
     tts_items = []
     speaker_voice_roles = load_speaker_voice_roles(run_paths, speaker_voice_config)
+    default_voice_role = _default_voice_role(speaker_voice_config)
     voice_roles = _voice_roles_for_segments(
         script["segments"],
         effective_tts_config,
         speaker_voice_roles,
+        default_voice_role,
     )
     for segment, voice_role in zip(script["segments"], voice_roles, strict=True):
         audio_path = run_paths.segments_dir / f"{segment['id']}.wav"

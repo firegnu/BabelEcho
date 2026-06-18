@@ -163,3 +163,67 @@ def test_adapt_to_chinese_rejects_chunk_response_with_missing_segment_id(
         assert "missing ids" in str(error)
     else:
         raise AssertionError("chunk response with a missing id should fail")
+
+
+def test_adapt_to_chinese_retries_chunk_response_with_missing_segment_id(
+    tmp_path: Path,
+    monkeypatch,
+):
+    run_paths = create_run(tmp_path, "retry-chunked-adapt-run")
+    write_json(
+        run_paths.normalized_transcript_json,
+        {
+            "episode_id": "retry-chunked-adapt-run",
+            "language": "en",
+            "segments": [
+                {
+                    "id": "0001",
+                    "start_ms": None,
+                    "end_ms": None,
+                    "speaker": "HOST",
+                    "text": "First sentence.",
+                    "source": "transcript",
+                },
+                {
+                    "id": "0002",
+                    "start_ms": None,
+                    "end_ms": None,
+                    "speaker": "GUEST",
+                    "text": "Second sentence.",
+                    "source": "transcript",
+                },
+            ],
+        },
+    )
+    calls = []
+
+    class FakeRetryBatchClient:
+        def adapt_segment(self, text: str) -> str:
+            raise AssertionError("chunked adapt should not call adapt_segment")
+
+        def adapt_segments(self, segments: list[dict]) -> list[dict]:
+            calls.append([segment["id"] for segment in segments])
+            if len(calls) == 1:
+                return [{"id": "0001", "text": "中文 0001"}]
+            return [
+                {"id": segment["id"], "text": f"中文 {segment['id']}"}
+                for segment in segments
+            ]
+
+    monkeypatch.setattr(
+        "babelecho.adapt.build_llm_client",
+        lambda _config: FakeRetryBatchClient(),
+    )
+
+    output = adapt_to_chinese(
+        run_paths,
+        {"provider": "fake"},
+        {"mode": "chunked", "chunk_max_segments": 10, "chunk_max_chars": 10_000},
+    )
+    data = read_json(output)
+
+    assert calls == [["0001", "0002"], ["0001", "0002"]]
+    assert [segment["text"] for segment in data["segments"]] == [
+        "中文 0001",
+        "中文 0002",
+    ]

@@ -1,4 +1,5 @@
 import subprocess
+import re
 
 from .jsonio import read_json
 from .paths import RunPaths
@@ -6,6 +7,32 @@ from .paths import RunPaths
 
 class CheckError(ValueError):
     pass
+
+
+TRANSCRIPT_ARTIFACT_PATTERNS = (
+    re.compile(r">>"),
+    re.compile(r"\bWEBVTT\b", re.IGNORECASE),
+    re.compile(r"</?c(?:\.[^>]*)?>", re.IGNORECASE),
+    re.compile(r"&(?:nbsp|amp|lt|gt|quot);", re.IGNORECASE),
+    re.compile(r"\d{2}:\d{2}:\d{2}[,.]\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}[,.]\d{3}"),
+    re.compile(r"```"),
+)
+ASCII_LETTER_RE = re.compile(r"[A-Za-z]")
+
+
+def _ascii_letter_ratio(text: str) -> float:
+    non_space_count = len("".join(text.split()))
+    if non_space_count == 0:
+        return 0.0
+    return len(ASCII_LETTER_RE.findall(text)) / non_space_count
+
+
+def _check_script_text_quality(segment_id: str, text: str) -> None:
+    if any(pattern.search(text) for pattern in TRANSCRIPT_ARTIFACT_PATTERNS):
+        raise CheckError(f"Script segment {segment_id} contains transcript artifact")
+    ascii_letters = len(ASCII_LETTER_RE.findall(text))
+    if ascii_letters >= 60 and _ascii_letter_ratio(text) >= 0.35:
+        raise CheckError(f"Script segment {segment_id} is English-heavy")
 
 
 def _check_script(run_paths: RunPaths, max_script_chars: int) -> dict:
@@ -25,6 +52,7 @@ def _check_script(run_paths: RunPaths, max_script_chars: int) -> dict:
                 f"Script segment {segment_id} is too long: "
                 f"{len(text)} > {max_script_chars}"
             )
+        _check_script_text_quality(str(segment_id), text)
     return {"script_segments": len(segments)}
 
 

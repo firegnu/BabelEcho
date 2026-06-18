@@ -243,7 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 def _raw_transcript_path(run_paths) -> Path:
     source = read_json(run_paths.source_json)
-    raw_transcript = source.get("raw_transcript")
+    raw_transcript = source.get("normalized_transcript_source") or source.get("raw_transcript")
     if not raw_transcript:
         raise ValueError(f"Missing raw_transcript in {run_paths.source_json}")
     return run_paths.run_dir / raw_transcript
@@ -317,6 +317,73 @@ def _format_speaker_voice_result(result: dict) -> str:
     elif result.get("reason"):
         message += f" ({result['reason']})"
     return message
+
+
+def _format_transcript_candidate_result(run_paths) -> list[str]:
+    candidates_path = run_paths.transcript_dir / "candidates.json"
+    if not candidates_path.exists():
+        return []
+    data = read_json(candidates_path)
+    candidates = data.get("candidates") or []
+    lines = [f"transcript candidates: {len(candidates)}"]
+    selected = data.get("selected")
+    if not selected:
+        lines.append("No usable transcript candidate found.")
+        for candidate in candidates:
+            reason = candidate.get("rejection_reason") or "not selected"
+            lines.append(f"- {candidate.get('source_type', 'unknown')}: {reason}")
+        return lines
+
+    source_type = selected.get("source_type", "unknown")
+    language = selected.get("language") or "unknown"
+    transcript_format = selected.get("format") or "unknown"
+    lines.append(
+        "selected transcript: "
+        f"{source_type}/{language}/{transcript_format} "
+        f"score={selected.get('score', 0)}"
+    )
+    warnings = selected.get("warnings") or []
+    if warnings:
+        lines.append(f"warnings: {', '.join(warnings)}")
+    cleaned_path = selected.get("cleaned_path")
+    if cleaned_path:
+        lines.append(f"cleaned transcript: {run_paths.run_dir / cleaned_path}")
+    return lines
+
+
+def _format_youtube_start_offset_result(run_paths) -> list[str]:
+    if not run_paths.source_json.exists():
+        return []
+    source = read_json(run_paths.source_json)
+    youtube_start_ms = source.get("youtube_start_ms")
+    if youtube_start_ms is None:
+        return []
+    return [f"start offset: {int(youtube_start_ms) // 1000}s"]
+
+
+def _format_transcript_quality_result(run_paths) -> list[str]:
+    quality_path = run_paths.transcript_quality_json
+    if not quality_path.exists():
+        return []
+    data = read_json(quality_path)
+    metrics = data.get("metrics") or {}
+    lines = [f"transcript quality: {data.get('recommendation', 'unknown')}"]
+    details = [
+        f"segments={metrics.get('segment_count', 0)}",
+        f"total_chars={metrics.get('total_chars', 0)}",
+        f"avg_chars={metrics.get('avg_chars_per_segment', 0)}",
+        f"max_chars={metrics.get('max_chars_per_segment', 0)}",
+        f"speakers={metrics.get('speaker_count', 0)}",
+        f"dirty_markup={metrics.get('dirty_markup_count', 0)}",
+        f"html_entities={metrics.get('html_entity_count', 0)}",
+        f"repeated_lines={metrics.get('repeated_line_score', 0)}",
+        f"repeated_phrases={metrics.get('repeated_phrase_score', 0)}",
+    ]
+    lines.append(f"quality metrics: {' '.join(details)}")
+    issues = data.get("reasons") or data.get("warnings") or []
+    if issues:
+        lines.append(f"quality issues: {', '.join(issues)}")
+    return lines
 
 
 def _podcast_index_api_config_from_args(args) -> dict:
@@ -455,16 +522,18 @@ def run_pipeline(
             lambda: ingest_transcript_source(source_config["source"], run_paths),
         )
         outputs.append(f"ingest: {raw_path}")
+        outputs.extend(_format_transcript_candidate_result(run_paths))
+        outputs.extend(_format_youtube_start_offset_result(run_paths))
 
     if stage_index <= PIPELINE_STAGES.index("normalize") <= stop_index:
         def normalize_stage() -> Path:
             nonlocal raw_path
-            if raw_path is None:
-                raw_path = _raw_transcript_path(run_paths)
+            raw_path = _raw_transcript_path(run_paths)
             return normalize_transcript(run_paths, raw_path)
 
         normalized_path = _run_stage(status, run_paths, "normalize", normalize_stage)
         outputs.append(f"normalize: {normalized_path}")
+        outputs.extend(_format_transcript_quality_result(run_paths))
 
     if stage_index <= PIPELINE_STAGES.index("adapt") <= stop_index:
         def adapt_stage() -> tuple[str, dict]:
@@ -565,6 +634,10 @@ def main(argv: list[str] | None = None) -> int:
         run_paths = create_run(args.workspace, args.run_id)
         output = normalize_transcript(run_paths, Path(args.raw_transcript))
         print(output)
+        for line in _format_youtube_start_offset_result(run_paths):
+            print(line)
+        for line in _format_transcript_quality_result(run_paths):
+            print(line)
         return 0
 
     if args.command == "publish":

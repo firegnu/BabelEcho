@@ -2,7 +2,7 @@
 
 BabelEcho is a local-first pipeline for converting English podcast transcripts into Chinese podcast audio.
 
-MVP-0 and MVP-0.5 are complete. MVP-1 now uses a fixed `sft_builtin_4role` voice-role profile: single-speaker scripts use `female_a` by default, explicit `male`/`男` labels use `male_a`, explicit `female`/`女` labels use `female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping across `female_a / male_a / female_b / male_b`. Rendering is hybrid local TTS: `male_a` uses `CosyVoice2-0.5B` cross-lingual synthesis at speed `1.1`, with a local calm prompt asset and male_a-only text smoothing when available, while `female_a`, `female_b`, and `male_b` use `CosyVoice-300M-SFT`. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
+MVP-0 and MVP-0.5 are complete. MVP-1 now uses a fixed `sft_builtin_4role` voice-role profile: single-speaker scripts use `female_a` by default, scripts with no speaker labels can set `speaker_voices.default_voice_role`, explicit `male`/`男` labels use `male_a`, explicit `female`/`女` labels use `female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping across `female_a / male_a / female_b / male_b`. Rendering is hybrid local TTS: `male_a` uses `CosyVoice2-0.5B` cross-lingual synthesis at speed `1.1`, with a local calm prompt asset and male_a-only text smoothing when available, while `female_a`, `female_b`, and `male_b` use `CosyVoice-300M-SFT`. The current focus is real podcast sources and common interview workflows beyond manually supplied transcripts.
 
 Current validation track: use DeepSeek API for the LLM adaptation baseline, then use the 5090D for local Chinese TTS. This is a temporary hybrid path to validate script quality and audio synthesis before replacing the cloud LLM with a local model.
 
@@ -19,11 +19,14 @@ The current pipeline supports:
 - On-demand single episode conversion with `babelecho episode convert`.
 - Manual transcript input with `babelecho run --transcript-file`.
 - Real podcast transcript sources from RSS `podcast:transcript`, iTunes RSS feed discovery, RSS episode selection, PodcastIndex episode metadata, PodcastIndex search/feed selection, first-party episode pages with public transcript text, and YouTube public captions.
+- YouTube single video or YouTube Podcasts episode URLs now write raw captions, cleaned captions, and `transcript/candidates.json`; fragmented VTT/SRT cues are cleaned and merged before `normalize`.
+- YouTube URLs with `t=` or `start=` keep the full raw/cleaned captions for traceability but crop `normalized.json` to the requested start offset.
+- `normalize` writes `transcript/quality.json` and prints a pre-DeepSeek quality summary with `safe_to_adapt`, `inspect_first`, or `reject` recommendations.
 - Chunked DeepSeek adaptation that batches complete transcript segments while preserving original segment ids and final script order.
 - Partial pipeline execution with `babelecho run --to-stage ...` and resume with `--from-stage ...`.
 - Chinese script preview with `babelecho script` before TTS.
 - Local terminology and pronunciation overrides before TTS with exact replacements.
-- Automatic TTS voice-role selection with hybrid local rendering: unlabeled single speaker uses `female_a`, explicit male/female single speakers use `male_a`/`female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping; only `male_a` is rendered by CosyVoice2 cross-lingual, and the other roles are rendered by 300M SFT.
+- Automatic TTS voice-role selection with hybrid local rendering: unlabeled single speaker uses `female_a`, scripts with no speaker labels can set `speaker_voices.default_voice_role`, explicit male/female single speakers use `male_a`/`female_a`, and 2+ speakers use stable `speaker -> voice_role` mapping; only `male_a` is rendered by CosyVoice2 cross-lingual, and the other roles are rendered by 300M SFT.
 - Basic artifact checks with `babelecho check`.
 - Run status tracking in `workspace/runs/<run-id>/run.json`.
 - File-based intermediate artifacts under `workspace/runs/<run-id>/`.
@@ -96,12 +99,14 @@ babelecho episode convert \
 
 Supported exact inputs in the first version:
 
-- YouTube URLs with public captions.
+- YouTube single video or YouTube Podcasts episode URLs with public captions. Playlist, channel, show, and subscription-style URLs are intentionally rejected for now.
 - Podcast episode pages with transcript text or a transcript link.
 - Existing `--source-config` YAML.
 - Local `--transcript-file`.
 
 If no transcript is available, the command fails clearly instead of falling back to ASR.
+
+For YouTube inputs, run to `normalize` first when validating a new URL. The CLI prints transcript candidate details plus quality metrics, and the full deterministic report is stored at `workspace/runs/<run-id>/transcript/quality.json`.
 
 The real 5090D run expects:
 

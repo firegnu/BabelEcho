@@ -55,6 +55,45 @@ VTT
     assert "https://www.youtube.com/watch?v=example" in args
 
 
+def test_fetch_youtube_captions_reads_printed_title(tmp_path: Path):
+    fake_yt_dlp = write_fake_yt_dlp(
+        tmp_path,
+        """#!/bin/sh
+for arg in "$@"; do
+  if [ "$arg" = "--print" ]; then
+    printf '%s\\n' 'Fixture YouTube Title'
+    exit 0
+  fi
+done
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    shift
+    out="$1"
+  fi
+  shift
+done
+file="${out%\\.%(ext)s}.en.vtt"
+cat > "$file" <<'VTT'
+WEBVTT
+
+00:00:00.000 --> 00:00:02.000
+Welcome to this YouTube episode.
+VTT
+""",
+    )
+
+    captions = fetch_youtube_captions(
+        {
+            "url": "https://www.youtube.com/watch?v=example",
+            "yt_dlp_command": str(fake_yt_dlp),
+        },
+        tmp_path / "captions",
+    )
+
+    assert captions.title == "Fixture YouTube Title"
+
+
 def test_fetch_youtube_captions_reports_missing_subtitle(tmp_path: Path):
     fake_yt_dlp = write_fake_yt_dlp(
         tmp_path,

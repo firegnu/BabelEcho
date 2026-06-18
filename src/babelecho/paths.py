@@ -26,6 +26,10 @@ class RunPaths:
         return self.transcript_dir / "normalized.json"
 
     @property
+    def transcript_quality_json(self) -> Path:
+        return self.transcript_dir / "quality.json"
+
+    @property
     def chinese_script_json(self) -> Path:
         return self.script_dir / "zh.json"
 

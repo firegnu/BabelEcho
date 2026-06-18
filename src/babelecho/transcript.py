@@ -1,8 +1,9 @@
 import re
 from pathlib import Path
 
-from .jsonio import write_json
+from .jsonio import read_json, write_json
 from .paths import RunPaths
+from .transcript_quality import write_transcript_quality
 
 TIME_RE = re.compile(
     r"(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s+-->\s+"
@@ -47,8 +48,14 @@ def _segment(
     }
 
 
-def _split_speaker_turns(text: str) -> list[tuple[str | None, str]]:
+def _split_speaker_turns(
+    text: str,
+    *,
+    infer_speaker_labels: bool = True,
+) -> list[tuple[str | None, str]]:
     normalized = " ".join(text.split())
+    if not infer_speaker_labels:
+        return [(None, normalized)]
     matches = list(SPEAKER_LABEL_RE.finditer(normalized))
     if not matches:
         return [(None, normalized)]
@@ -74,9 +81,13 @@ def _segments_from_text(
     text: str,
     start_ms: int | None,
     end_ms: int | None,
+    *,
+    infer_speaker_labels: bool = True,
 ) -> list[dict]:
     segments = []
-    for offset, (speaker, segment_text) in enumerate(_split_speaker_turns(text)):
+    for offset, (speaker, segment_text) in enumerate(
+        _split_speaker_turns(text, infer_speaker_labels=infer_speaker_labels)
+    ):
         segments.append(
             _segment(
                 first_segment_id + offset,
@@ -93,7 +104,7 @@ def _is_stage_marker(text: str) -> bool:
     return bool(STAGE_MARKER_RE.fullmatch(" ".join(text.split())))
 
 
-def parse_plain_text(content: str) -> list[dict]:
+def parse_plain_text(content: str, *, infer_speaker_labels: bool = True) -> list[dict]:
     paragraphs = [
         part.strip() for part in re.split(r"\n\s*\n", content) if part.strip()
     ]
@@ -101,7 +112,10 @@ def parse_plain_text(content: str) -> list[dict]:
     last_speaker: str | None = None
     can_inherit_speaker = False
     for paragraph in paragraphs:
-        turns = _split_speaker_turns(paragraph)
+        turns = _split_speaker_turns(
+            paragraph,
+            infer_speaker_labels=infer_speaker_labels,
+        )
         if (
             len(turns) == 1
             and turns[0][0] is None
@@ -135,7 +149,7 @@ def parse_plain_text(content: str) -> list[dict]:
     return segments
 
 
-def parse_timed_text(content: str) -> list[dict]:
+def parse_timed_text(content: str, *, infer_speaker_labels: bool = True) -> list[dict]:
     blocks = re.split(r"\n\s*\n", content.strip())
     segments: list[dict] = []
     for block in blocks:
@@ -159,19 +173,63 @@ def parse_timed_text(content: str) -> list[dict]:
                 " ".join(text_lines),
                 parse_timestamp_ms(match.group("start")),
                 parse_timestamp_ms(match.group("end")),
+                infer_speaker_labels=infer_speaker_labels,
             )
         )
     return segments
+
+
+def _infer_speaker_labels_for_run(run_paths: RunPaths) -> bool:
+    if not run_paths.source_json.exists():
+        return True
+    source = read_json(run_paths.source_json)
+    return source.get("source_type") != "youtube_captions"
+
+
+def _youtube_start_ms_for_run(run_paths: RunPaths) -> int | None:
+    if not run_paths.source_json.exists():
+        return None
+    source = read_json(run_paths.source_json)
+    if source.get("source_type") != "youtube_captions":
+        return None
+    value = source.get("youtube_start_ms")
+    if value is None:
+        return None
+    return int(value)
+
+
+def _renumber_segments(segments: list[dict]) -> list[dict]:
+    return [
+        {
+            **segment,
+            "id": f"{index:04d}",
+        }
+        for index, segment in enumerate(segments, start=1)
+    ]
+
+
+def _apply_youtube_start_offset(run_paths: RunPaths, segments: list[dict]) -> list[dict]:
+    youtube_start_ms = _youtube_start_ms_for_run(run_paths)
+    if youtube_start_ms is None:
+        return segments
+    kept = [
+        segment
+        for segment in segments
+        if segment.get("end_ms") is None or int(segment["end_ms"]) > youtube_start_ms
+    ]
+    return _renumber_segments(kept)
 
 
 def normalize_transcript(run_paths: RunPaths, raw_path: str | Path) -> Path:
     source = Path(raw_path)
     content = source.read_text(encoding="utf-8")
     suffix = source.suffix.lower()
+    infer_speaker_labels = _infer_speaker_labels_for_run(run_paths)
     if suffix in {".vtt", ".srt"}:
-        segments = parse_timed_text(content)
+        segments = parse_timed_text(content, infer_speaker_labels=infer_speaker_labels)
     else:
-        segments = parse_plain_text(content)
+        segments = parse_plain_text(content, infer_speaker_labels=infer_speaker_labels)
+    segments = _apply_youtube_start_offset(run_paths, segments)
     if not segments:
         raise ValueError(f"No transcript segments parsed from {source}")
     output = {
@@ -180,4 +238,5 @@ def normalize_transcript(run_paths: RunPaths, raw_path: str | Path) -> Path:
         "segments": segments,
     }
     write_json(run_paths.normalized_transcript_json, output)
+    write_transcript_quality(run_paths, run_paths.normalized_transcript_json)
     return run_paths.normalized_transcript_json

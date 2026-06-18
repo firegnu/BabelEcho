@@ -1,6 +1,6 @@
 # BabelEcho Roadmap
 
-日期：2026-06-18
+日期：2026-06-19
 
 ## 目的
 
@@ -92,9 +92,13 @@
 - 已支持 RSS item 内的 `podcast:transcript`。
 - 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D TTS 生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
 - 已支持 `adapt.mode: chunked`：DeepSeek 改写可按完整 segment 聚合 chunk 批量调用，chunk 不切断 segment，返回按原始 id 校验和重建 `script/zh.json`，TTS 不依赖 chunk 顺序。
+- `babelecho check --checks script` 会在 TTS 前拦截中文脚本中的 transcript artifact 和明显整段英文残留，避免脏稿直接进入 TTS。
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - 已选定 MVP-1 固定角色 TTS 规则：默认规则仍可按 speaker 首次出现顺序稳定映射，启用 `speaker_voices.mode: infer_once` 后会每集最多调用一次 LLM 推断 speaker 的 `male/female/unknown` 方向，再由代码映射到具体 `voice_role`。
 - `sft_builtin_4role` 现在是混合本地渲染：`female_a -> 300M SFT 中文女`、`male_a -> CosyVoice2 cross_lingual speed 1.1 + calm prompt if present + text smoothing`、`female_b -> 300M SFT 英文女`、`male_b -> 300M SFT 英文男`；它不做原主播 voice clone。
+- 对没有 speaker 标签的 YouTube captions 类点播 run，已支持用 `speaker_voices.default_voice_role` 手动指定 `male_a` / `female_a` 等默认角色；该配置只在脚本没有任何 speaker 时生效，不覆盖多人播客已有的 speaker 映射。
+- YouTube 用户 URL `youtube-user-yai8osncmnw-start1521-20260618` 已完成 5090D 完整男声 TTS：223 段全部 `male_a`，最终 MP3 为 `22050 Hz` mono，约 `2602.8s`，已拷回本机 ignored run 目录；用户听检认为整体可接受。
+- 近期 agent 主题 YouTube 端到端样本 `youtube-agent-skills-briefing-20260619` 已完成：normalized 28 段，quality=`safe_to_adapt`，DeepSeek adapt 和 script QA 通过，5090D TTS 默认 `female_a`，最终 MP3 为 `22050 Hz` mono，约 `543.8s`；用户试听反馈“听起来很不错”。
 - 2026-06-18 的 Practical AI `Model Context Protocol Deep Dive` 点播实跑已通过完整路径：来源 transcript -> chunked DeepSeek -> 每集一次 speaker role 推断 -> 混合本地 TTS -> MP3/RSS；用户试听反馈“基本还可以”。当前规则继续沿用，不再为 MVP-1 阻塞音色实验。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中同名 speaker 复用同一角色；LLM 推断的 `male/female` 会分别进入男/女角色池，`unknown` 和推断失败会自动兜底到具体角色，不要求人工介入。
 - 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
@@ -104,8 +108,9 @@
 - 已支持第一版 iTunes feed discovery：`babelecho itunes search --query ...` 可从 iTunes Search API 找 podcast RSS `feedUrl`，并写出 `source.type=podcast_rss`。
 - 已支持第一版 RSS episode selection：`babelecho rss episodes --feed-url ...` 可列出 feed 内 episodes，标记 transcript yes/no，并把选中 episode 写成 `source.type=podcast_rss`。
 - 已支持第一版 `source.type=youtube_captions`：用 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
+- 已完成 YouTube 单链接 pre-DeepSeek 清洗和质量门槛第一版：`babelecho episode convert --url ... --to-stage normalize` 对单个 YouTube 视频或 YouTube Podcasts 单集 URL 写出 `transcript/raw.vtt`、`transcript/cleaned.vtt`、`transcript/candidates.json`、`transcript/normalized.json` 和 `transcript/quality.json`；带 `t=` / `start=` 的 URL 会记录 `youtube_start_ms` 并裁剪 normalized 输入；YouTube 标题会写入 source metadata；CLI 会输出 `safe_to_adapt` / `inspect_first` / `reject` 建议和关键指标；字幕说话人箭头 `>>` 会在 deterministic cleaning 阶段移除；会拒绝 playlist/channel/show 类 URL，不做订阅扫描。
 - 点播式单集转换入口已完成：用户给一个 episode URL、已有 source YAML 或 transcript file，系统只转换这一集。
-- 当前真实瓶颈已转移到 transcript discovery / cleaning：不少用户想听的 episode 不是拿不到 transcript，就是拿到后 HTML / captions / speaker 格式不稳定。下一步已拆成 `02.09 Transcript Candidate Cleaning`。
+- YouTube 单链接探索已先收口；当前真实瓶颈转向标准播客点播来源对接：YouTube Podcasts 单集、RSS/iTunes feed、PodcastIndex episode 和官网 episode 页面之间的 URL 归一、transcript discovery、candidate 选择和清洗诊断。
 - 多 episode 批处理和跳过已处理 episode 后移，不作为当前主流程。
 - Spotify 和 Apple Podcasts 页面不在 `episode_page` 范围内；YouTube 只走字幕 source，不走页面正文解析。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
@@ -152,15 +157,15 @@
 - 后续固定音色扩展：先明确替换或新增哪个固定 role；它是固定音色扩展，不是原主播 voice clone。
 - 微调 `CosyVoice-300M-SFT`，目标是增加多个可长期使用的中文男声和中文女声，逐步减少当前借用 `英文女` / `英文男` speaker id 作为中文角色的临时性，并在试听确认后再决定是否替换现有 `male_a` CosyVoice2 路线。
 - 本地 LLM 替代 DeepSeek。
-- ASR fallback，用于没有 transcript 的 episode。
+- ASR fallback，用于没有 transcript 的 episode。ASR 和 speaker diarization / 声纹分离应作为同一个后期音频输入阶段来设计：ASR 解决“说了什么”，diarization 解决“谁在说”。两者结合后生成带 `speaker_1` / `speaker_2` 时间段的结构化 transcript，再进入现有 `normalize -> adapt -> TTS` 链路。
+- Speaker diarization / 声纹分离只用于多人音频的说话人分段和固定中文音色映射，不默认做真实身份识别，也不等同于原主播 voice clone。
 - 原主播 voice clone。
-- 更精细的 speaker diarization。
 - Web 管理后台。
 - macOS thin client。
 - 封面、章节、响度归一、时间轴对齐等发布增强。
 
 ## 当前最高优先级
 
-1. 执行 `docs/plans/02-real-podcasts/09-transcript-candidate-cleaning.md`：增加 transcript candidates、评分、清洗、YouTube captions 合并和 HTML speaker 修复。
-2. 继续以点播式单集转换为主入口，先把“拿到干净 transcript”的成功率做上去，再做搜索式 episode 选择。
+1. 继续以点播式单集转换为主入口，下一步转向标准播客来源：YouTube Podcasts 单集 URL、iTunes/RSS feed、PodcastIndex episode 和官网 episode 页面。
+2. 先对用户提供的单个标准播客 URL 做 `normalize` 前后的候选发现、transcript 质量验证和失败诊断；YouTube 单链接清洗已经完成第一版，暂不继续扩展。
 3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。

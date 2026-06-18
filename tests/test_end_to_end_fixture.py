@@ -79,6 +79,13 @@ def run_route_server(routes: dict[str, str]):
     return server
 
 
+def write_fake_yt_dlp(tmp_path: Path, body: str) -> Path:
+    script = tmp_path / "fake-yt-dlp"
+    script.write_text(body, encoding="utf-8")
+    script.chmod(0o755)
+    return script
+
+
 def test_end_to_end_fixture_pipeline(tmp_path: Path):
     workspace = tmp_path / "workspace"
     source_config = tmp_path / "source.yaml"
@@ -134,9 +141,88 @@ publish:
             check=False,
         )
         assert result.returncode == 0, result.stderr
+        if command[0] == "normalize":
+            assert "transcript quality:" in result.stdout
+            assert "quality metrics:" in result.stdout
 
     assert (workspace / "runs" / "demo" / "script" / "zh.json").exists()
     assert (workspace / "runs" / "demo" / "segments" / "0001.wav").exists()
+
+
+def test_run_pipeline_uses_cleaned_youtube_transcript_for_normalize(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    source_config = tmp_path / "youtube-source.yaml"
+    local_config = tmp_path / "local.yaml"
+    fake_yt_dlp = write_fake_yt_dlp(
+        tmp_path,
+        """#!/bin/sh
+out=""
+while [ "$#" -gt 0 ]; do
+  if [ "$1" = "-o" ]; then
+    shift
+    out="$1"
+  fi
+  shift
+done
+file="${out%\\.%(ext)s}.en.vtt"
+cat > "$file" <<'VTT'
+WEBVTT
+
+00:00:00.000 --> 00:00:01.000
+AI agents
+
+00:00:01.200 --> 00:00:02.000
+can call tools.
+VTT
+""",
+    )
+    source_config.write_text(
+        f"""
+source:
+  type: youtube_captions
+  url: "https://www.youtube.com/watch?v=abc123&t=1s"
+  language: "en"
+  yt_dlp_command: "{fake_yt_dlp}"
+""",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    output = run_pipeline(
+        str(workspace),
+        "youtube-normalize",
+        str(source_config),
+        str(local_config),
+        "ingest",
+        "normalize",
+    )
+
+    run_dir = workspace / "runs" / "youtube-normalize"
+    source = read_json(run_dir / "source.json")
+    normalized = read_json(run_dir / "transcript" / "normalized.json")
+    assert source["raw_transcript"] == "transcript/raw.vtt"
+    assert source["normalized_transcript_source"] == "transcript/cleaned.vtt"
+    assert source["youtube_start_ms"] == 1_000
+    assert len(normalized["segments"]) == 1
+    assert normalized["segments"][0]["text"] == "AI agents can call tools."
+    assert "transcript candidates: 1" in output
+    assert "start offset: 1s" in output
+    assert "selected transcript: youtube_captions/en/vtt score=" in output
+    assert "warnings: short transcript" in output
+    assert "cleaned transcript:" in output
+    assert "transcript/cleaned.vtt" in output
+    assert "transcript quality:" in output
+    assert "quality metrics:" in output
 
 
 def test_run_command_executes_fixture_pipeline(tmp_path: Path):

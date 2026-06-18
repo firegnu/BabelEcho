@@ -89,6 +89,7 @@ def _adapt_segments_in_chunks(
     client = build_llm_client(llm_config)
     max_segments = max(1, int(adapt_config.get("chunk_max_segments", 20)))
     max_chars = max(1, int(adapt_config.get("chunk_max_chars", 8000)))
+    retry_attempts = max(1, int(adapt_config.get("chunk_retry_attempts", 2)))
     chunks = _chunk_segments(transcript["segments"], max_segments, max_chars)
     chunk_dir = run_paths.script_dir / "adapt-chunks"
     chunk_dir.mkdir(parents=True, exist_ok=True)
@@ -102,8 +103,17 @@ def _adapt_segments_in_chunks(
             }
             for segment in chunk
         ]
-        adapted_segments = client.adapt_segments(payload)
-        chunk_result = _validate_chunk_response(chunk, adapted_segments, index)
+        last_error: ValueError | None = None
+        for _attempt in range(retry_attempts):
+            adapted_segments = client.adapt_segments(payload)
+            try:
+                chunk_result = _validate_chunk_response(chunk, adapted_segments, index)
+                break
+            except ValueError as error:
+                last_error = error
+        else:
+            assert last_error is not None
+            raise last_error
         adapted_by_id.update(chunk_result)
         write_json(
             chunk_dir / f"chunk-{index:04d}.json",
