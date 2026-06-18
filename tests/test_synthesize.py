@@ -194,9 +194,9 @@ def test_sft_builtin_4role_profile_assigns_stable_roles(monkeypatch, tmp_path: P
 
     assert [item["voice_role"] for item in captured["items"]] == [
         "female_a",
-        "male_b",
-        "female_b",
         "male_a",
+        "female_b",
+        "male_b",
         "female_a",
     ]
     manifest = read_json(manifest_path)
@@ -209,9 +209,9 @@ def test_sft_builtin_4role_profile_assigns_stable_roles(monkeypatch, tmp_path: P
     ]
     assert [segment["voice_role"] for segment in manifest["segments"]] == [
         "female_a",
-        "male_b",
-        "female_b",
         "male_a",
+        "female_b",
+        "male_b",
         "female_a",
     ]
 
@@ -311,7 +311,7 @@ def test_multi_speaker_script_auto_selects_sft_builtin_4role(monkeypatch, tmp_pa
     assert captured["tts_config"]["voice"] == "sft_builtin_4role"
     assert "mode" not in captured["tts_config"]
     assert "prompt_wav" not in captured["tts_config"]
-    assert [item["voice_role"] for item in captured["items"]] == ["female_a", "male_b"]
+    assert [item["voice_role"] for item in captured["items"]] == ["female_a", "male_a"]
 
 
 def test_single_unspecified_speaker_auto_selects_sft_female_default(monkeypatch, tmp_path: Path):
@@ -397,10 +397,10 @@ def test_single_explicit_male_speaker_auto_selects_sft_male_voice(monkeypatch, t
     assert captured["tts_config"]["voice"] == "sft_builtin_4role"
     assert "mode" not in captured["tts_config"]
     assert "prompt_wav" not in captured["tts_config"]
-    assert [item["voice_role"] for item in captured["items"]] == ["male_b", "male_b"]
+    assert [item["voice_role"] for item in captured["items"]] == ["male_a", "male_a"]
     manifest = read_json(manifest_path)
     assert manifest["tts_voice"] == "sft_builtin_4role"
-    assert [segment["voice_role"] for segment in manifest["segments"]] == ["male_b", "male_b"]
+    assert [segment["voice_role"] for segment in manifest["segments"]] == ["male_a", "male_a"]
 
 
 def test_single_explicit_female_speaker_auto_selects_sft_female_voice(monkeypatch, tmp_path: Path):

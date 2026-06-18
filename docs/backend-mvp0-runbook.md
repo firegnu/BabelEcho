@@ -62,7 +62,7 @@ tts:
 For MVP-1, the deployment default uses only `CosyVoice-300M-SFT`:
 
 - 0/1 distinct speaker without an explicit gender marker: use `female_a`.
-- 1 distinct speaker labeled with `male` or `男`: use `male_b`.
+- 1 distinct speaker labeled with `male` or `男`: use `male_a`.
 - 1 distinct speaker labeled with `female` or `女`: use `female_a`.
 - 2+ distinct speakers: use first-appearance mapping across the four roles.
 
@@ -78,8 +78,8 @@ tts:
   output_format: "wav"
 ```
 
-This profile maps script speakers by first appearance to `female_a`, `male_b`,
-`female_b`, and `male_a`, backed by `中文女`, `英文男`, `英文女`, and `中文男`.
+This profile maps script speakers by first appearance to `female_a`, `male_a`,
+`female_b`, and `male_b`, backed by `中文女`, `中文男`, `英文女`, and `英文男`.
 It is fixed-speaker synthesis, not original-host voice cloning.
 If `model_dir` is not set, the wrapper defaults to
 `<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for this profile.

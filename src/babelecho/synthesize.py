@@ -4,7 +4,7 @@ from .speaker_voices import load_speaker_voice_roles
 from .tts import synthesize_many_to_wav
 
 
-SFT_BUILTIN_4ROLE_SEQUENCE = ["female_a", "male_b", "female_b", "male_a"]
+SFT_BUILTIN_4ROLE_SEQUENCE = ["female_a", "male_a", "female_b", "male_b"]
 SINGLE_SPEAKER_KEYS = {"mode", "prompt_text", "prompt_wav"}
 FEMALE_SPEAKER_MARKERS = ("female", "woman", "女")
 MALE_SPEAKER_MARKERS = ("male", "man", "男")
@@ -38,7 +38,7 @@ def _single_speaker_role(segments: list[dict]) -> str:
     if any(marker in speaker_key for marker in FEMALE_SPEAKER_MARKERS):
         return "female_a"
     if any(marker in speaker_key for marker in MALE_SPEAKER_MARKERS):
-        return "male_b"
+        return "male_a"
     return "female_a"
 
 

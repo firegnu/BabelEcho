@@ -20,12 +20,16 @@ SFT_ROLE_SPEAKERS = {
 SFT_ROLE_FILTERS = {
     "female_a": "highpass=f=70,loudnorm=I=-19:TP=-1.5:LRA=8:linear=false",
     "male_a": (
-        "highpass=f=100,"
-        "equalizer=f=180:t=q:w=1.0:g=-3.0,"
-        "equalizer=f=500:t=q:w=1.0:g=-2.0,"
-        "equalizer=f=3500:t=q:w=1.0:g=5.0,"
-        "equalizer=f=7500:t=q:w=1.0:g=3.0,"
-        "loudnorm=I=-18.8:TP=-1.2:LRA=8:linear=false"
+        "volume=-4dB,"
+        "highpass=f=150,"
+        "equalizer=f=180:t=q:w=1.0:g=-4,"
+        "equalizer=f=340:t=q:w=1.0:g=-3.2,"
+        "equalizer=f=650:t=q:w=1.1:g=-2.2,"
+        "equalizer=f=3000:t=q:w=1.0:g=3.2,"
+        "equalizer=f=4500:t=q:w=1.0:g=4.0,"
+        "equalizer=f=6500:t=q:w=1.0:g=2.2,"
+        "equalizer=f=9000:t=q:w=1.0:g=1.4,"
+        "loudnorm=I=-18.5:TP=-1.2:LRA=8:linear=false"
     ),
     "female_b": "highpass=f=70,loudnorm=I=-19:TP=-1.5:LRA=8:linear=false",
     "male_b": "highpass=f=70,loudnorm=I=-19:TP=-1.5:LRA=8:linear=false",

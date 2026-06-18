@@ -6,9 +6,9 @@ from .llm import build_llm_client
 from .paths import RunPaths
 
 
-VOICE_ROLES = ("female_a", "male_b", "female_b", "male_a")
+VOICE_ROLES = ("female_a", "male_a", "female_b", "male_b")
 FEMALE_VOICE_ROLES = ("female_a", "female_b")
-MALE_VOICE_ROLES = ("male_b", "male_a")
+MALE_VOICE_ROLES = ("male_a", "male_b")
 VALID_GENDERS = {"male", "female", "unknown"}
 
 

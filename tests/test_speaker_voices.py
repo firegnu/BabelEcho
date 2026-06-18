@@ -68,7 +68,7 @@ def test_infer_speaker_voices_writes_concrete_roles_and_reuses_existing_file(
     assert [speaker["speaker"] for speaker in calls[0]] == ["ROMAN MARS", "VIVIAN LE", "TAYA"]
     data = read_json(result["path"])
     assert data["speaker_voices"] == {
-        "ROMAN MARS": "male_b",
+        "ROMAN MARS": "male_a",
         "VIVIAN LE": "female_a",
         "TAYA": "female_b",
     }

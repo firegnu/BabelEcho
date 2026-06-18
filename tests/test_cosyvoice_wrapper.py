@@ -413,4 +413,19 @@ def test_synthesize_sft_builtin_4role_uses_item_voice_roles(monkeypatch, tmp_pat
         "-i",
     ]
     assert str(tmp_path / "0001.raw.wav") in ffmpeg_calls[0][0]
+    filter_index = ffmpeg_calls[0][0].index("-af") + 1
+    assert ffmpeg_calls[0][0][filter_index] == (
+        "volume=-4dB,"
+        "highpass=f=150,"
+        "equalizer=f=180:t=q:w=1.0:g=-4,"
+        "equalizer=f=340:t=q:w=1.0:g=-3.2,"
+        "equalizer=f=650:t=q:w=1.1:g=-2.2,"
+        "equalizer=f=3000:t=q:w=1.0:g=3.2,"
+        "equalizer=f=4500:t=q:w=1.0:g=4.0,"
+        "equalizer=f=6500:t=q:w=1.0:g=2.2,"
+        "equalizer=f=9000:t=q:w=1.0:g=1.4,"
+        "loudnorm=I=-18.5:TP=-1.2:LRA=8:linear=false,"
+        "aresample=22050,"
+        "asetpts=N/SR/TB"
+    )
     assert str(output) == ffmpeg_calls[0][0][-1]
