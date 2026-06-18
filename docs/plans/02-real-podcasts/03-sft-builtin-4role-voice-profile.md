@@ -12,7 +12,7 @@
 
 ```text
 0/1 speaker without explicit gender marker -> CosyVoice-300M-SFT female_a
-1 speaker labeled male/男 -> CosyVoice-300M-SFT male_a
+1 speaker labeled male/男 -> CosyVoice-300M-SFT male_b
 1 speaker labeled female/女 -> CosyVoice-300M-SFT female_a
 2+ speakers -> stable voice role -> CosyVoice-300M-SFT speaker id -> wav segment
 ```
@@ -24,7 +24,7 @@
 最终规则：
 
 - `script/zh.json` 中检测到 0 或 1 个 distinct speaker，且没有显式性别标签：使用 `female_a`。
-- 单个 speaker 标签包含 `male` 或 `男`：使用 `male_a`。
+- 单个 speaker 标签包含 `male` 或 `男`：使用 `male_b`。
 - 单个 speaker 标签包含 `female` 或 `女`：使用 `female_a`。
 - 检测到 2 个及以上 distinct speaker：按首次出现顺序映射到四个固定角色。
 
@@ -33,9 +33,9 @@
 | Voice role | SFT speaker id | 用途 |
 | --- | --- | --- |
 | `female_a` | `中文女` | 第 1 个 speaker |
-| `male_a` | `中文男` | 第 2 个 speaker |
+| `male_b` | `英文男` | 第 2 个 speaker |
 | `female_b` | `英文女` | 第 3 个 speaker |
-| `male_b` | `英文男` | 第 4 个 speaker |
+| `male_a` | `中文男` | 第 4 个 speaker |
 
 用户试听结论：
 
@@ -49,17 +49,17 @@ In:
 
 - 新增 `tts.voice: sft_builtin_4role` profile。
 - 默认配置写 `tts.voice: sft_builtin_4role`；`synthesize` 也会把旧的 `default-zh` 配置覆盖到 `sft_builtin_4role`，避免运行时依赖 CosyVoice2。
-- 单个 speaker 标签包含 `male` / `男` 时固定分配到 `male_a`；包含 `female` / `女` 或没有显式性别标签时固定分配到 `female_a`。
+- 单个 speaker 标签包含 `male` / `男` 时固定分配到 `male_b`；包含 `female` / `女` 或没有显式性别标签时固定分配到 `female_a`。
 - `synthesize` 按 `script/zh.json` 里 speaker 首次出现顺序分配角色：
   - 第 1 个 speaker -> `female_a`
-  - 第 2 个 speaker -> `male_a`
+  - 第 2 个 speaker -> `male_b`
   - 第 3 个 speaker -> `female_b`
-  - 第 4 个 speaker -> `male_b`
+  - 第 4 个 speaker -> `male_a`
   - 第 5 个及以后按四角色循环复用
 - 同一个 speaker 在同一 run 中始终复用同一个 voice role。
 - batch manifest item 记录每段 `voice_role`。
 - wrapper 对 `sft_builtin_4role` 使用 `CosyVoice.inference_sft`，并对各段做固定响度处理。
-- `male_a` 使用更明亮的 EQ 和响度处理，避免 `中文男` 偏闷、偏小。
+- 真实点播 run 中 `male_a` 作为男一偏低沉；当前男声优先顺序改为 `male_b -> male_a`。
 
 Out:
 
@@ -117,7 +117,7 @@ tts:
 已覆盖：
 
 - 0/1 个 speaker 且没有显式性别标签时使用 `sft_builtin_4role` / `female_a`。
-- 单个 speaker 标签包含 `male` / `男` 时使用 `sft_builtin_4role` / `male_a`。
+- 单个 speaker 标签包含 `male` / `男` 时使用 `sft_builtin_4role` / `male_b`。
 - 单个 speaker 标签包含 `female` / `女` 时使用 `sft_builtin_4role` / `female_a`。
 - 2 个及以上 speaker 会使用 `sft_builtin_4role` 的四角色映射。
 - `synthesize` 按 speaker 首次出现顺序稳定分配四角色。

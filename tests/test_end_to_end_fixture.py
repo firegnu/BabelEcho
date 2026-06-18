@@ -357,12 +357,12 @@ publish:
     manifest = read_json(run_dir / "segments" / "manifest.json")
     assert "speaker voices: created" in output
     assert speaker_voices["speaker_voices"] == {
-        "MaleHost": "male_a",
+        "MaleHost": "male_b",
         "FemaleGuest": "female_a",
         "NeutralGuest": "female_b",
     }
     assert [segment["voice_role"] for segment in manifest["segments"]] == [
-        "male_a",
+        "male_b",
         "female_a",
         "female_b",
     ]
