@@ -97,6 +97,7 @@
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中按 speaker 首次出现顺序分配 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
 - 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
 - 后续仍需接入 PodcastIndex API 鉴权/请求，或从 episode 页面解析 transcript 链接。
+- `episode_page` 来源扩展已拆成计划：`docs/plans/02-real-podcasts/04-episode-page-transcript-source/`。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
 - 支持 speaker label 解析、人工 speaker 修正文件和缺失 speaker 的回退策略。

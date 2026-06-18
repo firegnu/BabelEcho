@@ -12,6 +12,7 @@
 
 - 大计划目录：`NN-topic/`
 - 子计划文件：`NN-short-name.md`
+- 如果某个子计划本身需要拆成一组可执行小计划，可以新增 `NN-topic/` 子目录，目录内用 `README.md` 描述大计划，再用 `NN-short-name.md` 保存小计划。
 
 例如：
 
@@ -24,6 +25,10 @@ docs/plans/
   02-publish-and-app/
     01-static-feed-hosting.md
     02-macos-reader-app.md
+  02-real-podcasts/
+    04-episode-page-transcript-source/
+      README.md
+      01-episode-page-transcript-only.md
 ```
 
 对应关系：
@@ -63,6 +68,8 @@ docs/plans/
 - [02.01 Real Podcast Transcript Source Input](./02-real-podcasts/01-real-podcast-transcript-source.md) - `done`
 - [02.02 Public RSS End-to-End Real Run](./02-real-podcasts/02-public-rss-real-run.md) - `done`
 - [02.03 SFT Built-in 4-role Voice Profile](./02-real-podcasts/03-sft-builtin-4role-voice-profile.md) - `done`
+- [02.04 Episode Page Transcript Source](./02-real-podcasts/04-episode-page-transcript-source/README.md) - `ready`
+  - [02.04.01 Episode Page Transcript-only Ingest](./02-real-podcasts/04-episode-page-transcript-source/01-episode-page-transcript-only.md) - `ready`
 
 ### Deferred Voice Work
 

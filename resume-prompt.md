@@ -224,7 +224,7 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 
 下一步继续 MVP-1 Real Podcasts：
 
-1. 继续扩展真实来源：在已支持 PodcastIndex episode JSON 的基础上，接入 PodcastIndex API 鉴权/请求，或支持 episode 页面提供的 transcript 链接。
+1. 继续扩展真实来源：优先按 `docs/plans/02-real-podcasts/04-episode-page-transcript-source/` 实现 `source.type=episode_page`，之后再接入 PodcastIndex API 鉴权/请求。
 2. 在真实 RSS run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
 3. 支持多 episode feed，跳过已处理 episode。
 
