@@ -1,0 +1,7 @@
+source:
+  type: podcast_index_api
+  endpoint: episodes/byid
+  episode_id: 123456
+  api_key_env: PODCASTINDEX_API_KEY
+  api_secret_env: PODCASTINDEX_API_SECRET
+  user_agent: "BabelEcho/0.1"

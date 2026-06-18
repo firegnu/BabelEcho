@@ -1,10 +1,39 @@
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from threading import Thread
+from urllib.parse import parse_qs, urlparse
 
 import pytest
 
 from babelecho.ingest import ingest_transcript_source
 from babelecho.jsonio import read_json
 from babelecho.paths import create_run
+
+
+def run_podcast_index_api_server(response_body: str):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.server.requests.append(
+                {
+                    "path": self.path,
+                    "headers": dict(self.headers),
+                }
+            )
+            encoded = response_body.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, format, *args):
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    server.requests = []
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 
 def write_feed(path: Path, transcript_url: str | None) -> None:
@@ -149,3 +178,64 @@ def test_ingest_podcast_index_episode_falls_back_to_transcript_url(tmp_path: Pat
     assert source["transcript_url"] == str(transcript)
     assert source["title"] == "PodcastIndex Fallback Episode"
     assert source["original_url"] == "episode-guid-2"
+
+
+def test_ingest_podcast_index_api_episode_by_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    monkeypatch.setenv("PODCASTINDEX_API_KEY", "api-key")
+    monkeypatch.setenv("PODCASTINDEX_API_SECRET", "api-secret")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    transcript = tmp_path / "episode.txt"
+    transcript.write_text("API transcript", encoding="utf-8")
+    server = run_podcast_index_api_server(
+        f"""{{
+  "episode": {{
+    "title": "API Episode",
+    "link": "https://example.com/api-episode",
+    "transcripts": [
+      {{
+        "url": "{transcript}",
+        "type": "text/plain"
+      }}
+    ]
+  }}
+}}
+"""
+    )
+    try:
+        run_paths = create_run(tmp_path / "workspace", "pi-api-demo")
+
+        raw_path = ingest_transcript_source(
+            {
+                "type": "podcast_index_api",
+                "api_base_url": f"http://127.0.0.1:{server.server_port}/api/1.0",
+                "endpoint": "episodes/byid",
+                "episode_id": 123,
+                "api_key_env": "PODCASTINDEX_API_KEY",
+                "api_secret_env": "PODCASTINDEX_API_SECRET",
+                "user_agent": "BabelEchoTest/0.1",
+            },
+            run_paths,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    request = server.requests[0]
+    parsed = urlparse(request["path"])
+    source = read_json(run_paths.source_json)
+    assert parse_qs(parsed.query) == {"id": ["123"], "fulltext": ["true"]}
+    assert request["headers"]["User-Agent"] == "BabelEchoTest/0.1"
+    assert request["headers"]["X-Auth-Key"] == "api-key"
+    assert request["headers"]["X-Auth-Date"]
+    assert request["headers"]["Authorization"]
+    assert raw_path == run_paths.transcript_dir / "raw.txt"
+    assert raw_path.read_text(encoding="utf-8") == "API transcript"
+    assert source["source_type"] == "podcast_index_api"
+    assert source["podcast_index_endpoint"] == "episodes/byid"
+    assert source["podcast_index_episode_id"] == 123
+    assert source["transcript_url"] == str(transcript)
+    assert source["title"] == "API Episode"
+    assert source["original_url"] == "https://example.com/api-episode"

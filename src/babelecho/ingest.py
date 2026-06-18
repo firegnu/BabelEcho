@@ -7,6 +7,7 @@ from .episode_page import discover_episode_page_transcript
 from .jsonio import write_json
 from .paths import RunPaths
 from .podcast import discover_podcast_index_transcript, discover_podcast_transcript
+from .podcast_index_api import fetch_podcast_index_episode
 
 
 TRANSCRIPT_EXTENSIONS = {
@@ -72,6 +73,17 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
             "original_url": source_config.get("original_url") or transcript.episode_url,
             "transcript_url": transcript.transcript_url,
         }
+    elif source_type == "podcast_index_api":
+        episode = fetch_podcast_index_episode(source_config)
+        transcript = discover_podcast_index_transcript(episode)
+        transcript_source = transcript.transcript_url
+        source_key = "transcript_url"
+        source_config = {
+            **source_config,
+            "title": source_config.get("title") or transcript.title,
+            "original_url": source_config.get("original_url") or transcript.episode_url,
+            "transcript_url": transcript.transcript_url,
+        }
     elif source_type == "episode_page":
         page_url = source_config.get("page_url")
         if not page_url:
@@ -91,7 +103,7 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
     else:
         raise ValueError(
             "BabelEcho supports source.type=transcript_url, transcript_file, "
-            "podcast_rss, podcast_index_episode, or episode_page"
+            "podcast_rss, podcast_index_episode, podcast_index_api, or episode_page"
         )
     if not transcript_source:
         raise ValueError(f"source.{source_key} is required")
@@ -107,6 +119,10 @@ def ingest_transcript_source(source_config: dict, run_paths: RunPaths) -> Path:
         "feed_url": source_config.get("feed_url"),
         "episode_url": source_config.get("episode_url"),
         "episode_json": source_config.get("episode_json"),
+        "podcast_index_endpoint": source_config.get("endpoint"),
+        "podcast_index_episode_id": source_config.get("episode_id"),
+        "feed_id": source_config.get("feed_id"),
+        "itunes_id": source_config.get("itunes_id"),
         "raw_transcript": str(raw_path.relative_to(run_paths.run_dir)),
     }
     if source_config.get("page_url") is not None:

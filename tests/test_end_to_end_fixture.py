@@ -1,8 +1,29 @@
+from http.server import BaseHTTPRequestHandler, HTTPServer
 import subprocess
 import sys
 from pathlib import Path
+from threading import Thread
 
 from babelecho.jsonio import read_json, write_json
+
+
+def run_podcast_index_api_server(response_body: str):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            encoded = response_body.encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(encoded)))
+            self.end_headers()
+            self.wfile.write(encoded)
+
+        def log_message(self, format, *args):
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 
 def test_end_to_end_fixture_pipeline(tmp_path: Path):
@@ -389,6 +410,103 @@ publish:
     assert source["episode_json"] == str(episode_json)
     assert source["title"] == "PodcastIndex Feed Episode"
     assert source["original_url"] == "https://example.com/pi-episode"
+    assert source["transcript_url"] == str(transcript)
+
+    status = read_json(run_dir / "run.json")
+    assert status["input"]["source_config"] == str(source_config)
+
+
+def test_run_command_accepts_podcast_index_api_source_config(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setenv("PODCASTINDEX_API_KEY", "api-key")
+    monkeypatch.setenv("PODCASTINDEX_API_SECRET", "api-secret")
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    workspace = tmp_path / "workspace"
+    source_config = tmp_path / "source.yaml"
+    local_config = tmp_path / "local.yaml"
+    transcript = Path("tests/fixtures/sample.vtt").resolve()
+    server = run_podcast_index_api_server(
+        f"""{{
+  "episode": {{
+    "title": "PodcastIndex API Episode",
+    "link": "https://example.com/pi-api-episode",
+    "transcripts": [
+      {{
+        "url": "{transcript}",
+        "type": "text/vtt"
+      }}
+    ]
+  }}
+}}
+"""
+    )
+    source_config.write_text(
+        f"""
+source:
+  type: podcast_index_api
+  api_base_url: "http://127.0.0.1:{server.server_port}/api/1.0"
+  endpoint: episodes/byid
+  episode_id: 123
+  api_key_env: PODCASTINDEX_API_KEY
+  api_secret_env: PODCASTINDEX_API_SECRET
+  user_agent: "BabelEchoTest/0.1"
+""",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "run",
+                "--workspace",
+                str(workspace),
+                "--run-id",
+                "pi-api-flow",
+                "--source-config",
+                str(source_config),
+                "--local-config",
+                str(local_config),
+                "--to-stage",
+                "adapt",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    run_dir = workspace / "runs" / "pi-api-flow"
+    assert result.returncode == 0, result.stderr
+    assert "ingest:" in result.stdout
+    assert "normalize:" in result.stdout
+    assert "adapt:" in result.stdout
+    assert (run_dir / "transcript" / "raw.vtt").exists()
+    assert (run_dir / "script" / "zh.json").exists()
+
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "podcast_index_api"
+    assert source["podcast_index_endpoint"] == "episodes/byid"
+    assert source["podcast_index_episode_id"] == 123
+    assert source["title"] == "PodcastIndex API Episode"
+    assert source["original_url"] == "https://example.com/pi-api-episode"
     assert source["transcript_url"] == str(transcript)
 
     status = read_json(run_dir / "run.json")

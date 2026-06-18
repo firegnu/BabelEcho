@@ -70,6 +70,8 @@ docs/plans/
 - [02.03 SFT Built-in 4-role Voice Profile](./02-real-podcasts/03-sft-builtin-4role-voice-profile.md) - `done`
 - [02.04 Episode Page Transcript Source](./02-real-podcasts/04-episode-page-transcript-source/README.md) - `done`
   - [02.04.01 Episode Page Transcript-only Ingest](./02-real-podcasts/04-episode-page-transcript-source/01-episode-page-transcript-only.md) - `done`
+- [02.05 PodcastIndex API Source](./02-real-podcasts/05-podcastindex-api-source/README.md) - `done`
+  - [02.05.01 PodcastIndex API Episode Ingest](./02-real-podcasts/05-podcastindex-api-source/01-podcastindex-api-episode-ingest.md) - `done`
 
 ### Deferred Voice Work
 

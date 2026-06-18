@@ -96,8 +96,9 @@
 - `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，不依赖额外参考 wav，也不要求部署 `CosyVoice2-0.5B`。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中按 speaker 首次出现顺序分配 `female_a / male_a / female_b / male_b`，同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。
 - 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
+- 已支持 `source.type=podcast_index_api`，可用 PodcastIndex API 鉴权请求获取 episode metadata，再复用现有 transcript ingest；API credentials 只从环境变量或 ignored env 文件读取。
 - 已支持 `source.type=episode_page`，可从播客官网 episode 页面发现 transcript 链接或 transcript 正文，并保存为干净 `transcript/raw.txt`；99% Invisible 真实 smoke 已通过到 `ingest`。
-- 后续仍需接入 PodcastIndex API 鉴权/请求。
+- 后续仍需做 PodcastIndex 搜索入口或多 episode 批处理。
 - YouTube、Spotify、Apple Podcasts 页面不在 `episode_page` 范围内；后续如果要接，需要另列来源计划。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
 - 支持多 episode feed，跳过已处理 episode。
@@ -151,6 +152,6 @@
 
 ## 当前最高优先级
 
-1. 继续扩展真实来源：在已支持 PodcastIndex episode JSON 的基础上，接入 PodcastIndex API 鉴权/请求。
-2. 在真实 RSS 或 episode_page run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
+1. 在真实 RSS、episode_page 或 podcast_index_api run 上验证 `sft_builtin_4role` 多 speaker profile，并补充人工 speaker 修正文件。
+2. 支持 PodcastIndex 搜索入口，把“搜索节目/episode”接到已有 source config。
 3. 支持多 episode feed，跳过已处理 episode。
