@@ -103,7 +103,7 @@
 - 已支持第一版 iTunes feed discovery：`babelecho itunes search --query ...` 可从 iTunes Search API 找 podcast RSS `feedUrl`，并写出 `source.type=podcast_rss`。
 - 已支持第一版 RSS episode selection：`babelecho rss episodes --feed-url ...` 可列出 feed 内 episodes，标记 transcript yes/no，并把选中 episode 写成 `source.type=podcast_rss`。
 - 已支持第一版 `source.type=youtube_captions`：用 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
-- 下一步主线改为点播式单集转换：用户给一个 episode URL、已有 source YAML 或 transcript file，系统只转换这一集。
+- 点播式单集转换入口已完成：用户给一个 episode URL、已有 source YAML 或 transcript file，系统只转换这一集。
 - 多 episode 批处理和跳过已处理 episode 后移，不作为当前主流程。
 - Spotify 和 Apple Podcasts 页面不在 `episode_page` 范围内；YouTube 只走字幕 source，不走页面正文解析。
 - 找不到完整 transcript 时，明确标记为不可处理，不静默失败。
@@ -158,6 +158,6 @@
 
 ## 当前最高优先级
 
-1. 实现点播式单集转换入口：用户给 episode URL / source YAML / transcript file，只转换这一集。
-2. 保留现有 adapter 合同，先支持 YouTube captions、官网 episode_page、RSS episode 和本地 transcript。
-3. 在点播式真实 run 上验证 `speaker_voices.mode: infer_once` 多 speaker profile。
+1. 以 `babelecho episode convert --url ...` 作为默认入口，做真实点播式单集回归。
+2. 对一集真实多 speaker 内容跑到 TTS，验证 `speaker_voices.mode: infer_once` 多 speaker profile。
+3. 继续补点播入口的真实失败诊断和站点/API 边界记录。

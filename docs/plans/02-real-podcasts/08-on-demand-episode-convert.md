@@ -1,6 +1,6 @@
 # 02.08 On-demand Episode Convert
 
-状态：ready
+状态：done
 
 ## 目标
 
@@ -61,3 +61,11 @@ Out:
 - 增加“节目名 + 期数/关键词”的搜索选择流程。
 - 增加 converted episode library，用于查看历史转换结果。
 - 如以后需要，再做多 episode batch 和 skip-processed。
+
+## 完成记录
+
+- 新增 `babelecho episode convert`，作为自用点播式单集转换入口。
+- `--url` 会把 YouTube URL 映射到 `source.type=youtube_captions`，把普通 http/https 或本地 episode 页面映射到 `source.type=episode_page`。
+- `--source-config` 和 `--transcript-file` 继续复用现有 pipeline。
+- 本地 full pytest 通过：`111 passed`。
+- 真实入口 smoke：`on-demand-99pi-karaoke-fixture-20260618` 使用 `https://99percentinvisible.org/episode/670-karaoke-videos/` 和 fixture local config 跑到 `adapt`；成功解析 transcript 页面 `.../transcript`，生成 150 段 `transcript/normalized.json` 和 150 段 `script/zh.json`。该 smoke 未调用 DeepSeek 或 TTS。

@@ -78,7 +78,7 @@ docs/plans/
   - [02.06.02 YouTube Captions Source](./02-real-podcasts/06-discovery-adapters/02-youtube-captions-source.md) - `done`
   - [02.06.03 RSS Episode Selection](./02-real-podcasts/06-discovery-adapters/03-rss-episode-selection.md) - `done`
 - [02.07 Chunked DeepSeek Adapt](./02-real-podcasts/07-chunked-adapt.md) - `done`
-- [02.08 On-demand Episode Convert](./02-real-podcasts/08-on-demand-episode-convert.md) - `ready`
+- [02.08 On-demand Episode Convert](./02-real-podcasts/08-on-demand-episode-convert.md) - `done`
 
 ### Deferred Voice Work
 
