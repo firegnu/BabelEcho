@@ -59,12 +59,16 @@ tts:
   output_format: "wav"
 ```
 
-For MVP-1, the deployment default uses only `CosyVoice-300M-SFT`:
+For MVP-1, the deployment default keeps the `sft_builtin_4role` role profile and
+uses hybrid local rendering:
 
 - 0/1 distinct speaker without an explicit gender marker: use `female_a`.
 - 1 distinct speaker labeled with `male` or `男`: use `male_a`.
 - 1 distinct speaker labeled with `female` or `女`: use `female_a`.
 - 2+ distinct speakers: use first-appearance mapping across the four roles.
+- Render `male_a` with `CosyVoice2-0.5B` cross-lingual synthesis,
+  `cross_lingual_prompt.wav`, and speed `1.1`.
+- Render `female_a`, `female_b`, and `male_b` with `CosyVoice-300M-SFT`.
 
 The profile is equivalent to this effective config:
 
@@ -79,18 +83,23 @@ tts:
 ```
 
 This profile maps script speakers by first appearance to `female_a`, `male_a`,
-`female_b`, and `male_b`, backed by `中文女`, `中文男`, `英文女`, and `英文男`.
-It is fixed-speaker synthesis, not original-host voice cloning.
+`female_b`, and `male_b`. `female_a`, `female_b`, and `male_b` are backed by
+the 300M SFT speaker ids `中文女`, `英文女`, and `英文男`; `male_a` is backed by
+the CosyVoice2 cross-lingual reference path chosen in the speed `1.1` preview.
+It is fixed-role synthesis, not original-host voice cloning.
 If `model_dir` is not set, the wrapper defaults to
-`<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for this profile.
+`<cosyvoice_repo>/pretrained_models/CosyVoice-300M-SFT` for the SFT roles.
+For `male_a`, the wrapper defaults to
+`<cosyvoice_repo>/pretrained_models/CosyVoice2-0.5B` and
+`<cosyvoice_repo>/asset/cross_lingual_prompt.wav`.
 The SFT profile intentionally does not reuse `COSYVOICE_MODEL_DIR` from the
-launcher, so an old launcher default pointing at `CosyVoice2-0.5B` cannot pull
-the runtime back to the previous model.
+launcher for the SFT roles.
 
 For `local_cli` synthesis, BabelEcho writes a `segments/tts-batch.json` file and
-starts the wrapper once per `synthesize` stage. The wrapper loads CosyVoice once,
-then loops over the segment text files to write `segments/<id>.wav`. The older
-single-segment wrapper form still works for direct smoke tests.
+starts the wrapper once per `synthesize` stage. The wrapper lazily loads the
+needed backend model or models, then loops over the segment text files to write
+`segments/<id>.wav`. The older single-segment wrapper form still works for
+direct smoke tests.
 
 ## Commands
 

@@ -10,30 +10,25 @@ from pathlib import Path
 
 DEFAULT_PROMPT_TEXT = "希望你以后能够做的比我还好呦。"
 DEFAULT_VOICE = "sft_builtin_4role"
+MALE_A_COSYVOICE2_SPEED = 1.1
 SUPPORTED_VOICES = {"default-zh", "sft_builtin_4role"}
+SUPPORTED_SFT_BUILTIN_4ROLE_ROLES = {
+    "female_a",
+    "male_a",
+    "female_b",
+    "male_b",
+}
 SFT_ROLE_SPEAKERS = {
     "female_a": "中文女",
-    "male_a": "中文男",
     "female_b": "英文女",
     "male_b": "英文男",
 }
 SFT_ROLE_FILTERS = {
     "female_a": "highpass=f=70,loudnorm=I=-19:TP=-1.5:LRA=8:linear=false",
-    "male_a": (
-        "volume=-4dB,"
-        "highpass=f=150,"
-        "equalizer=f=180:t=q:w=1.0:g=-4,"
-        "equalizer=f=340:t=q:w=1.0:g=-3.2,"
-        "equalizer=f=650:t=q:w=1.1:g=-2.2,"
-        "equalizer=f=3000:t=q:w=1.0:g=3.2,"
-        "equalizer=f=4500:t=q:w=1.0:g=4.0,"
-        "equalizer=f=6500:t=q:w=1.0:g=2.2,"
-        "equalizer=f=9000:t=q:w=1.0:g=1.4,"
-        "loudnorm=I=-18.5:TP=-1.2:LRA=8:linear=false"
-    ),
     "female_b": "highpass=f=70,loudnorm=I=-19:TP=-1.5:LRA=8:linear=false",
     "male_b": "highpass=f=70,loudnorm=I=-19:TP=-1.5:LRA=8:linear=false",
 }
+MALE_A_COSYVOICE2_FILTER = "loudnorm=I=-18.5:TP=-1.2:LRA=8:linear=false"
 
 
 @dataclass(frozen=True)
@@ -48,6 +43,9 @@ class WrapperConfig:
     text_file: Path | None = None
     output: Path | None = None
     batch_file: Path | None = None
+    male_a_model_dir: Path | None = None
+    male_a_prompt_wav: Path | None = None
+    male_a_speed: float = MALE_A_COSYVOICE2_SPEED
 
 
 @dataclass(frozen=True)
@@ -116,6 +114,19 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
         or os.environ.get("COSYVOICE_PROMPT_WAV")
         or default_prompt_wav
     )
+    male_a_speed = float(
+        os.environ.get("COSYVOICE_MALE_A_SPEED", str(MALE_A_COSYVOICE2_SPEED))
+    )
+    if male_a_speed <= 0:
+        raise ValueError("COSYVOICE_MALE_A_SPEED must be greater than 0")
+    male_a_model_dir = Path(
+        os.environ.get("COSYVOICE_MALE_A_MODEL_DIR")
+        or cosyvoice_repo / "pretrained_models" / "CosyVoice2-0.5B"
+    )
+    male_a_prompt_wav = Path(
+        os.environ.get("COSYVOICE_MALE_A_PROMPT_WAV")
+        or cosyvoice_repo / "asset" / "cross_lingual_prompt.wav"
+    )
     return WrapperConfig(
         voice=args.voice,
         cosyvoice_repo=cosyvoice_repo,
@@ -127,6 +138,9 @@ def resolve_config(args: argparse.Namespace) -> WrapperConfig:
         text_file=Path(args.text_file) if args.text_file else None,
         output=Path(args.output) if args.output else None,
         batch_file=Path(args.batch_file) if args.batch_file else None,
+        male_a_model_dir=male_a_model_dir,
+        male_a_prompt_wav=male_a_prompt_wav,
+        male_a_speed=male_a_speed,
     )
 
 
@@ -134,9 +148,12 @@ def _raw_output_path(output: Path) -> Path:
     return output.with_name(f"{output.stem}.raw{output.suffix}")
 
 
-def _postprocess_sft_role(raw_output: Path, output: Path, voice_role: str) -> None:
-    role_filter = SFT_ROLE_FILTERS[voice_role]
-    audio_filter = f"{role_filter},aresample=22050,asetpts=N/SR/TB"
+def _cosyvoice2_raw_output_path(output: Path) -> Path:
+    return output.with_name(f"{output.stem}.cosyvoice2.raw{output.suffix}")
+
+
+def _postprocess_wav(raw_output: Path, output: Path, audio_filter: str) -> None:
+    full_filter = f"{audio_filter},aresample=22050,asetpts=N/SR/TB"
     subprocess.run(
         [
             "ffmpeg",
@@ -147,7 +164,7 @@ def _postprocess_sft_role(raw_output: Path, output: Path, voice_role: str) -> No
             "-i",
             str(raw_output),
             "-af",
-            audio_filter,
+            full_filter,
             "-ar",
             "22050",
             "-ac",
@@ -156,6 +173,14 @@ def _postprocess_sft_role(raw_output: Path, output: Path, voice_role: str) -> No
         ],
         check=True,
     )
+
+
+def _postprocess_sft_role(raw_output: Path, output: Path, voice_role: str) -> None:
+    _postprocess_wav(raw_output, output, SFT_ROLE_FILTERS[voice_role])
+
+
+def _postprocess_male_a_cosyvoice2(raw_output: Path, output: Path) -> None:
+    _postprocess_wav(raw_output, output, MALE_A_COSYVOICE2_FILTER)
 
 
 def _synthesize_one(
@@ -174,15 +199,28 @@ def _synthesize_one(
 
     if config.voice == "sft_builtin_4role":
         voice_role = item.voice_role or "female_a"
-        if voice_role not in SFT_ROLE_SPEAKERS:
+        if voice_role not in SUPPORTED_SFT_BUILTIN_4ROLE_ROLES:
             raise ValueError(f"Unsupported sft_builtin_4role voice_role: {voice_role}")
-        outputs = model.inference_sft(
-            text,
-            SFT_ROLE_SPEAKERS[voice_role],
-            stream=False,
-            speed=config.speed,
-        )
-        save_output = _raw_output_path(output)
+        if voice_role == "male_a":
+            if config.male_a_prompt_wav is None:
+                raise ValueError("male_a_prompt_wav is required for male_a")
+            outputs = model.inference_cross_lingual(
+                text,
+                str(config.male_a_prompt_wav),
+                stream=False,
+                speed=config.male_a_speed,
+            )
+            save_output = _cosyvoice2_raw_output_path(output)
+            postprocess = "male_a_cosyvoice2"
+        else:
+            outputs = model.inference_sft(
+                text,
+                SFT_ROLE_SPEAKERS[voice_role],
+                stream=False,
+                speed=config.speed,
+            )
+            save_output = _raw_output_path(output)
+            postprocess = "sft"
     elif config.mode == "zero_shot":
         outputs = model.inference_zero_shot(
             text,
@@ -191,6 +229,7 @@ def _synthesize_one(
             stream=False,
             speed=config.speed,
         )
+        postprocess = None
     elif config.mode == "cross_lingual":
         outputs = model.inference_cross_lingual(
             text,
@@ -198,6 +237,7 @@ def _synthesize_one(
             stream=False,
             speed=config.speed,
         )
+        postprocess = None
     else:
         raise ValueError(f"Unsupported mode: {config.mode}")
 
@@ -205,10 +245,13 @@ def _synthesize_one(
     if not chunks:
         raise RuntimeError("CosyVoice generated no audio chunks")
     audio = torch.cat(chunks, dim=-1)
-    audio_output = save_output if config.voice == "sft_builtin_4role" else output
+    audio_output = save_output if postprocess else output
     torchaudio.save(str(audio_output), audio.cpu(), model.sample_rate)
-    if config.voice == "sft_builtin_4role":
+    if postprocess == "sft":
         _postprocess_sft_role(save_output, output, voice_role)
+        save_output.unlink(missing_ok=True)
+    elif postprocess == "male_a_cosyvoice2":
+        _postprocess_male_a_cosyvoice2(save_output, output)
         save_output.unlink(missing_ok=True)
 
 
@@ -238,15 +281,33 @@ def synthesize(config: WrapperConfig) -> None:
     import torch
     import torchaudio
 
+    items = _synthesis_items(config)
     if config.voice == "sft_builtin_4role":
-        from cosyvoice.cli.cosyvoice import CosyVoice
+        from cosyvoice.cli.cosyvoice import AutoModel, CosyVoice
 
-        model = CosyVoice(str(config.model_dir))
-    else:
-        from cosyvoice.cli.cosyvoice import AutoModel
+        sft_model = None
+        male_a_model = None
+        for item in items:
+            voice_role = item.voice_role or "female_a"
+            if voice_role not in SUPPORTED_SFT_BUILTIN_4ROLE_ROLES:
+                raise ValueError(f"Unsupported sft_builtin_4role voice_role: {voice_role}")
+            if voice_role == "male_a":
+                if config.male_a_model_dir is None:
+                    raise ValueError("male_a_model_dir is required for male_a")
+                if male_a_model is None:
+                    male_a_model = AutoModel(model_dir=str(config.male_a_model_dir))
+                model = male_a_model
+            else:
+                if sft_model is None:
+                    sft_model = CosyVoice(str(config.model_dir))
+                model = sft_model
+            _synthesize_one(config, model, torch, torchaudio, item)
+        return
 
-        model = AutoModel(model_dir=str(config.model_dir))
-    for item in _synthesis_items(config):
+    from cosyvoice.cli.cosyvoice import AutoModel
+
+    model = AutoModel(model_dir=str(config.model_dir))
+    for item in items:
         _synthesize_one(config, model, torch, torchaudio, item)
 
 

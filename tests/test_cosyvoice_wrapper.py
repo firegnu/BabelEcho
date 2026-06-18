@@ -314,37 +314,57 @@ def test_synthesize_batch_reuses_model_for_multiple_outputs(monkeypatch, tmp_pat
     ]
 
 
-def test_synthesize_sft_builtin_4role_uses_item_voice_roles(monkeypatch, tmp_path: Path):
+def test_synthesize_sft_builtin_4role_routes_male_a_to_cosyvoice2(
+    monkeypatch, tmp_path: Path
+):
     wrapper = load_wrapper()
-    text_file = tmp_path / "0001.txt"
-    output = tmp_path / "0001.wav"
+    male_a_text = tmp_path / "0001.txt"
+    male_b_text = tmp_path / "0002.txt"
+    male_a_output = tmp_path / "0001.wav"
+    male_b_output = tmp_path / "0002.wav"
     batch_file = tmp_path / "tts-batch.json"
-    text_file.write_text("第一段中文。", encoding="utf-8")
+    male_a_text.write_text("第一段中文。", encoding="utf-8")
+    male_b_text.write_text("第二段中文。", encoding="utf-8")
     batch_file.write_text(
         json.dumps(
             {
                 "items": [
                     {
-                        "text_file": str(text_file),
-                        "output": str(output),
+                        "text_file": str(male_a_text),
+                        "output": str(male_a_output),
                         "voice_role": "male_a",
+                    },
+                    {
+                        "text_file": str(male_b_text),
+                        "output": str(male_b_output),
+                        "voice_role": "male_b",
                     }
                 ]
             }
         ),
         encoding="utf-8",
     )
+    cosyvoice_repo = tmp_path / "CosyVoice"
+    sft_model_dirs = []
+    cosyvoice2_model_dirs = []
     sft_calls = []
+    cross_lingual_calls = []
 
     class FakeAutoModel:
+        sample_rate = 24_000
+
         def __init__(self, model_dir):
-            raise AssertionError("AutoModel should not be used for sft_builtin_4role")
+            cosyvoice2_model_dirs.append(model_dir)
+
+        def inference_cross_lingual(self, text, prompt_wav, stream, speed):
+            cross_lingual_calls.append((text, prompt_wav, stream, speed))
+            return [{"tts_speech": FakeTensor()}]
 
     class FakeCosyVoice:
         sample_rate = 22_050
 
         def __init__(self, model_dir):
-            self.model_dir = model_dir
+            sft_model_dirs.append(model_dir)
 
         def inference_sft(self, text, speaker, stream, speed):
             sft_calls.append((text, speaker, stream, speed))
@@ -371,8 +391,8 @@ def test_synthesize_sft_builtin_4role_uses_item_voice_roles(monkeypatch, tmp_pat
     def fake_run(command, check):
         ffmpeg_calls.append((command, check))
 
-    monkeypatch.setenv("COSYVOICE_REPO", str(tmp_path / "CosyVoice"))
-    monkeypatch.setenv("COSYVOICE_MODEL_DIR", str(tmp_path / "CosyVoice-300M-SFT"))
+    monkeypatch.setenv("COSYVOICE_REPO", str(cosyvoice_repo))
+    monkeypatch.delenv("COSYVOICE_MODEL_DIR", raising=False)
     monkeypatch.setitem(__import__("sys").modules, "torch", fake_torch)
     monkeypatch.setitem(__import__("sys").modules, "torchaudio", fake_torchaudio)
     monkeypatch.setitem(
@@ -401,9 +421,26 @@ def test_synthesize_sft_builtin_4role_uses_item_voice_roles(monkeypatch, tmp_pat
 
     wrapper.synthesize(config)
 
-    assert sft_calls == [("第一段中文。", "中文男", False, 1.0)]
-    assert saved == [(str(tmp_path / "0001.raw.wav"), saved[0][1], 22_050)]
-    assert ffmpeg_calls
+    assert cosyvoice2_model_dirs == [
+        str(cosyvoice_repo / "pretrained_models" / "CosyVoice2-0.5B")
+    ]
+    assert sft_model_dirs == [
+        str(cosyvoice_repo / "pretrained_models" / "CosyVoice-300M-SFT")
+    ]
+    assert cross_lingual_calls == [
+        (
+            "第一段中文。",
+            str(cosyvoice_repo / "asset" / "cross_lingual_prompt.wav"),
+            False,
+            1.1,
+        )
+    ]
+    assert sft_calls == [("第二段中文。", "英文男", False, 1.0)]
+    assert saved == [
+        (str(tmp_path / "0001.cosyvoice2.raw.wav"), saved[0][1], 24_000),
+        (str(tmp_path / "0002.raw.wav"), saved[1][1], 22_050),
+    ]
+    assert len(ffmpeg_calls) == 2
     assert ffmpeg_calls[0][0][:6] == [
         "ffmpeg",
         "-hide_banner",
@@ -412,20 +449,20 @@ def test_synthesize_sft_builtin_4role_uses_item_voice_roles(monkeypatch, tmp_pat
         "-y",
         "-i",
     ]
-    assert str(tmp_path / "0001.raw.wav") in ffmpeg_calls[0][0]
-    filter_index = ffmpeg_calls[0][0].index("-af") + 1
-    assert ffmpeg_calls[0][0][filter_index] == (
-        "volume=-4dB,"
-        "highpass=f=150,"
-        "equalizer=f=180:t=q:w=1.0:g=-4,"
-        "equalizer=f=340:t=q:w=1.0:g=-3.2,"
-        "equalizer=f=650:t=q:w=1.1:g=-2.2,"
-        "equalizer=f=3000:t=q:w=1.0:g=3.2,"
-        "equalizer=f=4500:t=q:w=1.0:g=4.0,"
-        "equalizer=f=6500:t=q:w=1.0:g=2.2,"
-        "equalizer=f=9000:t=q:w=1.0:g=1.4,"
+    assert str(tmp_path / "0001.cosyvoice2.raw.wav") in ffmpeg_calls[0][0]
+    male_a_filter_index = ffmpeg_calls[0][0].index("-af") + 1
+    assert ffmpeg_calls[0][0][male_a_filter_index] == (
         "loudnorm=I=-18.5:TP=-1.2:LRA=8:linear=false,"
+        "aresample=22050,asetpts=N/SR/TB"
+    )
+    assert str(male_a_output) == ffmpeg_calls[0][0][-1]
+
+    assert str(tmp_path / "0002.raw.wav") in ffmpeg_calls[1][0]
+    male_b_filter_index = ffmpeg_calls[1][0].index("-af") + 1
+    assert ffmpeg_calls[1][0][male_b_filter_index] == (
+        "highpass=f=70,"
+        "loudnorm=I=-19:TP=-1.5:LRA=8:linear=false,"
         "aresample=22050,"
         "asetpts=N/SR/TB"
     )
-    assert str(output) == ffmpeg_calls[0][0][-1]
+    assert str(male_b_output) == ffmpeg_calls[1][0][-1]

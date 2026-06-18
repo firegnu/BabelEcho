@@ -84,17 +84,17 @@
 
 需要做：
 
-- 运行默认已改为单模型 `CosyVoice-300M-SFT` / `sft_builtin_4role`，不用再部署 CosyVoice2。
+- 运行默认使用 `sft_builtin_4role` 固定角色 profile；`male_a` 渲染走 `CosyVoice2-0.5B cross_lingual speed=1.1`，`female_a / female_b / male_b` 渲染走 `CosyVoice-300M-SFT`。
 - 固定音色校准只选择或调整本地 TTS 可用声音和参数，不做原主播 voice clone。
-- 历史 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0` 样本只保留为校准记录；当前不再继续围绕 CosyVoice 内置的两个 wav 反复微调。
-- 后续如需新固定音色，优先找可直接用于 300M SFT 或同级单模型部署的方案，不阻塞真实 podcast 来源接入。
+- 历史 `cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0` 样本只保留为校准记录；当前固定使用 speed `1.1` 作为 `male_a` 路线，不再围绕 CosyVoice 内置的两个 wav 反复微调。
+- 后续如需新固定音色，优先明确替换哪个固定 role，不阻塞真实 podcast 来源接入。
 - 已支持第一版 RSS feed 输入：`babelecho run --podcast-feed ...`，并用公开 feed 跑通到 `adapt`。
 - 已支持 RSS item 内的 `podcast:transcript`。
 - 已完成公开 RSS 端到端真实 run：`mvp1-real-rss-monetize-20260617` 使用 `Podcasts for Profit` 的 SRT transcript，经 DeepSeek adapt 和 5090D TTS 生成 75 段中文音频，最终 MP3 约 `840.8s`，并生成 `publish/feed.xml`。
 - 已支持 `adapt.mode: chunked`：DeepSeek 改写可按完整 segment 聚合 chunk 批量调用，chunk 不切断 segment，返回按原始 id 校验和重建 `script/zh.json`，TTS 不依赖 chunk 顺序。
 - 已优化真实节目 TTS 执行效率：`local_cli` 现在每个 `synthesize` stage 只启动一次 wrapper，并通过 `segments/tts-batch.json` 批量生成 wav；5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
-- 已选定 MVP-1 单模型 TTS 规则：运行默认只部署 `CosyVoice-300M-SFT` 的 `sft_builtin_4role`；默认规则仍可按 speaker 首次出现顺序稳定映射，启用 `speaker_voices.mode: infer_once` 后会每集最多调用一次 LLM 推断 speaker 的 `male/female/unknown` 方向，再由代码映射到具体 `voice_role`。
-- `sft_builtin_4role` 使用 `CosyVoice-300M-SFT` 的 `中文女 / 中文男 / 英文女 / 英文男` 四个内置 speaker id；它不做原主播 voice clone，不依赖额外参考 wav，也不要求部署 `CosyVoice2-0.5B`。
+- 已选定 MVP-1 固定角色 TTS 规则：默认规则仍可按 speaker 首次出现顺序稳定映射，启用 `speaker_voices.mode: infer_once` 后会每集最多调用一次 LLM 推断 speaker 的 `male/female/unknown` 方向，再由代码映射到具体 `voice_role`。
+- `sft_builtin_4role` 现在是混合本地渲染：`female_a -> 300M SFT 中文女`、`male_a -> CosyVoice2 cross_lingual speed 1.1`、`female_b -> 300M SFT 英文女`、`male_b -> 300M SFT 英文男`；它不做原主播 voice clone。
 - 已支持 `speaker -> voice_role` 稳定映射：同一 run 中同名 speaker 复用同一角色；LLM 推断的 `male/female` 会分别进入男/女角色池，`unknown` 和推断失败会自动兜底到具体角色，不要求人工介入。
 - 已支持 `source.type=podcast_index_episode`，可从已获取的 PodcastIndex episode JSON 中优先读取 `transcripts[].url`，并回退到 `transcriptUrl`。
 - 已支持 `source.type=podcast_index_api`，可用 PodcastIndex API 鉴权请求获取 episode metadata，再复用现有 transcript ingest；API credentials 只从环境变量或 ignored env 文件读取。
@@ -147,7 +147,7 @@
 
 这些能力有价值，但不应该阻塞自用版本：
 
-- 后续固定音色扩展：优先评估不重新引入双模型部署的方案；它是固定音色扩展，不是原主播 voice clone。
+- 后续固定音色扩展：先明确替换或新增哪个固定 role；它是固定音色扩展，不是原主播 voice clone。
 - 本地 LLM 替代 DeepSeek。
 - ASR fallback，用于没有 transcript 的 episode。
 - 原主播 voice clone。
