@@ -22,13 +22,16 @@ tts:
   speed: 1.0
   output_format: "wav"
 
-# MVP-1 TTS uses only CosyVoice-300M-SFT by default:
+# MVP-1 TTS uses a fixed four-role profile with hybrid local rendering:
 # - 0/1 distinct speaker without an explicit gender marker: female_a.
 # - 1 distinct speaker labeled with "male" or "男": male_a.
 # - 1 distinct speaker labeled with "female" or "女": female_a.
 # - 2+ distinct speakers: stable first-appearance mapping.
-# The SFT profile maps multi-speaker scripts by first appearance to:
-# female_a=中文女, male_a=中文男, female_b=英文女, male_b=英文男.
+# Rendering backends:
+# female_a=CosyVoice-300M-SFT/中文女
+# male_a=CosyVoice2-0.5B/cross_lingual_prompt.wav/speed=1.1
+# female_b=CosyVoice-300M-SFT/英文女
+# male_b=CosyVoice-300M-SFT/英文男
 # If COSYVOICE_REPO is not available in the wrapper environment, set:
 # cosyvoice_repo: "/home/th5090d/Develop/ai_tools/CosyVoice"
 

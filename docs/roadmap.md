@@ -113,7 +113,7 @@
 
 验收标准：
 
-- 当前运行默认改为 `CosyVoice-300M-SFT`，历史 `cross_lingual_prompt.wav + speed=1.0` 只保留为校准记录，不作为部署要求。
+- 当前运行默认使用 `sft_builtin_4role` 固定角色 profile；`male_a` 用 `CosyVoice2 cross_lingual speed=1.1`，其余角色用 `CosyVoice-300M-SFT`。
 - 一个有公开 `podcast:transcript` 的 RSS feed 可以被处理成中文 feed。
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出；三到四人节目可以用 `sft_builtin_4role` 输出可区分的固定角色。
 - 用户指定某一期时，可以把这一期转换成中文 MP3，并可选生成播客客户端可播放的 feed item；99% Invisible `Karaoke Videos` 已通过 `episode convert --url` 在 5090D 跑完整真实链路。

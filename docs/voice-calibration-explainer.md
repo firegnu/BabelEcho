@@ -9,13 +9,18 @@
 
 ## 当前结论
 
-MVP-1 默认固定中文音色基线已经选定：
+MVP-1 当前固定角色路由已经更新：
 
 ```text
-cross_lingual_prompt.wav + mode=cross_lingual + speed=1.0
+female_a -> CosyVoice-300M-SFT / 中文女
+male_a   -> CosyVoice2-0.5B / cross_lingual_prompt.wav / speed=1.1
+female_b -> CosyVoice-300M-SFT / 英文女
+male_b   -> CosyVoice-300M-SFT / 英文男
 ```
 
-对应试听样本：
+本文下方记录的是历史 CosyVoice2 单固定音色校准。当前 `male_a` 继续使用 `cross_lingual_prompt.wav`，但速度已经按后续试听结论改为 `1.1`；其他角色不使用这一路。
+
+历史试听样本：
 
 ```text
 workspace/runs/voice-calibration-20260617-round2/d-cross-lingual-speed-100.mp3
@@ -70,11 +75,13 @@ F: speed = 0.90
 
 语速会影响停顿、拉长、句子节奏和播客感，因此听起来会有差异。但这不是换了一个说话人。
 
-选择 D 的含义是：
+选择 D 在当时的含义是：
 
 ```text
-当前 MVP-1 默认基线采用 cross_lingual_prompt.wav 这个参考音色，并使用正常速度 speed=1.0。
+当时 MVP-1 默认基线采用 cross_lingual_prompt.wav 这个参考音色，并使用正常速度 speed=1.0。
 ```
+
+后续结论已经更新：`cross_lingual_prompt.wav` 只固定用于 `male_a`，并采用 speed `1.1`。
 
 ## C 和 D 为什么也可能略有差异
 
