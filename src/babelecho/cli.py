@@ -8,6 +8,7 @@ import yaml
 from .adapt import adapt_to_chinese
 from .article_pipeline import ARTICLE_PIPELINE_STAGES, run_article_pipeline
 from .audio import assemble_audio
+from .audio_pipeline import AUDIO_PIPELINE_STAGES, run_audio_pipeline
 from .checks import CheckError, check_run_artifacts
 from .config import load_yaml, require_keys
 from .episode_convert import build_on_demand_source_config
@@ -244,6 +245,34 @@ def build_parser() -> argparse.ArgumentParser:
         "--to-stage",
         choices=ARTICLE_PIPELINE_STAGES,
         default="publish",
+    )
+
+    audio = subparsers.add_parser(
+        "audio",
+        help="Convert one local audio file.",
+    )
+    audio_subparsers = audio.add_subparsers(
+        dest="audio_command",
+        required=True,
+    )
+    audio_convert = audio_subparsers.add_parser(
+        "convert",
+        help="Convert one local audio file through the audio-first pipeline.",
+    )
+    audio_convert.add_argument("--workspace", required=True)
+    audio_convert.add_argument("--run-id", required=True)
+    audio_convert.add_argument("--audio-file", required=True)
+    audio_convert.add_argument("--local-config", required=True)
+    audio_convert.add_argument("--title")
+    audio_convert.add_argument(
+        "--from-stage",
+        choices=AUDIO_PIPELINE_STAGES,
+        default="ingest_audio",
+    )
+    audio_convert.add_argument(
+        "--to-stage",
+        choices=AUDIO_PIPELINE_STAGES,
+        default="ingest_audio",
     )
 
     run = subparsers.add_parser("run", help="Run the transcript-to-podcast pipeline.")
@@ -912,6 +941,24 @@ def main(argv: list[str] | None = None) -> int:
                     to_stage=args.to_stage,
                     url=args.url,
                     article_file=args.file,
+                    title=args.title,
+                )
+                print(output)
+                return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
+
+    if args.command == "audio":
+        try:
+            if args.audio_command == "convert":
+                output = run_audio_pipeline(
+                    workspace=args.workspace,
+                    run_id=args.run_id,
+                    audio_file=args.audio_file,
+                    local_config_path=args.local_config,
+                    from_stage=args.from_stage,
+                    to_stage=args.to_stage,
                     title=args.title,
                 )
                 print(output)

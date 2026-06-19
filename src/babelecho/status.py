@@ -28,7 +28,11 @@ def collect_outputs(run_paths: RunPaths) -> dict[str, str]:
     outputs: dict[str, str] = {}
     candidates = {
         "source": run_paths.source_json,
+        "audio_metadata": run_paths.run_dir / "audio" / "metadata.json",
+        "asr_raw": run_paths.run_dir / "asr" / "raw.json",
+        "asr_diarization": run_paths.run_dir / "asr" / "diarization.json",
         "normalized": run_paths.normalized_transcript_json,
+        "transcript_quality": run_paths.transcript_quality_json,
         "script": run_paths.chinese_script_json,
         "segments_manifest": run_paths.segments_dir / "manifest.json",
         "audio": run_paths.output_audio,

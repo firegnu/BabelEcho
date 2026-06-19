@@ -1,0 +1,22 @@
+{
+  "provider": "fixture",
+  "model": "fixture",
+  "language": "en",
+  "duration_seconds": 9.2,
+  "segments": [
+    {
+      "id": "asr_0001",
+      "start_ms": 0,
+      "end_ms": 4200,
+      "text": "Welcome back to the agent systems roundtable.",
+      "confidence": 0.95
+    },
+    {
+      "id": "asr_0002",
+      "start_ms": 4300,
+      "end_ms": 9200,
+      "text": "Today we are looking at evaluation failures in long running agents.",
+      "confidence": 0.93
+    }
+  ]
+}

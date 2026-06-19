@@ -204,3 +204,105 @@ def test_publish_episode_maps_article_route_and_public_source_metadata(tmp_path:
     assert index["episodes"][0]["route"] == "article_reading"
     assert index["episodes"][0]["source_type"] == "web_article"
     assert index["episodes"][0]["speaker_count"] == 0
+
+
+def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
+    run_paths = create_run(tmp_path, "audio-publish-run")
+    run_paths.output_audio.write_bytes(b"fake mp3")
+    write_json(
+        run_paths.source_json,
+        {
+            "run_id": "audio-publish-run",
+            "source_type": "audio_file",
+            "provider": "local_file",
+            "title": "Audio Source",
+            "audio_input": "audio/input.mp3",
+            "audio_metadata": "audio/metadata.json",
+        },
+    )
+    write_json(
+        run_paths.run_dir / "asr" / "raw.json",
+        {
+            "provider": "fixture",
+            "model": "fixture",
+            "language": "en",
+            "duration_seconds": 9.2,
+            "segments": [
+                {"id": "asr_0001", "start_ms": 0, "end_ms": 4200, "text": "Hello."},
+                {"id": "asr_0002", "start_ms": 4300, "end_ms": 9200, "text": "Hi."},
+            ],
+        },
+    )
+    write_json(
+        run_paths.run_dir / "asr" / "diarization.json",
+        {
+            "provider": "fixture",
+            "model": "fixture",
+            "speaker_count": 2,
+            "segments": [
+                {"start_ms": 0, "end_ms": 4200, "speaker": "speaker_1"},
+                {"start_ms": 4300, "end_ms": 9200, "speaker": "speaker_2"},
+            ],
+        },
+    )
+    write_json(
+        run_paths.normalized_transcript_json,
+        {
+            "episode_id": "audio-publish-run",
+            "segments": [
+                {"id": "0001", "speaker": "speaker_1", "text": "Hello.", "source": "asr"},
+                {"id": "0002", "speaker": "speaker_2", "text": "Hi.", "source": "asr"},
+            ],
+        },
+    )
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "audio-publish-run",
+            "segments": [
+                {"id": "0001", "speaker": "speaker_1", "text": "你好。"},
+                {"id": "0002", "speaker": "speaker_2", "text": "嗨。"},
+            ],
+        },
+    )
+    write_json(
+        run_paths.transcript_quality_json,
+        {
+            "recommendation": "safe_to_adapt",
+            "metrics": {
+                "segment_count": 2,
+                "speaker_count": 2,
+                "avg_confidence": None,
+                "source_type": "audio_file",
+                "extractor": "asr",
+            },
+            "warnings": [],
+            "reasons": [],
+        },
+    )
+
+    publish_episode(run_paths, {"base_url": "https://example.com/babelecho"})
+
+    artifact = read_json(
+        run_paths.workspace
+        / "published"
+        / "episodes"
+        / "audio-publish-run"
+        / "artifact.json"
+    )
+    assert artifact["route"] == "audio_first"
+    assert artifact["source"]["type"] == "audio_file"
+    assert artifact["asr"] == {
+        "provider": "fixture",
+        "model": "fixture",
+        "language": "en",
+        "duration_seconds": 9.2,
+        "segment_count": 2,
+        "speaker_count": 2,
+        "diarization_provider": "fixture",
+        "quality": {
+            "recommendation": "safe_to_adapt",
+            "warnings": [],
+            "reasons": [],
+        },
+    }

@@ -171,6 +171,34 @@ def _speaker_summaries(script: dict, speaker_voices: dict | None) -> list[dict]:
     return speakers
 
 
+def _asr_summary(run_paths: RunPaths, source: dict) -> dict | None:
+    if _source_type(source) != "audio_file":
+        return None
+    raw_asr = _read_optional_json(run_paths.run_dir / "asr" / "raw.json") or {}
+    if not raw_asr:
+        return None
+    diarization = _read_optional_json(run_paths.run_dir / "asr" / "diarization.json") or {}
+    quality = _quality_summary(run_paths)
+    return {
+        "provider": raw_asr.get("provider"),
+        "model": raw_asr.get("model"),
+        "language": raw_asr.get("language"),
+        "duration_seconds": raw_asr.get("duration_seconds"),
+        "segment_count": len(raw_asr.get("segments") or []),
+        "speaker_count": (
+            diarization.get("speaker_count")
+            or quality.get("metrics", {}).get("speaker_count")
+            or 0
+        ),
+        "diarization_provider": diarization.get("provider"),
+        "quality": {
+            "recommendation": quality.get("recommendation", "unknown"),
+            "warnings": quality.get("warnings", []),
+            "reasons": quality.get("reasons", []),
+        },
+    }
+
+
 def _write_published_index(stable_publish_dir: Path, generated_at: str) -> None:
     episodes = []
     for artifact_path in sorted((stable_publish_dir / "episodes").glob("*/artifact.json")):
@@ -250,7 +278,7 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
             "feed": "../../feed.xml",
         },
         "speakers": _speaker_summaries(script, speaker_voices),
-        "asr": None,
+        "asr": _asr_summary(run_paths, source),
         "ui": {
             "default_tab": "script",
             "badges": [_route_for_source(source).replace("_", "-")],

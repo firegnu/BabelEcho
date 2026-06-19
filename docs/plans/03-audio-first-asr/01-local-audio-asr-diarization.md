@@ -1,6 +1,6 @@
 # 03.01 Audio-first 本地音频 ASR 与说话人分离计划
 
-状态：ready
+状态：in_progress
 
 日期：2026-06-19
 
@@ -657,8 +657,164 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - `publish` artifact 对 `audio_first` 有合理 source/asr/quality/media 字段。
 - Route A 来源矩阵和全量测试仍通过。
 
+## 当前完成记录
+
+### 2026-06-19：阶段 1 Route B 最小骨架
+
+- 已新增独立 `babelecho audio convert` CLI。
+- 阶段 1 初始版本只支持 `--to-stage ingest_audio`，不接 ASR、不接 diarization、不进 DeepSeek/TTS/publish。
+- 已新增 `source.type=audio_file` 本地音频输入验证和 run-local artifact：
+  - `source.json`
+  - `audio/input.<ext>`
+  - `audio/metadata.json`
+  - `run.json`
+- `source.json` 和 `audio/metadata.json` 不写本机绝对路径，只写 run-local 相对路径。
+- `run.json.outputs` 已能记录 `audio_metadata=audio/metadata.json`。
+- 已新增测试：
+  - `tests/test_audio_source.py`
+  - `tests/test_audio_pipeline.py`
+- 验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_source.py tests/test_audio_pipeline.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_source_matrix.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_article.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest -q`
+
+### 2026-06-19：阶段 2 Fixture ASR Provider
+
+- 已新增 fixture ASR provider：`asr.provider=fixture`。
+- `babelecho audio convert --to-stage asr` 已能在 run-local 写入：
+  - `asr/raw.json`
+- `asr/raw.json` 当前 canonical shape 包含：
+  - `provider`
+  - `model`
+  - `language`
+  - `duration_seconds`
+  - `segments[]`
+- `segments[]` 必须包含：
+  - `start_ms`
+  - `end_ms`
+  - `text`
+- 当前仍不接真实 ASR 模型、不接 diarization、不做声纹、不进 DeepSeek/TTS/publish。
+- 已新增测试：
+  - `tests/test_asr.py`
+  - `tests/fixtures/asr/two-speaker-asr.json`
+- 验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_asr_stage_writes_fixture_asr_artifact -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_source.py tests/test_audio_pipeline.py tests/test_asr.py -q`
+
+### 2026-06-19：阶段 3 Fixture Diarization Provider
+
+- 已新增 fixture diarization provider：`diarization.provider=fixture`。
+- `babelecho audio convert --to-stage diarize` 已能在 run-local 写入：
+  - `asr/diarization.json`
+- `asr/diarization.json` 当前 canonical shape 包含：
+  - `provider`
+  - `model`
+  - `speaker_count`
+  - `segments[]`
+- `segments[]` 必须包含：
+  - `start_ms`
+  - `end_ms`
+  - `speaker`
+- `diarization.provider=none` 会写空 artifact：
+  - `speaker_count=1`
+  - `segments=[]`
+  - `warnings=["diarization_disabled"]`
+- 当前仍不接真实 diarization 模型、不做声纹、不进 DeepSeek/TTS/publish。
+- 已新增测试：
+  - `tests/test_diarization.py`
+  - `tests/fixtures/asr/two-speaker-diarization.json`
+- 验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_writes_fixture_diarization_artifact -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_source.py tests/test_audio_pipeline.py tests/test_asr.py tests/test_diarization.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest -q`
+
+### 2026-06-19：阶段 4 ASR + Diarization 到 normalized.json
+
+- 已新增 audio-first normalize bridge：`audio_normalize.py`。
+- `babelecho audio convert --to-stage normalize` 已能把 fixture ASR + fixture/none diarization 转换为：
+  - `transcript/normalized.json`
+  - `transcript/quality.json`
+- `transcript/normalized.json` 使用现有后流程兼容 shape：
+  - `episode_id`
+  - `language`
+  - `segments[]`
+- `segments[]` 使用四位字符串 id，保留 ASR 原文，不翻译、不总结、不润色，`source="asr"`。
+- 第一版 speaker 分配策略：
+  - 有 diarization 时，对每个 ASR segment 选择时间重叠最多的 speaker turn。
+  - `diarization.provider=none` 或无 turn 时，统一映射为 `speaker_1`。
+  - ASR segment 横跨多个 speaker turn 时不拆分，选择最大重叠 speaker，并写 warning。
+  - 相邻同 speaker、间隔短、文本短的 ASR segment 会合并，避免过碎。
+- `transcript/quality.json` 为 audio-first 专属报告，保留 `safe_to_adapt` / `inspect_first` / `reject` 语义，并增加：
+  - `avg_confidence`
+  - `low_confidence_segment_count`
+  - `timestamp_error_count`
+  - `speaker_turn_count`
+  - `avg_speaker_turn_ms`
+  - `short_speaker_turn_count`
+  - `source_type`
+  - `extractor`
+- 当前仍不接真实 ASR、真实 diarization、声纹、DeepSeek/TTS/publish。
+- 已新增测试：
+  - `tests/test_audio_normalize.py`
+- 验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_normalize.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_normalize_stage_writes_transcript_artifacts -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_source.py tests/test_audio_pipeline.py tests/test_asr.py tests/test_diarization.py tests/test_audio_normalize.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest -q`
+
+### 2026-06-19：阶段 5 Fixture Full-chain
+
+- `babelecho audio convert --to-stage publish` 已能用 fixture ASR、fixture diarization、fixture LLM、fixture TTS 跑完整 Route B 到 publish。
+- audio-first pipeline 当前 stage 顺序：
+  - `ingest_audio`
+  - `asr`
+  - `diarize`
+  - `normalize`
+  - `adapt`
+  - `synthesize`
+  - `assemble`
+  - `publish`
+- 复用现有后流程原子能力：
+  - `adapt_to_chinese()`
+  - `synthesize_segments()`
+  - `assemble_audio()`
+  - `publish_episode()`
+- Fixture full-chain 已生成并验证：
+  - `source.json`
+  - `audio/metadata.json`
+  - `asr/raw.json`
+  - `asr/diarization.json`
+  - `transcript/normalized.json`
+  - `script/zh.json`
+  - `segments/manifest.json`
+  - `output/audio.mp3`
+  - `publish/feed.xml`
+  - `published/episodes/<run-id>/artifact.json`
+- `publish` artifact 对 `route=audio_first` 已输出 ASR 摘要，不发布私有路径或 voiceprint embedding：
+  - `provider`
+  - `model`
+  - `language`
+  - `duration_seconds`
+  - `segment_count`
+  - `speaker_count`
+  - `diarization_provider`
+  - `quality`
+- 当前仍不接真实 ASR、真实 diarization 或声纹。
+- 已新增/扩展测试：
+  - `tests/test_audio_pipeline.py::test_audio_convert_publish_stage_runs_fixture_full_chain`
+  - `tests/test_publish.py::test_publish_episode_adds_audio_first_asr_summary`
+- 验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_publish_stage_runs_fixture_full_chain -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_publish.py::test_publish_episode_adds_audio_first_asr_summary -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_source.py tests/test_audio_pipeline.py tests/test_asr.py tests/test_diarization.py tests/test_audio_normalize.py tests/test_publish.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest -q`
+
 ## 后续
 
+- 下一步进入阶段 6：5090D 真实 ASR Provider Smoke，先用短音频跑到 `asr` 或 `normalize`，不急着 TTS。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
 - 同一节目跨 episode speaker profile 复用。
