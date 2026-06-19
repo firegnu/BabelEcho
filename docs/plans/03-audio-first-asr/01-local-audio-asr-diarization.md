@@ -941,6 +941,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 当前 profile 只含 turn 数、总时长、首尾时间和 `embedding_status=not_computed`，不做身份识别，不写 voiceprint embedding。
   - publish 阶段如果发现该文件，会复制到 episode published 目录，并在 `artifact.json.artifacts.speaker_profiles` 与 `artifact.json.asr.speaker_profiles` 中暴露摘要。
   - 5090D 临时 worktree 已用 Practical AI 8 分钟样本跑到 `diarize`：`speaker_count=2`，speaker ids 为 `speaker_1/speaker_2`，所有 profile `embedding_status=not_computed`，`run.json.outputs.speaker_profiles=asr/speaker-profiles.json`。
+  - 5090D 最新 `main` full publish smoke `audio-speaker-profiles-practicalai-publish-20260620` 已通过：ASR 123 段、normalized/script/manifest 均 32 段，quality=`safe_to_adapt`，最终 MP3 为 `22050 Hz` mono、约 `361.48s`；published artifact 中 `speaker-profiles.json` 存在，`artifact.json.artifacts.speaker_profiles="speaker-profiles.json"`，`artifact.json.asr.speaker_profiles.embedding_status="not_computed"`。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py tests/test_audio_pipeline.py tests/test_audio_normalize.py -q`
