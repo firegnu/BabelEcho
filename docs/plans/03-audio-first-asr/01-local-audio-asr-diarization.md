@@ -908,6 +908,12 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - `tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider`
   - `tests/test_audio_normalize.py::test_audio_normalize_keeps_low_risk_cross_speaker_segments_safe`
   - `tests/test_audio_normalize.py::test_audio_normalize_marks_ambiguous_cross_speaker_segments_for_inspection`
+- ASR 模型横评第一轮：
+  - 同一样本使用已有官方 VTT 做粗略 WER 对比。
+  - `small.en`：cached normalize 约 `23.1s`，粗略 WER `0.165`，quality=`safe_to_adapt`。
+  - `medium.en`：首次下载后 cached normalize 约 `28.7s`，粗略 WER `0.178`，quality=`safe_to_adapt`。
+  - 专名表现：`small.en` 多把 `Claude` 写成 `cloud`；`medium.en` 抓到 1 次 `Claude Code`，但也多次写成 `Clod`，并把 `Whitenack` 写成 `Witek`。
+  - 当前不把默认 ASR 从 `small.en` 升到 `medium.en`。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python tools/pyannote_diarization_wrapper.py --help`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider -q`
@@ -916,8 +922,8 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 
 ## 后续
 
-- 进入真实 ASR 模型横评，同一样本优先比较 `small.en` 与 `medium.en`。
-- 横评重点看专名错词、断句、speaker 边界附近文本质量，以及 normalize 后是否仍为 `safe_to_adapt`。
+- 先设计 ASR 专名纠错策略，覆盖 `Claude/cloud/Clod`、`Whitenack/Witek/White Knack`、`Anthropic` 等高频 AI podcast 专名。
+- 或继续横评 `large-v3` / faster-whisper，但必须继续只在 audio-first 路线验证，不作为 Route A fallback。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
 - 同一节目跨 episode speaker profile 复用。
