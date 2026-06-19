@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BabelEcho · 本地资料库</title>
+<link rel="stylesheet" href="./css/tokens.css">
+<link rel="stylesheet" href="./css/app.css">
+</head>
+<body>
+  <!-- top bar -->
+  <header class="topbar">
+    <a class="brand" href="#/">
+      <span class="brand-name">BabelEcho</span>
+      <span class="brand-sub">~/published · 本地资料库 · 只读</span>
+    </a>
+  </header>
+
+  <!-- screens render here -->
+  <main id="app" aria-live="polite"></main>
+
+  <!-- real audio element, controlled by the player UI -->
+  <audio id="player" preload="metadata"></audio>
+
+  <script defer src="./js/format.js"></script>
+  <script defer src="./js/data.js"></script>
+  <script defer src="./js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,61 @@
+/* Self-hosted Latin display/mono faces (variable woff2, latin subset) so the
+   distinctive type works fully offline — this is a local/LAN tool. CJK body text
+   uses the system CJK font (PingFang SC / Microsoft YaHei), not a bundled Noto. */
+@font-face {
+  font-family: 'Space Grotesk'; font-style: normal; font-weight: 500 700;
+  font-display: swap; src: url('../fonts/space-grotesk.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 400 700;
+  font-display: swap; src: url('../fonts/jetbrains-mono.woff2') format('woff2');
+}
+
+/* Design tokens — lifted verbatim from design-reference/BabelEcho.dc.html (:root).
+   Dark-only per HANDOFF.md ("纯暗色"). */
+:root {
+  --bg:#08090d; --panel:rgba(255,255,255,.045); --panel-2:rgba(255,255,255,.025); --inset:rgba(255,255,255,.05);
+  --border:rgba(255,255,255,.09); --border-2:rgba(255,255,255,.15); --wave:rgba(255,255,255,.13);
+  --fg:#eef0f6; --fg-2:#a6abbd; --fg-3:#6b7184;
+  --accent:#8b97ff; --accent-soft:rgba(139,151,255,.15); --accent-2:#4be0c4; --glow:rgba(139,151,255,.5);
+  --ok:#56d6b0; --warn:#ffcf5e; --bad:#ff7e8a; --unknown:#7c8190;
+  --role-male_a:#8b97ff; --role-male_b:#4be0c4; --role-female_a:#ff85c0; --role-female_b:#ffd166;
+  --shadow:0 1px 2px rgba(0,0,0,.4); --shadow-lg:0 10px 26px -14px rgba(0,0,0,.5);
+
+  --mono:'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --display:'Space Grotesk', sans-serif;
+  --sans:'Noto Sans SC', -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+
+body {
+  font-family: var(--sans);
+  color: var(--fg);
+  background:
+    radial-gradient(1200px 760px at 50% -24%, color-mix(in srgb, var(--accent) 17%, transparent), transparent 62%),
+    radial-gradient(820px 540px at 94% 20%, color-mix(in srgb, var(--accent-2) 9%, transparent), transparent 56%),
+    var(--bg);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  min-height: 100vh;
+}
+
+button { font-family: inherit; cursor: pointer; }
+a { color: inherit; }
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 6px; border: 3px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-track { background: transparent; }
+::selection { background: var(--accent); color: #0a0b12; }
+
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+@keyframes eq { 0%,100% { transform: scaleY(.28); } 50% { transform: scaleY(1); } }
+@keyframes riseIn { from { transform: translateY(9px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+@keyframes blink { 0%,49% { opacity: 1; } 50%,100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+}

@@ -1,0 +1,882 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f3f3f0; --panel:#ffffff; --panel-2:#faf9f7; --inset:#edece8;
+  --border:#e6e5e0; --border-2:#d8d7d1; --wave:#cfceC8; --wave:#cdccc6;
+  --fg:#1b1c1e; --fg-2:#56585b; --fg-3:#8a8c8f;
+  --accent:#2f6ba6; --accent-soft:rgba(47,107,166,0.10); --accent-2:#2f8f7d;
+  --ok:#5f8169; --warn:#b0822f; --bad:#a8534b; --unknown:#9a9c9f;
+  --role-male_a:#3b78cc; --role-male_b:#2f9183; --role-female_a:#9163c9; --role-female_b:#c4863a;
+  --shadow:0 1px 2px rgba(20,20,25,.05); --shadow-lg:0 14px 36px -20px rgba(20,20,25,.26);
+}
+[data-theme="dark"]{
+  --bg:#0e1012; --panel:#16181b; --panel-2:#1b1e22; --inset:#101316;
+  --border:#272a2e; --border-2:#363a3f; --wave:#383c41;
+  --fg:#e9e9e7; --fg-2:#a6a8ab; --fg-3:#737679;
+  --accent:#5f9bd6; --accent-soft:rgba(95,155,214,0.16); --accent-2:#4eb6a0;
+  --ok:#7fa088; --warn:#caa05c; --bad:#cf7d75; --unknown:#7e8185;
+  --role-male_a:#69a6f0; --role-male_b:#54c2af; --role-female_a:#bd97ec; --role-female_b:#e2ad62;
+  --shadow:0 1px 2px rgba(0,0,0,.32); --shadow-lg:0 18px 44px -22px rgba(0,0,0,.66);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{font-family:'Noto Sans SC',-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:#f3f3f0;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+button{font-family:inherit;cursor:pointer}
+a{color:inherit}
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-thumb{background:var(--border-2);border-radius:6px;border:3px solid transparent;background-clip:padding-box}
+::-webkit-scrollbar-track{background:transparent}
+::selection{background:var(--accent-soft)}
+@keyframes eq{0%,100%{transform:scaleY(.28)}50%{transform:scaleY(1)}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes riseIn{from{transform:translateY(9px)}to{transform:translateY(0)}}
+@keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+@keyframes glow{0%,100%{box-shadow:0 8px 22px -6px color-mix(in srgb,var(--accent) 50%,transparent)}50%{box-shadow:0 10px 30px -4px color-mix(in srgb,var(--accent) 78%,transparent)}}
+</style>
+</helmet>
+
+<div data-theme="{{ themeAttr }}" style="min-height:100vh;width:100%;background:var(--bg);color:var(--fg);font-family:'Noto Sans SC',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif">
+
+<!-- ============ DESKTOP ============ -->
+<sc-if value="{{ showDesktop }}" hint-placeholder-val="{{ true }}">
+<div>
+
+<!-- top bar -->
+<div style="height:53px;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--border);background:var(--panel);position:sticky;top:0;z-index:30">
+  <div onClick="{{ home }}" style="display:flex;align-items:baseline;gap:11px;cursor:pointer">
+    <span style="font-size:16px;font-weight:700;letter-spacing:-0.02em">BabelEcho</span>
+    <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">本地资料库 · 只读</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px">
+    <button onClick="{{ openMobile }}" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--border-2);background:var(--panel);color:var(--fg-2);font-size:13px" style-hover="border-color:var(--accent);color:var(--accent)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>
+      移动端预览
+    </button>
+    <button onClick="{{ toggleTheme }}" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:7px;border:1px solid var(--border-2);background:var(--panel);color:var(--fg-2);font-size:13px" style-hover="border-color:var(--accent);color:var(--accent)">
+      <sc-if value="{{ isDark }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.4 1.4M17.6 17.6L19 19M19 5l-1.4 1.4M6.4 17.6L5 19"/></svg></sc-if>
+      <sc-if value="{{ notDark }}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.8A8.3 8.3 0 1111.2 3a6.6 6.6 0 009.8 9.8z"/></svg></sc-if>
+      {{ themeLabel }}
+    </button>
+  </div>
+</div>
+
+<!-- LIBRARY -->
+<sc-if value="{{ showLibrary }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;align-items:stretch;height:calc(100vh - 53px)">
+
+  <!-- filter rail -->
+  <div style="width:252px;flex:none;border-right:1px solid var(--border);background:var(--panel);overflow-y:auto;padding:18px 14px">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;border-radius:8px;background:var(--accent-soft);color:var(--accent);font-weight:600;font-size:14px;margin-bottom:6px">
+      <span>资料库</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:12px">{{ epCount }}</span>
+    </div>
+
+    <div style="margin-top:18px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:0.08em;color:var(--fg-3);padding:0 10px 8px">ROUTE</div>
+      <sc-for list="{{ routeF }}" as="f" hint-placeholder-count="3">
+        <div onClick="{{ f.onClick }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px;background:{{ f.bg }};color:{{ f.fg }};font-weight:{{ f.weight }}" style-hover="background:var(--inset)">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px">{{ f.label }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ f.count }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:18px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:0.08em;color:var(--fg-3);padding:0 10px 8px">SOURCE</div>
+      <sc-for list="{{ sourceF }}" as="f" hint-placeholder-count="4">
+        <div onClick="{{ f.onClick }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px;background:{{ f.bg }};color:{{ f.fg }};font-weight:{{ f.weight }}" style-hover="background:var(--inset)">
+          <span style="font-family:'JetBrains Mono',monospace;font-size:12px">{{ f.label }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ f.count }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <div style="margin-top:18px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:0.08em;color:var(--fg-3);padding:0 10px 8px">QUALITY</div>
+      <sc-for list="{{ qualityF }}" as="f" hint-placeholder-count="4">
+        <div onClick="{{ f.onClick }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px;background:{{ f.bg }};color:{{ f.fg }};font-weight:{{ f.weight }}" style-hover="background:var(--inset)">
+          <span style="display:flex;align-items:center;gap:8px;font-family:'JetBrains Mono',monospace;font-size:12px"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:{{ f.dot }}"></span>{{ f.label }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ f.count }}</span>
+        </div>
+      </sc-for>
+      <div style="font-size:11px;line-height:1.6;color:var(--fg-3);padding:8px 10px 0">当前所有 fixture 均为 safe_to_adapt；其余状态为占位展示。</div>
+    </div>
+
+    <div style="margin-top:18px">
+      <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;font-weight:600;letter-spacing:0.08em;color:var(--fg-3);padding:0 10px 8px">SPEAKER</div>
+      <sc-for list="{{ speakerF }}" as="f" hint-placeholder-count="2">
+        <div onClick="{{ f.onClick }}" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px;background:{{ f.bg }};color:{{ f.fg }};font-weight:{{ f.weight }}" style-hover="background:var(--inset)">
+          <span style="font-size:13px">{{ f.label }}</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ f.count }}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ filtersActive }}" hint-placeholder-val="{{ false }}">
+      <button onClick="{{ clearFilters }}" style="margin-top:18px;width:100%;height:32px;border-radius:7px;border:1px solid var(--border-2);background:none;color:var(--fg-2);font-size:13px" style-hover="border-color:var(--accent);color:var(--accent)">清除筛选</button>
+    </sc-if>
+  </div>
+
+  <!-- list -->
+  <div style="flex:1;min-width:0;overflow:auto;padding:26px 30px 48px">
+    <div style="display:flex;align-items:baseline;gap:14px;margin-bottom:4px">
+      <h1 style="margin:0;font-size:22px;font-weight:700;letter-spacing:-0.02em">Episode</h1>
+      <span style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--fg-3)">{{ rowsCount }} / {{ epCount }} 集</span>
+    </div>
+    <div style="font-size:12.5px;color:var(--fg-3);margin-bottom:14px">按 published_at 倒序 · 仅展示 status = succeeded</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px">
+      <span style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:8px;background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-2)"><span style="color:var(--fg-3)">总时长</span><span style="color:var(--fg);font-variant-numeric:tabular-nums">{{ totalDurLabel }}</span></span>
+      <span style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:8px;background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-2)"><span style="color:var(--fg-3)">route</span><span style="color:var(--fg)">{{ routeKinds }}</span></span>
+      <span style="display:inline-flex;align-items:center;gap:7px;padding:5px 11px;border-radius:8px;background:var(--panel);border:1px solid var(--border);box-shadow:var(--shadow);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-2)"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>全部 safe_to_adapt</span>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 196px 78px 104px 152px;gap:12px;min-width:880px;padding:0 16px 10px;font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.06em;color:var(--fg-3);text-transform:uppercase;white-space:nowrap">
+      <div>标题 / 来源</div><div>route · source</div><div>时长</div><div>角色</div><div>质量 · 发布</div>
+    </div>
+
+    <sc-for list="{{ rows }}" as="row" hint-placeholder-count="3">
+      <div onClick="{{ row.onClick }}" style="display:grid;grid-template-columns:minmax(0,1fr) 196px 78px 104px 152px;gap:12px;min-width:880px;align-items:center;padding:16px;border:1px solid var(--border);border-left:3px solid {{ row.routeColor }};border-radius:11px;background:var(--panel);box-shadow:var(--shadow);cursor:pointer;margin-bottom:11px;transition:transform .16s ease,box-shadow .16s ease,border-color .16s ease" style-hover="border-color:var(--border-2);box-shadow:var(--shadow-lg);transform:translateY(-2px)">
+        <div style="min-width:0">
+          <div style="font-size:15px;font-weight:600;line-height:1.35;color:var(--fg);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.title }}</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--fg-3);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ row.host }}</div>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px">
+          <span style="padding:3px 8px;border-radius:6px;background:{{ row.routeBg }};font-family:'JetBrains Mono',monospace;font-size:10.5px;color:{{ row.routeColor }};font-weight:500">{{ row.route }}</span>
+          <span style="padding:3px 8px;border-radius:6px;border:1px solid var(--border-2);background:var(--panel-2);font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--fg-2)">{{ row.source_type }}</span>
+        </div>
+        <div style="font-family:'JetBrains Mono',monospace;font-size:13px;color:var(--fg);font-variant-numeric:tabular-nums">{{ row.durLabel }}</div>
+        <div style="font-size:12.5px;color:{{ row.speakerColor }}">{{ row.speakerLabel }}</div>
+        <div>
+          <div style="display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--fg-2)"><span style="width:7px;height:7px;border-radius:50%;flex:none;background:var(--ok)"></span>safe_to_adapt</div>
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3);margin-top:5px">{{ row.publishedShort }}</div>
+        </div>
+      </div>
+    </sc-for>
+
+    <sc-if value="{{ rowsEmpty }}" hint-placeholder-val="{{ false }}">
+      <div style="margin-top:14px;padding:48px 24px;border:1px dashed var(--border-2);border-radius:12px;text-align:center;background:var(--panel-2)">
+        <div style="font-size:15px;font-weight:600;color:var(--fg-2)">{{ emptyMsg }}</div>
+        <div style="font-size:13px;color:var(--fg-3);margin-top:8px">这些状态目前没有 fixture，界面仍保留其展示形态。</div>
+        <button onClick="{{ clearFilters }}" style="margin-top:18px;height:34px;padding:0 16px;border-radius:8px;border:1px solid var(--border-2);background:var(--panel);color:var(--accent);font-size:13px">清除筛选</button>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</sc-if>
+
+<!-- DETAIL -->
+<sc-if value="{{ showDetail }}" hint-placeholder-val="{{ false }}">
+<div style="height:calc(100vh - 53px);overflow-y:auto">
+  <div style="max-width:1180px;margin:0 auto;padding:20px 32px 96px;animation:riseIn .4s cubic-bezier(.2,.7,.3,1)">
+
+    <button onClick="{{ back }}" style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 11px 0 8px;border-radius:7px;border:1px solid var(--border-2);background:var(--panel);color:var(--fg-2);font-size:13px;margin-bottom:20px" style-hover="border-color:var(--accent);color:var(--accent)">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>返回资料库
+    </button>
+
+    <!-- header -->
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px">
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;background:color-mix(in srgb, {{ cur.accentVar }} 14%, transparent);color:{{ cur.accentVar }};font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:500">{{ cur.route }}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--fg-2);font-family:'JetBrains Mono',monospace;font-size:11.5px">{{ cur.source_type }}</span>
+      <span style="display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:7px;border:1px solid var(--border-2);background:var(--panel-2);color:var(--fg-2);font-size:12px"><span style="width:7px;height:7px;border-radius:50%;background:var(--ok)"></span>succeeded · 可播放</span>
+    </div>
+    <h1 style="margin:0;font-size:38px;font-weight:700;letter-spacing:-0.03em;line-height:1.18;text-wrap:pretty;max-width:920px">{{ cur.title }}</h1>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:12.5px;color:var(--fg-3)">
+      <span>{{ cur.host }}</span><span>·</span><span>{{ cur.durLabel }}</span><span>·</span><span>{{ cur.publishedFull }}</span>
+    </div>
+
+    <!-- 2-col -->
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 308px;gap:30px;margin-top:24px;align-items:start">
+
+      <!-- main -->
+      <div style="min-width:0">
+        <!-- player -->
+        <div style="border:1px solid var(--border);border-radius:14px;background:var(--panel);padding:18px 20px;box-shadow:var(--shadow-lg)">
+          <div onClick="{{ seek }}" style="height:54px;display:flex;align-items:flex-end;gap:2px;cursor:pointer">
+            <sc-for list="{{ cur.wave }}" as="b" hint-placeholder-count="60">
+              <span style="flex:1;height:{{ b.h }};min-height:2px;background:{{ b.color }};border-radius:2px 2px 1px 1px;pointer-events:none;transition:background .25s ease"></span>
+            </sc-for>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-3);font-variant-numeric:tabular-nums">
+            <span style="color:var(--fg-2)">{{ cur.posLabel }}</span><span>{{ cur.durLabel }}</span>
+          </div>
+          <div style="display:flex;align-items:center;gap:12px;margin-top:14px">
+            <button onClick="{{ togglePlay }}" style="width:48px;height:48px;flex:none;border-radius:50%;border:none;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 22px -6px color-mix(in srgb, var(--accent) 60%, transparent)" style-hover="filter:brightness(1.08)">
+              <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></sc-if>
+              <sc-if value="{{ notPlaying }}" hint-placeholder-val="{{ true }}"><svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></sc-if>
+            </button>
+            <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}">
+              <div style="display:flex;align-items:flex-end;gap:3px;height:20px">
+                <span style="width:3px;height:20px;background:var(--accent);border-radius:2px;transform-origin:bottom;animation:eq .9s ease-in-out infinite"></span>
+                <span style="width:3px;height:20px;background:var(--accent);border-radius:2px;transform-origin:bottom;animation:eq .7s ease-in-out infinite;animation-delay:.15s"></span>
+                <span style="width:3px;height:20px;background:var(--accent);border-radius:2px;transform-origin:bottom;animation:eq 1.1s ease-in-out infinite;animation-delay:.3s"></span>
+                <span style="width:3px;height:20px;background:var(--accent);border-radius:2px;transform-origin:bottom;animation:eq .8s ease-in-out infinite;animation-delay:.05s"></span>
+              </div>
+            </sc-if>
+            <div style="display:flex;align-items:center;gap:7px">
+              <span style="height:32px;padding:0 11px;display:flex;align-items:center;border-radius:7px;border:1px solid var(--border-2);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-2)">−15s</span>
+              <span style="height:32px;padding:0 11px;display:flex;align-items:center;border-radius:7px;border:1px solid var(--border-2);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-2)">+15s</span>
+              <span style="height:32px;padding:0 11px;display:flex;align-items:center;border-radius:7px;border:1px solid var(--border-2);font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-2)">1.0×</span>
+            </div>
+            <div style="flex:1"></div>
+            <button style="display:flex;align-items:center;gap:7px;height:36px;padding:0 16px;border-radius:8px;border:none;background:var(--fg);color:var(--bg);font-size:13px;font-weight:600;white-space:nowrap;flex:none" style-hover="filter:brightness(1.1)">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>下载 MP3
+            </button>
+          </div>
+        </div>
+
+        <!-- tabs -->
+        <div style="display:flex;gap:4px;border-bottom:1px solid var(--border);margin-top:22px">
+          <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+            <button onClick="{{ t.onClick }}" style="padding:11px 15px;background:none;border:none;border-bottom:2px solid {{ t.border }};color:{{ t.color }};font-weight:{{ t.weight }};font-size:14px;margin-bottom:-1px">{{ t.label }}</button>
+          </sc-for>
+        </div>
+
+        <div style="padding-top:22px">
+          <!-- SCRIPT tab -->
+          <sc-if value="{{ tabScript }}" hint-placeholder-val="{{ true }}">
+            <!-- article reading -->
+            <sc-if value="{{ cur.isArticle }}" hint-placeholder-val="{{ false }}">
+              <div style="max-width:680px">
+                <sc-for list="{{ cur.zh }}" as="seg" hint-placeholder-count="2">
+                  <sc-if value="{{ seg.heading }}" hint-placeholder-val="{{ false }}"><h3 style="font-size:19px;font-weight:700;letter-spacing:-0.01em;margin:30px 0 12px;color:var(--fg)">{{ seg.text }}</h3></sc-if>
+                  <sc-if value="{{ seg.notHeading }}" hint-placeholder-val="{{ true }}"><p style="margin:0 0 18px;font-size:16.5px;line-height:1.95;color:var(--fg)">{{ seg.text }}</p></sc-if>
+                </sc-for>
+              </div>
+            </sc-if>
+            <!-- transcript rows -->
+            <sc-if value="{{ cur.notArticle }}" hint-placeholder-val="{{ true }}">
+              <div>
+                <sc-for list="{{ cur.zh }}" as="seg" hint-placeholder-count="4">
+                  <div style="padding:14px 0;border-bottom:1px solid var(--border)">
+                    <sc-if value="{{ seg.hasSpeaker }}" hint-placeholder-val="{{ true }}">
+                      <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px">
+                        <span style="padding:3px 9px;border-radius:6px;background:color-mix(in srgb, {{ seg.roleColor }} 15%, transparent);color:{{ seg.roleColor }};font-size:12.5px;font-weight:600">{{ seg.speaker }}</span>
+                        <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ seg.role }}</span>
+                      </div>
+                    </sc-if>
+                    <div style="display:flex;gap:13px">
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3);width:34px;flex:none;padding-top:4px">{{ seg.id }}</span>
+                      <p style="margin:0;flex:1;font-size:15.5px;line-height:1.9;color:var(--fg)">{{ seg.text }}</p>
+                    </div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+            <div style="margin-top:18px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--fg-3);line-height:1.6">{{ cur.zhNote }}</div>
+          </sc-if>
+
+          <!-- ORIGINAL (en) tab -->
+          <sc-if value="{{ tabOriginal }}" hint-placeholder-val="{{ false }}">
+            <sc-if value="{{ cur.hasEn }}" hint-placeholder-val="{{ false }}">
+              <div>
+                <sc-for list="{{ cur.en }}" as="seg" hint-placeholder-count="1">
+                  <div style="padding:14px 0;border-bottom:1px solid var(--border)">
+                    <div style="display:flex;align-items:center;gap:9px;margin-bottom:7px">
+                      <span style="padding:3px 9px;border-radius:6px;background:color-mix(in srgb, {{ seg.roleColor }} 15%, transparent);color:{{ seg.roleColor }};font-size:12.5px;font-weight:600">{{ seg.speaker }}</span>
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ seg.time }}</span>
+                    </div>
+                    <div style="display:flex;gap:13px">
+                      <span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3);width:34px;flex:none;padding-top:4px">{{ seg.id }}</span>
+                      <p style="margin:0;flex:1;font-size:15.5px;line-height:1.9;color:var(--fg)">{{ seg.text }}</p>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="margin-top:18px;font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--fg-3);line-height:1.6">{{ cur.enNote }}</div>
+              </div>
+            </sc-if>
+            <sc-if value="{{ cur.noEn }}" hint-placeholder-val="{{ true }}">
+              <div style="padding:36px 22px;border:1px dashed var(--border-2);border-radius:12px;background:var(--panel-2)">
+                <div style="font-size:14.5px;color:var(--fg-2);line-height:1.7;max-width:560px">{{ cur.enEmptyNote }}</div>
+                <a href="{{ cur.sourceUrl }}" target="_blank" style="display:inline-flex;align-items:center;gap:7px;margin-top:14px;color:var(--accent);text-decoration:none;font-size:13.5px">打开原文 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></a>
+              </div>
+            </sc-if>
+          </sc-if>
+
+          <!-- QUALITY tab -->
+          <sc-if value="{{ tabQuality }}" hint-placeholder-val="{{ false }}">
+            <div style="display:flex;align-items:flex-start;gap:13px;padding:18px;border:1px solid var(--border);border-radius:12px;background:var(--panel)">
+              <span style="width:11px;height:11px;border-radius:50%;flex:none;margin-top:5px;background:var(--ok)"></span>
+              <div>
+                <div style="font-family:'JetBrains Mono',monospace;font-size:15px;font-weight:600;color:var(--fg)">safe_to_adapt</div>
+                <div style="font-size:13.5px;color:var(--fg-2);line-height:1.7;margin-top:6px;max-width:600px">{{ cur.qualityDesc }}</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:24px;margin-top:18px;flex-wrap:wrap">
+              <div style="flex:1;min-width:200px">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.06em;color:var(--fg-3);margin-bottom:8px">WARNINGS</div>
+                <div style="font-size:13.5px;color:var(--fg-3)">无警告</div>
+              </div>
+              <div style="flex:1;min-width:200px">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.06em;color:var(--fg-3);margin-bottom:8px">REASONS</div>
+                <div style="font-size:13.5px;color:var(--fg-3)">无</div>
+              </div>
+            </div>
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.06em;color:var(--fg-3);margin:24px 0 10px">METRICS</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+              <sc-for list="{{ cur.metrics }}" as="m" hint-placeholder-count="6">
+                <div style="background:var(--panel);padding:13px 14px">
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ m.k }}</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:500;color:var(--fg);margin-top:4px">{{ m.v }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="margin-top:18px;display:flex;align-items:center;gap:8px;font-size:13px;color:var(--fg-3)">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/></svg>{{ cur.asrNote }}
+            </div>
+          </sc-if>
+
+          <!-- META tab -->
+          <sc-if value="{{ tabMeta }}" hint-placeholder-val="{{ false }}">
+            <sc-for list="{{ cur.metaSections }}" as="sec" hint-placeholder-count="3">
+              <div style="margin-bottom:26px">
+                <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.06em;color:var(--fg-3);margin-bottom:4px">{{ sec.title }}</div>
+                <sc-for list="{{ sec.items }}" as="it" hint-placeholder-count="4">
+                  <div style="display:flex;justify-content:space-between;gap:18px;padding:10px 0;border-bottom:1px solid var(--border);font-size:13px">
+                    <span style="color:var(--fg-3);flex:none">{{ it.k }}</span>
+                    <sc-if value="{{ it.href }}" hint-placeholder-val="{{ false }}"><a href="{{ it.href }}" target="_blank" style="color:var(--accent);text-decoration:none;font-family:'JetBrains Mono',monospace;font-size:12px;text-align:right;word-break:break-all">{{ it.v }} ↗</a></sc-if>
+                    <sc-if value="{{ it.noHref }}" hint-placeholder-val="{{ true }}"><span style="color:var(--fg);font-family:'JetBrains Mono',monospace;font-size:12px;text-align:right;word-break:break-all">{{ it.v }}</span></sc-if>
+                  </div>
+                </sc-for>
+                <sc-if value="{{ sec.hasNote }}" hint-placeholder-val="{{ false }}"><div style="font-size:12px;color:var(--fg-3);line-height:1.6;margin-top:10px">{{ sec.note }}</div></sc-if>
+              </div>
+            </sc-for>
+
+            <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;letter-spacing:0.06em;color:var(--fg-3);margin-bottom:8px">ARTIFACTS</div>
+            <sc-for list="{{ cur.artifacts }}" as="a" hint-placeholder-count="4">
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0;border-bottom:1px solid var(--border)">
+                <div style="min-width:0">
+                  <span style="font-size:13.5px;color:var(--fg)">{{ a.label }}</span>
+                  <span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--fg-3);margin-left:10px">{{ a.path }}</span>
+                </div>
+                <sc-if value="{{ a.isDownload }}" hint-placeholder-val="{{ false }}"><span style="display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:7px;background:var(--accent-soft);color:var(--accent);font-size:12.5px;font-weight:600;flex:none">下载</span></sc-if>
+                <sc-if value="{{ a.isOpen }}" hint-placeholder-val="{{ true }}"><span style="color:var(--accent);font-size:12.5px;flex:none">查看 ↗</span></sc-if>
+              </div>
+            </sc-for>
+          </sc-if>
+        </div>
+      </div>
+
+      <!-- right rail -->
+      <aside style="min-width:0">
+        <sc-if value="{{ cur.showSpeakerList }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:16px;margin-bottom:14px">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px"><span style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.04em;color:var(--fg-3)">说话人 SPEAKERS</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-2)">{{ cur.speaker_count }}</span></div>
+            <sc-for list="{{ cur.speakers }}" as="sp" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;gap:11px;padding:8px 0;border-top:1px solid var(--border)">
+                <div style="width:32px;height:32px;flex:none;border-radius:50%;background:color-mix(in srgb, {{ sp.roleColor }} 16%, transparent);color:{{ sp.roleColor }};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;box-shadow:inset 0 0 0 1.5px color-mix(in srgb, {{ sp.roleColor }} 42%, transparent)">{{ sp.initial }}</div>
+                <div style="flex:1;min-width:0">
+                  <div style="font-size:13.5px;font-weight:500;color:var(--fg)">{{ sp.name }}</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--fg-3)">{{ sp.subLabel }}</div>
+                </div>
+                <div style="text-align:right;flex:none">
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:{{ sp.roleColor }};background:color-mix(in srgb, {{ sp.roleColor }} 15%, transparent);padding:2px 7px;border-radius:5px;font-weight:500">{{ sp.role }}</div>
+                  <div style="font-family:'JetBrains Mono',monospace;font-size:10.5px;color:var(--fg-3);margin-top:4px">{{ sp.countLabel }}</div>
+                </div>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{ cur.showNoSpeakerNote }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid var(--border);border-radius:12px;background:var(--panel-2);padding:16px;margin-bottom:14px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.04em;color:var(--fg-3);margin-bottom:8px">说话人 SPEAKERS</div>
+            <div style="font-size:13px;color:var(--fg-2);line-height:1.65">无角色分段。本集未识别说话人（speakers = []）。</div>
+          </div>
+        </sc-if>
+        <sc-if value="{{ cur.showArticleNote }}" hint-placeholder-val="{{ false }}">
+          <div style="border:1px solid var(--border);border-radius:12px;background:var(--panel-2);padding:16px;margin-bottom:14px">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.04em;color:var(--fg-3);margin-bottom:8px">文章朗读 ARTICLE</div>
+            <div style="font-size:13px;color:var(--fg-2);line-height:1.65">article_reading 路线不区分说话人，按正文 + 小标题阅读排版呈现。</div>
+          </div>
+        </sc-if>
+
+        <div style="border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:16px;margin-bottom:14px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.04em;color:var(--fg-3);margin-bottom:12px">信息 INFO</div>
+          <sc-for list="{{ cur.info }}" as="i" hint-placeholder-count="5">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;gap:12px;padding:7px 0;font-size:13px"><span style="color:var(--fg-3);white-space:nowrap;flex:none">{{ i.k }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg);text-align:right">{{ i.v }}</span></div>
+          </sc-for>
+        </div>
+
+        <div style="border:1px solid var(--border);border-radius:12px;background:var(--panel);padding:16px">
+          <div style="font-family:'JetBrains Mono',monospace;font-size:11px;letter-spacing:0.04em;color:var(--fg-3);margin-bottom:12px">来源 / 下载</div>
+          <button style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;height:38px;border-radius:8px;border:none;background:var(--fg);color:var(--bg);font-size:13px;font-weight:600;margin-bottom:9px" style-hover="filter:brightness(1.1)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>下载 MP3
+          </button>
+          <a href="{{ cur.sourceUrl }}" target="_blank" style="display:flex;align-items:center;justify-content:space-between;gap:8px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--border-2);color:var(--fg-2);text-decoration:none;font-size:13px;margin-bottom:9px" style-hover="border-color:var(--accent);color:var(--accent)">打开来源页 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg></a>
+          <sc-if value="{{ cur.hasFeed }}" hint-placeholder-val="{{ false }}">
+            <a href="{{ cur.feedUrl }}" target="_blank" style="display:flex;align-items:center;justify-content:space-between;gap:8px;height:36px;padding:0 12px;border-radius:8px;border:1px solid var(--border-2);color:var(--fg-2);text-decoration:none;font-size:13px" style-hover="border-color:var(--accent);color:var(--accent)">打开 RSS feed <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="19" r="2"/><path d="M3 11a10 10 0 0110 10h-2.6A7.4 7.4 0 003 13.6z"/><path d="M3 4a17 17 0 0117 17h-2.6A14.4 14.4 0 003 6.6z"/></svg></a>
+          </sc-if>
+          <sc-if value="{{ cur.sourceEmptyNote }}" hint-placeholder-val="{{ false }}">
+            <div style="font-size:11.5px;color:var(--fg-3);line-height:1.6;margin-top:10px">{{ cur.sourceEmptyNote }}</div>
+          </sc-if>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</sc-if>
+
+<!-- ============ MOBILE ============ -->
+<sc-if value="{{ showMobile }}" hint-placeholder-val="{{ false }}">
+<div style="min-height:100vh;width:100%;background:var(--bg);display:flex;flex-direction:column;align-items:center;padding:26px 16px">
+  <div style="width:100%;max-width:760px;display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+    <button onClick="{{ back }}" style="display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px 0 9px;border-radius:8px;border:1px solid var(--border-2);background:var(--panel);color:var(--fg-2);font-size:13px" style-hover="border-color:var(--accent);color:var(--accent)"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg>返回桌面</button>
+    <div style="font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-3)">Mobile · 390 × 844 · Episode Detail</div>
+    <button onClick="{{ toggleTheme }}" style="display:flex;align-items:center;gap:7px;height:32px;padding:0 12px;border-radius:8px;border:1px solid var(--border-2);background:var(--panel);color:var(--fg-2);font-size:13px">{{ themeLabel }}</button>
+  </div>
+
+  <div style="width:390px;height:844px;background:var(--panel);border:1px solid var(--border-2);border-radius:46px;box-shadow:0 32px 90px rgba(0,0,0,0.22);overflow:hidden;position:relative;display:flex;flex-direction:column;animation:riseIn .45s cubic-bezier(.2,.7,.3,1)">
+    <!-- status bar -->
+    <div style="height:46px;flex:none;display:flex;align-items:center;justify-content:space-between;padding:0 30px"><span style="font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:600">9:41</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">BabelEcho</span></div>
+
+    <!-- sticky player header -->
+    <div style="flex:none;padding:4px 18px 14px;border-bottom:1px solid var(--border);background:var(--panel)">
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <span style="padding:3px 8px;border-radius:6px;background:var(--accent-soft);color:var(--accent);font-family:'JetBrains Mono',monospace;font-size:10px">{{ cur.route }}</span>
+        <span style="padding:3px 8px;border-radius:6px;border:1px solid var(--border-2);color:var(--fg-2);font-family:'JetBrains Mono',monospace;font-size:10px">{{ cur.source_type }}</span>
+      </div>
+      <div style="font-size:16px;font-weight:700;line-height:1.3;letter-spacing:-0.01em">{{ cur.title }}</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3);margin-top:5px">{{ cur.host }}</div>
+      <div onClick="{{ seek }}" style="height:34px;display:flex;align-items:flex-end;gap:1.5px;cursor:pointer;margin-top:13px">
+        <sc-for list="{{ cur.wave }}" as="b" hint-placeholder-count="60">
+          <span style="flex:1;height:{{ b.h }};min-height:2px;background:{{ b.color }};border-radius:1.5px;pointer-events:none;transition:background .25s ease"></span>
+        </sc-for>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:11px">
+        <button onClick="{{ togglePlay }}" style="width:42px;height:42px;flex:none;border-radius:50%;border:none;background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 6px 18px -5px color-mix(in srgb, var(--accent) 60%, transparent)">
+          <sc-if value="{{ playing }}" hint-placeholder-val="{{ false }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></sc-if>
+          <sc-if value="{{ notPlaying }}" hint-placeholder-val="{{ true }}"><svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></sc-if>
+        </button>
+        <div style="flex:1;font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--fg-3);display:flex;justify-content:space-between"><span>{{ cur.posLabel }}</span><span>{{ cur.durLabel }}</span></div>
+        <button style="width:42px;height:42px;flex:none;border-radius:50%;border:1px solid var(--border-2);background:var(--panel);color:var(--fg-2);display:flex;align-items:center;justify-content:center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg></button>
+      </div>
+    </div>
+
+    <!-- scroll content -->
+    <div style="flex:1;overflow-y:auto;padding:14px 18px 30px">
+      <div style="display:flex;gap:16px;border-bottom:1px solid var(--border);margin-bottom:14px">
+        <sc-for list="{{ tabs }}" as="t" hint-placeholder-count="4">
+          <button onClick="{{ t.onClick }}" style="padding:8px 0;background:none;border:none;border-bottom:2px solid {{ t.border }};color:{{ t.color }};font-weight:{{ t.weight }};font-size:13.5px;margin-bottom:-1px">{{ t.label }}</button>
+        </sc-for>
+      </div>
+
+      <sc-if value="{{ tabScript }}" hint-placeholder-val="{{ true }}">
+        <sc-for list="{{ cur.zh }}" as="seg" hint-placeholder-count="4">
+          <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+            <sc-if value="{{ seg.hasSpeaker }}" hint-placeholder-val="{{ true }}"><span style="display:inline-block;padding:2px 8px;border-radius:6px;background:color-mix(in srgb, {{ seg.roleColor }} 16%, transparent);color:{{ seg.roleColor }};font-size:11.5px;font-weight:600;margin-bottom:6px">{{ seg.speaker }}</span></sc-if>
+            <p style="margin:0;font-size:14.5px;line-height:1.85;color:var(--fg)">{{ seg.text }}</p>
+          </div>
+        </sc-for>
+        <div style="margin-top:14px;font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3);line-height:1.6">{{ cur.zhNote }}</div>
+      </sc-if>
+
+      <sc-if value="{{ tabOriginal }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ cur.en }}" as="seg" hint-placeholder-count="1">
+          <div style="padding:12px 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;gap:9px;margin-bottom:5px"><span style="padding:2px 8px;border-radius:6px;background:color-mix(in srgb, {{ seg.roleColor }} 16%, transparent);color:{{ seg.roleColor }};font-size:11.5px;font-weight:600">{{ seg.speaker }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--fg-3)">{{ seg.time }}</span></div>
+            <p style="margin:0;font-size:14.5px;line-height:1.85;color:var(--fg)">{{ seg.text }}</p>
+          </div>
+        </sc-for>
+      </sc-if>
+
+      <sc-if value="{{ tabQuality }}" hint-placeholder-val="{{ false }}">
+        <div style="display:flex;align-items:center;gap:9px;font-size:14px;color:var(--fg);margin-bottom:14px"><span style="width:9px;height:9px;border-radius:50%;background:var(--ok)"></span><span style="font-family:'JetBrains Mono',monospace">safe_to_adapt</span></div>
+        <sc-for list="{{ cur.metrics }}" as="m" hint-placeholder-count="4">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px"><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--fg-3)">{{ m.k }}</span><span style="font-family:'JetBrains Mono',monospace;color:var(--fg)">{{ m.v }}</span></div>
+        </sc-for>
+      </sc-if>
+
+      <sc-if value="{{ tabMeta }}" hint-placeholder-val="{{ false }}">
+        <sc-for list="{{ cur.metaFlat }}" as="it" hint-placeholder-count="6">
+          <div style="display:flex;justify-content:space-between;gap:14px;padding:8px 0;border-bottom:1px solid var(--border);font-size:12.5px"><span style="color:var(--fg-3);flex:none">{{ it.k }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--fg);text-align:right;word-break:break-all">{{ it.v }}</span></div>
+        </sc-for>
+      </sc-if>
+
+      <!-- accordions -->
+      <div style="margin-top:18px;border:1px solid var(--border);border-radius:11px;overflow:hidden">
+        <div onClick="{{ toggleMSpk }}" style="display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;font-size:13.5px;font-weight:600"><span>说话人 · {{ cur.speaker_count }}</span><span style="color:var(--fg-3);font-size:18px">{{ mSpkSign }}</span></div>
+        <sc-if value="{{ mSpkOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:0 14px 12px">
+            <sc-for list="{{ cur.speakers }}" as="sp" hint-placeholder-count="5">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-top:1px solid var(--border);font-size:13px"><span>{{ sp.name }}</span><span style="font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--accent)">{{ sp.role }} · {{ sp.countLabel }}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="margin-top:10px;border:1px solid var(--border);border-radius:11px;overflow:hidden">
+        <div onClick="{{ toggleMSrc }}" style="display:flex;align-items:center;justify-content:space-between;padding:13px 14px;cursor:pointer;font-size:13.5px;font-weight:600"><span>来源 source</span><span style="color:var(--fg-3);font-size:18px">{{ mSrcSign }}</span></div>
+        <sc-if value="{{ mSrcOpen }}" hint-placeholder-val="{{ false }}">
+          <div style="padding:0 14px 14px">
+            <a href="{{ cur.sourceUrl }}" target="_blank" style="display:block;color:var(--accent);text-decoration:none;font-family:'JetBrains Mono',monospace;font-size:11.5px;word-break:break-all;line-height:1.6">{{ cur.sourceUrl }} ↗</a>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;defaultTheme&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;light&quot;,&quot;dark&quot;],&quot;default&quot;:&quot;light&quot;,&quot;tsType&quot;:&quot;'light'|'dark'&quot;}}">
+class Component extends DCLogic {
+  state = {
+    theme: 'light',
+    view: 'library',
+    epId: null,
+    tab: 'script',
+    playing: false,
+    pos: 0,
+    fRoute: 'all', fSource: 'all', fQuality: 'all', fSpeaker: 'all',
+    mSpk: false, mSrc: false
+  };
+
+  componentDidMount() {
+    let t = null;
+    try { t = localStorage.getItem('be:theme'); } catch (e) {}
+    if (t !== 'dark' && t !== 'light') t = this.props.defaultTheme === 'dark' ? 'dark' : 'light';
+    if (t !== this.state.theme) this.setState({ theme: t });
+  }
+  componentWillUnmount() { this._stop(); }
+  _stop() { if (this._t) { clearInterval(this._t); this._t = null; } }
+
+  fmt(s) {
+    s = Math.max(0, Math.floor(s));
+    const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), x = s % 60;
+    const ss = String(x).padStart(2, '0');
+    return h > 0 ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+  }
+  fmtDur(s) { return this.fmt(Math.round(s)); }
+  fmtTime(iso) { if (!iso) return ''; return iso.replace('T', ' ').replace('Z', ' UTC').slice(0, 16); }
+  host(u) { try { return new URL(u).host; } catch (e) { return u || ''; } }
+  _roleVar(role) { const set = { male_a: 1, male_b: 1, female_a: 1, female_b: 1 }; return role && set[role] ? ('var(--role-' + role + ')') : 'var(--accent)'; }
+  _wave(seed, n) {
+    let h = 2166136261; for (let i = 0; i < seed.length; i++) { h ^= seed.charCodeAt(i); h = Math.imul(h, 16777619); }
+    let x = h >>> 0; const out = [];
+    for (let i = 0; i < n; i++) { x = (Math.imul(x, 1664525) + 1013904223) >>> 0; const r = x / 4294967295; const env = 0.4 + 0.6 * Math.sin((i / (n - 1)) * Math.PI); out.push(Math.max(0.14, Math.min(1, (0.22 + 0.9 * r) * env))); }
+    return out;
+  }
+
+  episodes() {
+    return [
+      {
+        run_id: 'article-anthropic-infra-noise-20260619',
+        title: 'Quantifying infrastructure noise in agentic coding evals \\ Anthropic',
+        route: 'article_reading', source_type: 'web_article',
+        duration: 684.849342, quality: 'safe_to_adapt', speaker_count: 0,
+        published: '2026-06-19T13:01:30Z',
+        source: { type: 'web_article', provider: 'trafilatura', input_url: 'https://www.anthropic.com/engineering/infrastructure-noise', episode_url: 'https://www.anthropic.com/engineering/infrastructure-noise' },
+        media: { mime: 'audio/mpeg', sample_rate: 22050, channels: 1 },
+        speakers: [],
+        zh: [
+          { id: '0001', text: '像 SWE-bench 和 Terminal-Bench 这样的智能体编程基准测试，常被用来比较前沿模型的软件工程能力……差距达到了 6 个百分点（p 值小于 0.01）。' },
+          { id: '0002', heading: true, text: '我们是如何发现这一点的' }
+        ],
+        zhNote: '正文共 33 段 · 此处展示开头片段。article_reading 路线为文章正文 + 小标题段，按阅读排版而非主持人转录行。',
+        en: [],
+        enEmptyNote: '英文为原始网页正文，transcript.en.json 无段级时间戳，无法用于跟读对照。可直接打开原文阅读。',
+        metrics: [{ k: 'segment_count', v: 33 }, { k: 'speaker_count', v: 0 }, { k: 'extractor', v: 'trafilatura' }],
+        artifacts: [
+          { label: 'audio.mp3', path: 'audio.mp3', kind: 'download' },
+          { label: 'transcript.zh.json', path: 'transcript.zh.json', kind: 'open' },
+          { label: 'transcript.en.json', path: 'transcript.en.json', kind: 'open' }
+        ]
+      },
+      {
+        run_id: 'frontend-publish-practical-ai-faithful-sidecar-20260619',
+        title: 'The AI engineer skills gap',
+        route: 'transcript_first', source_type: 'podcast_rss',
+        duration: 2372.179592, quality: 'safe_to_adapt', speaker_count: 5,
+        published: '2026-06-19T10:13:37Z',
+        source: { type: 'podcast_rss', provider: 'rss', episode_url: 'https://share.transistor.fm/s/e3639074' },
+        media: { mime: 'audio/mpeg', sample_rate: 22050, channels: 1 },
+        speakers: [
+          { name: 'Jerod', role: 'male_a', gender: 'male', count: 2 },
+          { name: 'Daniel', role: 'male_b', gender: 'male', count: 14 },
+          { name: 'Chris', role: 'male_a', gender: 'male', count: 7 },
+          { name: 'Ramin', role: 'male_b', gender: 'male', count: 17 },
+          { name: 'Sponsors', role: 'female_a', gender: null, count: 1, pseudo: true }
+        ],
+        zh: [
+          { id: '0001', speaker: 'Jerod', role: 'male_a', text: '欢迎收听 Practical AI 播客，在这里我们拆解人工智能的真实世界应用。你可以在 practicalai 点 fm 了解更多。' },
+          { id: '0002', text: '现在进入正题。' },
+          { id: '0003', speaker: 'Daniel', role: 'male_b', text: '欢迎收听新一期的 Practical AI 播客。我是 Daniel Wightnack，Prediction Guard 的 CEO……Chris，你怎么样？' },
+          { id: '0004', speaker: 'Chris', role: 'male_a', text: '嘿，今天挺好的，Daniel。你怎么样？' }
+        ],
+        zhNote: '脚本共 103 段 · 此处展示开头片段。含一个无 speaker 的过场段（“现在进入正题。”），按规则不显标签。中文脚本无段级时间戳。',
+        en: [
+          { id: '0001', speaker: 'Jerod', time: '00:00', text: 'Welcome to the Practical AI Podcast, where we break down the real world applications of artificial intelligence…' }
+        ],
+        enNote: '英文原文含段级时间戳（仅 podcast 路线 transcript.en.json），可按 id 与中文对照 · 共 103 段。',
+        metrics: [{ k: 'segment_count', v: 103 }, { k: 'speaker_count', v: 5 }],
+        artifacts: [
+          { label: 'audio.mp3', path: 'audio.mp3', kind: 'download' },
+          { label: 'transcript.zh.json', path: 'transcript.zh.json', kind: 'open' },
+          { label: 'transcript.en.json', path: 'transcript.en.json', kind: 'open' },
+          { label: 'feed.xml', path: '../../feed.xml', kind: 'open' }
+        ]
+      },
+      {
+        run_id: 'frontend-publish-podnews-sidecar-20260619',
+        title: 'A new AMP member',
+        route: 'transcript_first', source_type: 'podcast_rss',
+        duration: 231.523265, quality: 'safe_to_adapt', speaker_count: 0,
+        published: '2026-06-19T10:00:57Z',
+        source: { type: 'podcast_rss', provider: 'rss', input_url: 'https://podnews.net/rss', episode_url: 'https://podnews.net/update/amp-member', transcript_url: 'https://podnews.net/audio/podnews260618.mp3.vtt', feed_url: 'https://podnews.net/rss' },
+        media: { mime: 'audio/mpeg', sample_rate: 22050, channels: 1, file_size: 3704834 },
+        speakers: [],
+        zh: [
+          { id: '0001', text: '来自我们的免费每日新闻通讯，podnews.net 的最新消息，由 Spots Now 赞助播出。' }
+        ],
+        zhNote: '脚本共 18 段 · 无角色分段（speakers = []）· 此处展示开头片段。',
+        en: [],
+        enEmptyNote: '本集英文 transcript 无段级时间戳。可打开来源 transcript_url 查看原始 VTT。',
+        metrics: [
+          { k: 'segment_count', v: 18 }, { k: 'speaker_count', v: 0 }, { k: 'total_chars', v: 4251 },
+          { k: 'avg_chars_per_segment', v: 236.2 }, { k: 'max_chars_per_segment', v: 279 },
+          { k: 'dirty_markup_count', v: 0 }, { k: 'html_entity_count', v: 0 },
+          { k: 'repeated_line_score', v: 0.0 }, { k: 'repeated_phrase_score', v: 0.003 }
+        ],
+        artifacts: [
+          { label: 'audio.mp3', path: 'audio.mp3', kind: 'download' },
+          { label: 'transcript.zh.json', path: 'transcript.zh.json', kind: 'open' },
+          { label: 'transcript.en.json', path: 'transcript.en.json', kind: 'open' },
+          { label: 'feed.xml', path: '../../feed.xml', kind: 'open' }
+        ]
+      }
+    ];
+  }
+  cur() { return this.episodes().find(e => e.run_id === this.state.epId) || null; }
+  posKey(id) { return 'be:pos:' + id; }
+  _loadPos(id) { try { const v = localStorage.getItem(this.posKey(id)); if (v) return parseFloat(v) || 0; } catch (e) {} return 0; }
+  _savePos(id, p) { try { localStorage.setItem(this.posKey(id), String(p)); } catch (e) {} }
+
+  open(id) { this._stop(); this.setState({ view: 'detail', epId: id, pos: this._loadPos(id), playing: false, tab: 'script' }); }
+  back() { this._stop(); this.setState({ view: 'library', playing: false }); }
+  home() { this._stop(); this.setState({ view: 'library', playing: false }); }
+  openMobile() {
+    this._stop();
+    const id = 'frontend-publish-practical-ai-faithful-sidecar-20260619';
+    this.setState({ view: 'mobile', epId: id, pos: this._loadPos(id), playing: false, tab: 'script', mSpk: false, mSrc: false });
+  }
+  setTab(t) { this.setState({ tab: t }); }
+  toggleTheme() { const t = this.state.theme === 'dark' ? 'light' : 'dark'; try { localStorage.setItem('be:theme', t); } catch (e) {} this.setState({ theme: t }); }
+  setFilter(g, v) { const k = { route: 'fRoute', source: 'fSource', quality: 'fQuality', speaker: 'fSpeaker' }[g]; this.setState({ [k]: this.state[k] === v ? 'all' : v }); }
+  clearFilters() { this.setState({ fRoute: 'all', fSource: 'all', fQuality: 'all', fSpeaker: 'all' }); }
+
+  togglePlay() {
+    const ep = this.cur(); if (!ep) return;
+    if (this.state.playing) { this._stop(); this.setState({ playing: false }); return; }
+    this._t = setInterval(() => {
+      this.setState(s => {
+        let p = s.pos + 1;
+        if (p >= ep.duration) { p = ep.duration; this._stop(); this._savePos(ep.run_id, p); return { pos: p, playing: false }; }
+        this._savePos(ep.run_id, p); return { pos: p };
+      });
+    }, 1000);
+    this.setState({ playing: true });
+  }
+  seek(ev) {
+    const ep = this.cur(); if (!ep) return;
+    const r = ev.currentTarget.getBoundingClientRect();
+    const ratio = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+    const p = ratio * ep.duration;
+    this._savePos(ep.run_id, p);
+    this.setState({ pos: p });
+  }
+
+  buildMeta(ep) {
+    const src = ep.source, md = ep.media;
+    const mk = (k, v, href) => ({ k, v: String(v), href: href || null, noHref: !href });
+    const idItems = [mk('run_id', ep.run_id), mk('schema_version', '1.0'), mk('status', 'succeeded'), mk('route', ep.route), mk('published_at', ep.published)];
+    const srcItems = [mk('type', src.type), mk('provider', src.provider)];
+    if (src.input_url) srcItems.push(mk('input_url', src.input_url, src.input_url));
+    if (src.episode_url) srcItems.push(mk('episode_url', src.episode_url, src.episode_url));
+    if (src.transcript_url) srcItems.push(mk('transcript_url', src.transcript_url, src.transcript_url));
+    if (src.feed_url) srcItems.push(mk('feed_url', src.feed_url, src.feed_url));
+    const mediaItems = [mk('mime_type', md.mime), mk('duration_seconds', ep.duration), mk('sample_rate', '22050'), mk('channels', '1')];
+    if (md.file_size) mediaItems.push(mk('file_size_bytes', md.file_size));
+    const sections = [
+      { title: 'IDENTITY', items: idItems, note: null, hasNote: false },
+      { title: 'SOURCE', items: srcItems, note: ep.route === 'article_reading' ? '该来源未提供 author / site_name / published_time / excerpt，按缺省留白。asr = null。' : null, hasNote: ep.route === 'article_reading' },
+      { title: 'MEDIA', items: mediaItems, note: null, hasNote: false }
+    ];
+    return sections;
+  }
+
+  renderVals() {
+    const s = this.state;
+    const eps = this.episodes();
+    const themeAttr = s.theme;
+
+    // ---- filters ----
+    const keyOf = { route: 'fRoute', source: 'fSource', quality: 'fQuality', speaker: 'fSpeaker' };
+    const cnt = (pred) => eps.filter(pred).length;
+    const mk = (group, value, label, opts) => {
+      opts = opts || {};
+      const active = s[keyOf[group]] === value;
+      const c = opts.count;
+      return {
+        label, count: c, dot: opts.dot || 'transparent',
+        active, onClick: () => this.setFilter(group, value),
+        bg: active ? 'var(--accent-soft)' : 'transparent',
+        fg: active ? 'var(--accent)' : (c === 0 ? 'var(--fg-3)' : 'var(--fg-2)'),
+        weight: active ? 600 : 450
+      };
+    };
+    const routeF = [
+      mk('route', 'transcript_first', 'transcript_first', { count: cnt(e => e.route === 'transcript_first') }),
+      mk('route', 'article_reading', 'article_reading', { count: cnt(e => e.route === 'article_reading') }),
+      mk('route', 'audio_first', 'audio_first', { count: 0 })
+    ];
+    const sourceF = [
+      mk('source', 'podcast_rss', 'podcast_rss', { count: cnt(e => e.source_type === 'podcast_rss') }),
+      mk('source', 'web_article', 'web_article', { count: cnt(e => e.source_type === 'web_article') }),
+      mk('source', 'youtube_captions', 'youtube_captions', { count: 0 }),
+      mk('source', 'audio_file', 'audio_file', { count: 0 })
+    ];
+    const qualityF = [
+      mk('quality', 'safe_to_adapt', 'safe_to_adapt', { count: cnt(e => e.quality === 'safe_to_adapt'), dot: 'var(--ok)' }),
+      mk('quality', 'inspect_first', 'inspect_first', { count: 0, dot: 'var(--warn)' }),
+      mk('quality', 'reject', 'reject', { count: 0, dot: 'var(--bad)' }),
+      mk('quality', 'unknown', 'unknown', { count: 0, dot: 'var(--unknown)' })
+    ];
+    const speakerF = [
+      mk('speaker', 'with', '有角色', { count: cnt(e => e.speaker_count > 0) }),
+      mk('speaker', 'without', '无角色分段', { count: cnt(e => e.speaker_count === 0) })
+    ];
+
+    // ---- filtered rows ----
+    const fr = eps.filter(e =>
+      (s.fRoute === 'all' || e.route === s.fRoute) &&
+      (s.fSource === 'all' || e.source_type === s.fSource) &&
+      (s.fQuality === 'all' || e.quality === s.fQuality) &&
+      (s.fSpeaker === 'all' || (s.fSpeaker === 'with' ? e.speaker_count > 0 : e.speaker_count === 0))
+    );
+    const rows = fr.map(e => {
+      const rc = e.route === 'article_reading' ? 'var(--accent-2)' : 'var(--accent)';
+      return {
+        title: e.title, route: e.route, source_type: e.source_type,
+        durLabel: this.fmtDur(e.duration),
+        speakerLabel: e.speaker_count > 0 ? (e.speaker_count + ' 位说话人') : '无角色',
+        speakerColor: e.speaker_count > 0 ? 'var(--fg-2)' : 'var(--fg-3)',
+        publishedShort: this.fmtTime(e.published).slice(5, 16),
+        host: this.host(e.source.episode_url || e.source.input_url),
+        routeColor: rc, routeBg: 'color-mix(in srgb, ' + rc + ' 13%, transparent)',
+        onClick: () => this.open(e.run_id)
+      };
+    });
+    const totalDur = eps.reduce((a, e) => a + e.duration, 0);
+    const routeKinds = new Set(eps.map(e => e.route)).size;
+    const filtersActive = s.fRoute !== 'all' || s.fSource !== 'all' || s.fQuality !== 'all' || s.fSpeaker !== 'all';
+    const parts = [];
+    if (s.fRoute !== 'all') parts.push('route = ' + s.fRoute);
+    if (s.fSource !== 'all') parts.push('source = ' + s.fSource);
+    if (s.fQuality !== 'all') parts.push('quality = ' + s.fQuality);
+    if (s.fSpeaker !== 'all') parts.push('speaker = ' + (s.fSpeaker === 'with' ? '有角色' : '无角色'));
+    const emptyMsg = parts.length ? ('当前筛选（' + parts.join(' · ') + '）没有匹配的 episode。') : '没有 episode。';
+
+    // ---- current detail ----
+    const ep = this.cur();
+    let C = null;
+    const tab = s.tab;
+    let isArt = false;
+    if (ep) {
+      isArt = ep.route === 'article_reading';
+      const hasSpk = ep.speaker_count > 0;
+      const dur = ep.duration;
+      const segMetric = ep.metrics.find(m => m.k === 'segment_count');
+      const info = [
+        { k: '路线 route', v: ep.route },
+        { k: '来源 source', v: ep.source_type },
+        { k: '段数 segments', v: segMetric ? String(segMetric.v) : '—' },
+        { k: '时长 duration', v: this.fmtDur(dur) },
+        { k: '采样率', v: '22050 Hz' },
+        { k: '声道', v: 'mono' }
+      ];
+      const metaSections = this.buildMeta(ep);
+      const metaFlat = [];
+      metaSections.forEach(sec => sec.items.forEach(it => metaFlat.push({ k: it.k, v: it.v })));
+      const feedUrl = ep.source.feed_url || '../../feed.xml';
+      const hasFeed = !!ep.source.feed_url || ep.artifacts.some(a => a.label.indexOf('feed') >= 0);
+      C = {
+        title: ep.title,
+        host: this.host(ep.source.episode_url || ep.source.input_url),
+        route: ep.route, source_type: ep.source_type,
+        isArticle: isArt, notArticle: !isArt,
+        showSpeakerList: hasSpk, showNoSpeakerNote: (!hasSpk && !isArt), showArticleNote: (!hasSpk && isArt),
+        speaker_count: ep.speaker_count,
+        speakers: ep.speakers.map(sp => ({
+          name: sp.name, role: sp.role, initial: (sp.name || '?').slice(0, 1),
+          countLabel: sp.count + ' 段', roleColor: this._roleVar(sp.role),
+          subLabel: (sp.pseudo ? '非真人 · 赞助口播 · ' : '') + (sp.gender === 'male' ? '男声' : sp.gender === 'female' ? '女声' : 'gender —')
+        })),
+        zh: ep.zh.map(g => ({ id: g.id, speaker: g.speaker || '', role: g.role || '', text: g.text, hasSpeaker: !!g.speaker, heading: !!g.heading, notHeading: !g.heading, roleColor: this._roleVar(g.role) })),
+        zhNote: ep.zhNote,
+        wave: this._wave(ep.run_id, 60).map((hh, i) => ({ h: (hh * 100).toFixed(1) + '%', color: (i < Math.round((dur > 0 ? s.pos / dur : 0) * 60)) ? (isArt ? 'var(--accent-2)' : 'var(--accent)') : 'var(--wave)' })),
+        accentVar: isArt ? 'var(--accent-2)' : 'var(--accent)',
+        hasEn: ep.en.length > 0, noEn: ep.en.length === 0,
+        en: ep.en.map(g => ({ ...g, roleColor: this._roleVar((ep.speakers.find(z => z.name === g.speaker) || {}).role) })), enNote: ep.enNote || '', enEmptyNote: ep.enEmptyNote || '',
+        sourceUrl: ep.source.episode_url || ep.source.input_url,
+        metrics: ep.metrics,
+        qualityDesc: '已通过后端质量门禁，可进入后续流程。safe_to_adapt 表示“正常可播放”，不代表内容绝对正确，仍建议抽检。',
+        asrNote: '未使用 ASR · ' + ep.route + ' 路线，asr = null。',
+        metaSections, metaFlat,
+        artifacts: ep.artifacts.map(a => ({ label: a.label, path: a.path, isDownload: a.kind === 'download', isOpen: a.kind === 'open' })),
+        hasFeed, feedUrl,
+        sourceEmptyNote: isArt ? '该来源仅提供一个 URL，未含作者 / 站点名 / 发布时间 / 摘要，也无 RSS feed。' : null,
+        info,
+        durLabel: this.fmtDur(dur), posLabel: this.fmt(Math.floor(s.pos)),
+        progressPct: (dur > 0 ? Math.min(100, (s.pos / dur) * 100) : 0).toFixed(3) + '%',
+        publishedFull: this.fmtTime(ep.published)
+      };
+    }
+
+    const tabDefs = [
+      { key: 'script', label: isArt ? '正文' : '中文脚本' },
+      { key: 'original', label: '英文原文' },
+      { key: 'quality', label: '质量' },
+      { key: 'meta', label: 'Metadata' }
+    ];
+    const tabs = tabDefs.map(t => ({
+      label: t.label, onClick: () => this.setTab(t.key),
+      color: tab === t.key ? 'var(--fg)' : 'var(--fg-3)',
+      border: tab === t.key ? 'var(--accent)' : 'transparent',
+      weight: tab === t.key ? 600 : 450
+    }));
+
+    return {
+      themeAttr, isDark: s.theme === 'dark', notDark: s.theme !== 'dark',
+      themeLabel: s.theme === 'dark' ? '浅色' : '深色',
+      toggleTheme: () => this.toggleTheme(), openMobile: () => this.openMobile(),
+      home: () => this.home(), back: () => this.back(),
+      showDesktop: s.view !== 'mobile', showLibrary: s.view === 'library', showDetail: s.view === 'detail', showMobile: s.view === 'mobile',
+      rows, rowsCount: rows.length, rowsEmpty: rows.length === 0, emptyMsg,
+      totalDurLabel: this.fmtDur(totalDur), routeKinds,
+      filtersActive, clearFilters: () => this.clearFilters(),
+      routeF, sourceF, qualityF, speakerF, epCount: eps.length,
+      cur: C, tabs, tabScript: tab === 'script', tabOriginal: tab === 'original', tabQuality: tab === 'quality', tabMeta: tab === 'meta',
+      togglePlay: () => this.togglePlay(), playing: s.playing, notPlaying: !s.playing, seek: (e) => this.seek(e),
+      mSpkOpen: s.mSpk, mSrcOpen: s.mSrc, mSpkSign: s.mSpk ? '−' : '+', mSrcSign: s.mSrc ? '−' : '+',
+      toggleMSpk: () => this.setState(st => ({ mSpk: !st.mSpk })), toggleMSrc: () => this.setState(st => ({ mSrc: !st.mSrc }))
+    };
+  }
+}
+</script>
+</body>
+</html>
