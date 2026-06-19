@@ -162,8 +162,10 @@ publish:
 ```yaml
 asr:
   provider: local_cli
-  command: "/home/th5090d/miniforge3/envs/babelecho-asr/bin/asr-wrapper"
+  command: "/home/th5090d/miniforge3/envs/babelecho-tts/bin/python tools/openai_whisper_asr_wrapper.py"
+  model: "tiny.en"
   language: "en"
+  device: "cuda"
 
 diarization:
   provider: local_cli
@@ -812,9 +814,39 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_source.py tests/test_audio_pipeline.py tests/test_asr.py tests/test_diarization.py tests/test_audio_normalize.py tests/test_publish.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest -q`
 
+### 2026-06-19：阶段 6 真实 ASR Provider Smoke 起步
+
+- 5090D 上已确认本地 ASR 基础环境：
+  - Python env：`/home/th5090d/miniforge3/envs/babelecho-tts`
+  - Whisper CLI：`/home/th5090d/miniforge3/envs/babelecho-tts/bin/whisper`
+  - `torch 2.11.0+cu130`
+  - CUDA 可用，设备为 `NVIDIA GeForce RTX 5090 D v2`
+  - 已安装 `openai-whisper`；暂未安装 `faster-whisper` / `whisperx`
+- 已用公开英文短样本 `jfk.flac` 做本地 smoke：
+  - `tiny.en` 模型可自动下载到 `/home/th5090d/.cache/whisper/tiny.en.pt`
+  - `--device cuda --fp16 True` 可运行
+  - 输出 JSON 包含 2 个英文 ASR segment，内容与样本语音一致
+- 已新增真实 ASR wrapper：
+  - `tools/openai_whisper_asr_wrapper.py`
+  - 输入：`--audio-file`
+  - 输出：`--output-json`
+  - 可选：`--model`、`--language`、`--device`、`--task`、`--fp16`
+  - wrapper 输出 BabelEcho canonical `asr/raw.json`，不让后续流程依赖 Whisper 私有结构。
+- 已新增 `asr.provider=local_cli`：
+  - core pipeline 只调用本地命令并校验 `asr/raw.json`
+  - 普通本机测试不导入、不安装 Whisper
+  - fixture provider 保持兼容
+- 已新增/扩展测试：
+  - `tests/test_asr.py::test_local_cli_asr_invokes_wrapper_and_writes_canonical_raw_json`
+  - `tests/test_audio_pipeline.py::test_audio_convert_asr_stage_supports_local_cli_provider`
+- 本机验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py::test_local_cli_asr_invokes_wrapper_and_writes_canonical_raw_json tests/test_audio_pipeline.py::test_audio_convert_asr_stage_supports_local_cli_provider -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py tests/test_audio_pipeline.py -q`
+- 注意：这一步只证明真实 OpenAI Whisper ASR runtime 和 `local_cli` 接口可用；尚未完成真实音频通过 `babelecho audio convert --to-stage asr/normalize` 的端到端远程验证，也尚未接真实 diarization 或声纹。
+
 ## 后续
 
-- 下一步进入阶段 6：5090D 真实 ASR Provider Smoke，先用短音频跑到 `asr` 或 `normalize`，不急着 TTS。
+- 下一步把当前代码提交并同步到 5090D 后，用 `babelecho audio convert` + `asr.provider=local_cli` 跑真实英文短音频到 `asr` 或 `normalize`，不急着 TTS。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
 - 同一节目跨 episode speaker profile 复用。

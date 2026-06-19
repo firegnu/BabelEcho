@@ -3,7 +3,7 @@ from pathlib import Path
 from .adapt import adapt_to_chinese
 from .audio import assemble_audio
 from .audio_normalize import normalize_audio_transcript
-from .asr import run_fixture_asr
+from .asr import run_asr
 from .audio_source import ingest_audio_source
 from .checks import check_run_artifacts
 from .config import load_yaml
@@ -101,7 +101,7 @@ def run_audio_pipeline(
             status,
             run_paths,
             "asr",
-            lambda: run_fixture_asr(
+            lambda: run_asr(
                 local_config.get("asr") or {},
                 run_paths,
                 config_path=Path(local_config_path),

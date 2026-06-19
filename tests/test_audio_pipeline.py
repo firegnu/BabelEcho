@@ -129,6 +129,103 @@ publish:
     assert status["outputs"]["asr_raw"] == "asr/raw.json"
 
 
+def test_audio_convert_asr_stage_supports_local_cli_provider(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    audio = tmp_path / "sample.wav"
+    audio.write_bytes(b"fixture audio bytes")
+    wrapper = tmp_path / "fake_asr_wrapper.py"
+    wrapper.write_text(
+        """
+import argparse
+import json
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--audio-file", required=True)
+parser.add_argument("--output-json", required=True)
+parser.add_argument("--model")
+parser.add_argument("--language")
+parser.add_argument("--device")
+args = parser.parse_args()
+
+source = Path(args.audio_file)
+Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
+Path(args.output_json).write_text(json.dumps({
+    "provider": "fake_asr",
+    "model": args.model,
+    "language": args.language,
+    "duration_seconds": 1.5,
+    "segments": [
+        {
+            "start_ms": 0,
+            "end_ms": 1500,
+            "text": f"local cli saw {source.name}",
+        }
+    ],
+}), encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    local_config = tmp_path / "local-audio.yaml"
+    local_config.write_text(
+        f"""
+asr:
+  provider: local_cli
+  command: "{sys.executable} {wrapper}"
+  model: tiny.en
+  language: en
+  device: cpu
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "audio",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "audio-local-cli-asr",
+            "--audio-file",
+            str(audio),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "asr",
+        ],
+        text=True,
+        capture_output=True,
+        env=worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "asr:" in result.stdout
+    run_dir = workspace / "runs" / "audio-local-cli-asr"
+    raw_asr = read_json(run_dir / "asr" / "raw.json")
+    status = read_json(run_dir / "run.json")
+    assert raw_asr["provider"] == "fake_asr"
+    assert raw_asr["model"] == "tiny.en"
+    assert raw_asr["language"] == "en"
+    assert raw_asr["segments"] == [
+        {
+            "id": "asr_0001",
+            "start_ms": 0,
+            "end_ms": 1500,
+            "text": "local cli saw input.wav",
+        }
+    ]
+    assert status["status"] == "succeeded"
+    assert status["to_stage"] == "asr"
+    assert status["outputs"]["asr_raw"] == "asr/raw.json"
+
+
 def test_audio_convert_diarize_stage_writes_fixture_diarization_artifact(
     tmp_path: Path,
 ):
