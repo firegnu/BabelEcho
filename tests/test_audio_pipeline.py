@@ -279,11 +279,19 @@ publish:
     assert "diarize:" in result.stdout
     run_dir = workspace / "runs" / "audio-diarize-cli"
     diarization = read_json(run_dir / "asr" / "diarization.json")
+    profiles = read_json(run_dir / "asr" / "speaker-profiles.json")
     status = read_json(run_dir / "run.json")
     assert diarization == read_json(diarization_fixture)
+    assert profiles["provider"] == "diarization_stats"
+    assert profiles["speaker_count"] == 2
+    assert [speaker["id"] for speaker in profiles["speakers"]] == [
+        "speaker_1",
+        "speaker_2",
+    ]
     assert status["status"] == "succeeded"
     assert status["to_stage"] == "diarize"
     assert status["outputs"]["asr_diarization"] == "asr/diarization.json"
+    assert status["outputs"]["speaker_profiles"] == "asr/speaker-profiles.json"
 
 
 def test_audio_convert_diarize_stage_supports_local_cli_provider(tmp_path: Path):
@@ -512,6 +520,7 @@ publish:
     assert (run_dir / "audio" / "metadata.json").exists()
     assert (run_dir / "asr" / "raw.json").exists()
     assert (run_dir / "asr" / "diarization.json").exists()
+    assert (run_dir / "asr" / "speaker-profiles.json").exists()
     assert (run_dir / "transcript" / "normalized.json").exists()
     assert (run_dir / "script" / "zh.json").exists()
     assert (run_dir / "segments" / "manifest.json").exists()
@@ -532,7 +541,21 @@ publish:
     assert artifact["asr"]["model"] == "fixture"
     assert artifact["asr"]["segment_count"] == 2
     assert artifact["asr"]["speaker_count"] == 2
+    assert artifact["asr"]["speaker_profiles"] == {
+        "provider": "diarization_stats",
+        "speaker_count": 2,
+        "profile_kind": "diarization_stats",
+        "embedding_status": "not_computed",
+    }
     assert artifact["asr"]["quality"]["recommendation"] == "safe_to_adapt"
+    assert artifact["artifacts"]["speaker_profiles"] == "speaker-profiles.json"
+    assert (
+        workspace
+        / "published"
+        / "episodes"
+        / "audio-fixture-full-chain"
+        / "speaker-profiles.json"
+    ).exists()
     assert status["status"] == "succeeded"
     assert status["to_stage"] == "publish"
     assert status["outputs"]["audio"] == "output/audio.mp3"

@@ -28,6 +28,39 @@ def test_fixture_diarization_writes_canonical_json(tmp_path: Path):
         "speaker_1",
         "speaker_2",
     ]
+    profiles = read_json(run_paths.run_dir / "asr" / "speaker-profiles.json")
+    assert profiles == {
+        "schema_version": "1.0",
+        "provider": "diarization_stats",
+        "source": "diarization",
+        "diarization_provider": "fixture",
+        "diarization_model": "fixture",
+        "speaker_count": 2,
+        "speakers": [
+            {
+                "id": "speaker_1",
+                "label": "speaker_1",
+                "turn_count": 1,
+                "total_ms": 4200,
+                "first_start_ms": 0,
+                "last_end_ms": 4200,
+                "avg_turn_ms": 4200.0,
+                "profile_kind": "diarization_stats",
+                "embedding_status": "not_computed",
+            },
+            {
+                "id": "speaker_2",
+                "label": "speaker_2",
+                "turn_count": 1,
+                "total_ms": 4900,
+                "first_start_ms": 4300,
+                "last_end_ms": 9200,
+                "avg_turn_ms": 4900.0,
+                "profile_kind": "diarization_stats",
+                "embedding_status": "not_computed",
+            },
+        ],
+    }
 
 
 def test_disabled_diarization_writes_empty_single_speaker_artifact(tmp_path: Path):
@@ -47,6 +80,73 @@ def test_disabled_diarization_writes_empty_single_speaker_artifact(tmp_path: Pat
         "segments": [],
         "warnings": ["diarization_disabled"],
     }
+    profiles = read_json(run_paths.run_dir / "asr" / "speaker-profiles.json")
+    assert profiles == {
+        "schema_version": "1.0",
+        "provider": "diarization_stats",
+        "source": "diarization",
+        "diarization_provider": "none",
+        "diarization_model": None,
+        "speaker_count": 1,
+        "speakers": [
+            {
+                "id": "speaker_1",
+                "label": "speaker_1",
+                "turn_count": 0,
+                "total_ms": 0,
+                "first_start_ms": None,
+                "last_end_ms": None,
+                "avg_turn_ms": None,
+                "profile_kind": "diarization_stats",
+                "embedding_status": "not_computed",
+            }
+        ],
+    }
+
+
+def test_fixture_diarization_profiles_preserve_custom_speaker_labels(tmp_path: Path):
+    fixture = tmp_path / "custom-speaker-diarization.json"
+    write_json(
+        fixture,
+        {
+            "provider": "fixture",
+            "model": "fixture",
+            "speaker_count": 1,
+            "segments": [
+                {
+                    "start_ms": 1000,
+                    "end_ms": 2500,
+                    "speaker": "host",
+                }
+            ],
+        },
+    )
+    run_paths = create_run(tmp_path / "workspace", "custom-speaker-diarization")
+
+    run_diarization(
+        {
+            "provider": "fixture",
+            "fixture_path": str(fixture),
+        },
+        run_paths,
+        config_path=fixture,
+    )
+
+    profiles = read_json(run_paths.run_dir / "asr" / "speaker-profiles.json")
+    assert profiles["speaker_count"] == 1
+    assert profiles["speakers"] == [
+        {
+            "id": "host",
+            "label": "host",
+            "turn_count": 1,
+            "total_ms": 1500,
+            "first_start_ms": 1000,
+            "last_end_ms": 2500,
+            "avg_turn_ms": 1500.0,
+            "profile_kind": "diarization_stats",
+            "embedding_status": "not_computed",
+        }
+    ]
 
 
 def test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json(

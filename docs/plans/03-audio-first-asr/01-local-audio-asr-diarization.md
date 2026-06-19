@@ -57,7 +57,7 @@ local audio file
 - 支持 fixture ASR / fixture diarization provider，用于本机无重模型测试。
 - 支持从 `normalize` 之后继续复用 DeepSeek/TTS/publish。
 - 质量门禁至少覆盖空文本、时间戳异常、speaker 过碎、低置信度和音频 metadata 缺失。
-- 发布 artifact 中 `source.type=audio_file`、`route=audio_first`、`asr` 摘要可展示给只读前端。
+- 发布 artifact 中 `source.type=audio_file`、`route=audio_first`、`asr` 摘要可展示给只读前端；不含 embedding 的 speaker profile 统计文件可以同步到 published，真实 voiceprint embedding 不发布。
 
 ### Out
 
@@ -266,17 +266,27 @@ publish:
 
 ### `asr/speaker-profiles.json`
 
-可选。第一版可以只写 speaker 聚类摘要：
+可选。第一版只写 speaker 聚类统计摘要，不写声纹 embedding：
 
 ```json
 {
-  "provider": "fixture",
-  "profiles": [
+  "schema_version": "1.0",
+  "provider": "diarization_stats",
+  "source": "diarization",
+  "diarization_provider": "pyannote",
+  "diarization_model": "pyannote/speaker-diarization-community-1",
+  "speaker_count": 2,
+  "speakers": [
     {
-      "speaker": "speaker_1",
-      "segment_count": 42,
-      "duration_seconds": 320.5,
-      "embedding_path": null
+      "id": "speaker_1",
+      "label": "speaker_1",
+      "turn_count": 12,
+      "total_ms": 320500,
+      "first_start_ms": 0,
+      "last_end_ms": 601200,
+      "avg_turn_ms": 26708.3,
+      "profile_kind": "diarization_stats",
+      "embedding_status": "not_computed"
     }
   ]
 }
@@ -284,9 +294,9 @@ publish:
 
 约束：
 
-- 文件留在 ignored run 目录。
-- 不同步到 `workspace/published/`。
-- 如果以后保存 embedding，只能保存 run-local 相对路径，并且 published artifact 只能展示摘要。
+- 文件会写在 ignored run 目录 `asr/speaker-profiles.json`。
+- publish 阶段可以把无 embedding 的统计 profile 同步为 `workspace/published/episodes/<run-id>/speaker-profiles.json`，并在 `artifact.json.artifacts.speaker_profiles` 中给出相对路径。
+- 如果以后保存真实 embedding，只能保存 run-local 相对路径；published artifact 只能展示统计摘要和 `embedding_status`，不能发布 embedding 文件。
 
 ### `transcript/normalized.json`
 
@@ -602,7 +612,7 @@ ssh my-5090d-host '
 
 - 多人样本至少能分出 `speaker_1` / `speaker_2`。
 - 单人样本不会被过度切成很多 speaker。
-- `speaker-profiles.json` 不进入 published 目录。
+- `speaker-profiles.json` 写入 run 目录；如果只含统计 profile 且 `embedding_status=not_computed`，publish 可以同步到 published 目录。
 
 ### 阶段 8：Route B 小样本完整链路
 
@@ -925,9 +935,16 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 默认不开启，只支持显式短语 `from -> to`，按配置顺序应用，不做自动词典和宽泛 `cloud` 替换。
   - 命中摘要写入 `asr/raw.json` 的 `metadata.asr_replacements`。
   - 5090D 临时 worktree 已用 Practical AI 8 分钟样本验证：`tests/test_asr.py` 通过，`small.en` ASR 仍输出 123 段；3 条窄规则命中 4 次，修正 `Daniel White Knack`、`cloud code`、`cloud co-worker`，同时保留未确认的普通 `cloud security`。
+  - 5090D 最新 `main` 已跑 `audio-diarization-practicalai-replacements-normalize-20260620`：`small.en` + pyannote 到 `normalize` 仍为 `safe_to_adapt`，ASR 123 段、normalized 32 段、3 条规则命中 4 次；继续 `adapt` 后 DeepSeek 生成 32 段中文脚本，script QA 通过，首段脚本保留 `Daniel Whitenack`。
+- Speaker profile contract 第一版：
+  - `diarize` 阶段会从 canonical diarization turns 生成 `asr/speaker-profiles.json`。
+  - 当前 profile 只含 turn 数、总时长、首尾时间和 `embedding_status=not_computed`，不做身份识别，不写 voiceprint embedding。
+  - publish 阶段如果发现该文件，会复制到 episode published 目录，并在 `artifact.json.artifacts.speaker_profiles` 与 `artifact.json.asr.speaker_profiles` 中暴露摘要。
+  - 5090D 临时 worktree 已用 Practical AI 8 分钟样本跑到 `diarize`：`speaker_count=2`，speaker ids 为 `speaker_1/speaker_2`，所有 profile `embedding_status=not_computed`，`run.json.outputs.speaker_profiles=asr/speaker-profiles.json`。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py tests/test_audio_pipeline.py tests/test_audio_normalize.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py tests/test_audio_pipeline.py tests/test_publish.py -q`
   - `.conda/babelecho-dev/bin/python tools/pyannote_diarization_wrapper.py --help`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py tests/test_audio_pipeline.py tests/test_audio_normalize.py -q`

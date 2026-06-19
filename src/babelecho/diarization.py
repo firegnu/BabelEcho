@@ -87,6 +87,71 @@ def _disabled_diarization() -> dict[str, Any]:
     }
 
 
+def _speaker_profiles(diarization: dict[str, Any]) -> dict[str, Any]:
+    speakers: dict[str, dict[str, Any]] = {}
+    ordered_speakers: list[str] = []
+    for turn in diarization.get("segments") or []:
+        speaker = str(turn["speaker"])
+        if speaker not in speakers:
+            ordered_speakers.append(speaker)
+            speakers[speaker] = {
+                "id": speaker,
+                "label": speaker,
+                "turn_count": 0,
+                "total_ms": 0,
+                "first_start_ms": None,
+                "last_end_ms": None,
+                "profile_kind": "diarization_stats",
+                "embedding_status": "not_computed",
+            }
+        profile = speakers[speaker]
+        start_ms = int(turn["start_ms"])
+        end_ms = int(turn["end_ms"])
+        profile["turn_count"] += 1
+        profile["total_ms"] += end_ms - start_ms
+        if profile["first_start_ms"] is None or start_ms < profile["first_start_ms"]:
+            profile["first_start_ms"] = start_ms
+        if profile["last_end_ms"] is None or end_ms > profile["last_end_ms"]:
+            profile["last_end_ms"] = end_ms
+
+    speaker_count = int(diarization.get("speaker_count") or len(speakers) or 1)
+    if not ordered_speakers:
+        for index in range(1, speaker_count + 1):
+            speaker = f"speaker_{index}"
+            ordered_speakers.append(speaker)
+            speakers[speaker] = {
+                "id": speaker,
+                "label": speaker,
+                "turn_count": 0,
+                "total_ms": 0,
+                "first_start_ms": None,
+                "last_end_ms": None,
+                "profile_kind": "diarization_stats",
+                "embedding_status": "not_computed",
+            }
+
+    profiles = []
+    for speaker in ordered_speakers:
+        profile = speakers[speaker]
+        turn_count = int(profile["turn_count"])
+        profile["avg_turn_ms"] = (
+            round(int(profile["total_ms"]) / turn_count, 1)
+            if turn_count
+            else None
+        )
+        profiles.append(profile)
+
+    return {
+        "schema_version": "1.0",
+        "provider": "diarization_stats",
+        "source": "diarization",
+        "diarization_provider": diarization.get("provider"),
+        "diarization_model": diarization.get("model"),
+        "speaker_count": speaker_count,
+        "speakers": profiles,
+    }
+
+
 def _resolve_audio_input(run_paths: RunPaths) -> Path:
     source = _require_mapping(read_json(run_paths.source_json), "audio source")
     audio_input = source.get("audio_input")
@@ -202,4 +267,5 @@ def run_diarization(
 
     diarization_path = _asr_dir(run_paths) / "diarization.json"
     write_json(diarization_path, diarization)
+    write_json(_asr_dir(run_paths) / "speaker-profiles.json", _speaker_profiles(diarization))
     return diarization_path

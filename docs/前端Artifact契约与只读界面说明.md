@@ -353,6 +353,12 @@ audio-first 路线以后可以填充 `asr`：
   "language": "en",
   "duration_seconds": 601.2,
   "segment_count": 96,
+  "speaker_profiles": {
+    "provider": "diarization_stats",
+    "speaker_count": 3,
+    "profile_kind": "diarization_stats",
+    "embedding_status": "not_computed"
+  },
   "diarization": {
     "enabled": true,
     "speaker_count": 3,
@@ -370,6 +376,7 @@ audio-first 路线以后可以填充 `asr`：
 - 这个字段只做展示和人工判断。
 - 前端不依赖具体 ASR 模型名做分支逻辑。
 - 前端不展示或保存 voiceprint embedding。
+- 如果 `artifacts.speaker_profiles` 存在，它指向无 embedding 的 speaker 统计 profile，例如 turn 数、总时长和首尾时间；前端可用于详情页展示 speaker 分布。
 - `confidence` 第一版可以是粗粒度字符串：`high`、`medium`、`low`、`unknown`。
 
 ## Transcript / Script Contract

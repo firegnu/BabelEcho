@@ -179,7 +179,7 @@ def _asr_summary(run_paths: RunPaths, source: dict) -> dict | None:
         return None
     diarization = _read_optional_json(run_paths.run_dir / "asr" / "diarization.json") or {}
     quality = _quality_summary(run_paths)
-    return {
+    summary = {
         "provider": raw_asr.get("provider"),
         "model": raw_asr.get("model"),
         "language": raw_asr.get("language"),
@@ -197,6 +197,20 @@ def _asr_summary(run_paths: RunPaths, source: dict) -> dict | None:
             "reasons": quality.get("reasons", []),
         },
     }
+    speaker_profiles = _read_optional_json(run_paths.run_dir / "asr" / "speaker-profiles.json")
+    if speaker_profiles:
+        speakers = speaker_profiles.get("speakers") or []
+        summary["speaker_profiles"] = {
+            "provider": speaker_profiles.get("provider"),
+            "speaker_count": speaker_profiles.get("speaker_count") or len(speakers),
+            "profile_kind": (
+                speakers[0].get("profile_kind") if speakers else None
+            ),
+            "embedding_status": (
+                speakers[0].get("embedding_status") if speakers else None
+            ),
+        }
+    return summary
 
 
 def _write_published_index(stable_publish_dir: Path, generated_at: str) -> None:
@@ -257,8 +271,19 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
     write_json(episode_dir / "metadata.json", metadata)
     shutil.copy2(run_paths.normalized_transcript_json, episode_dir / "transcript.en.json")
     shutil.copy2(run_paths.chinese_script_json, episode_dir / "transcript.zh.json")
+    speaker_profiles_path = run_paths.run_dir / "asr" / "speaker-profiles.json"
+    if speaker_profiles_path.exists():
+        shutil.copy2(speaker_profiles_path, episode_dir / "speaker-profiles.json")
     published_at = _utc_timestamp()
     speaker_voices = _read_optional_json(run_paths.script_dir / "speaker-voices.json")
+    artifact_paths = {
+        "metadata": "metadata.json",
+        "transcript_en": "transcript.en.json",
+        "script_zh": "transcript.zh.json",
+        "feed": "../../feed.xml",
+    }
+    if speaker_profiles_path.exists():
+        artifact_paths["speaker_profiles"] = "speaker-profiles.json"
     artifact = {
         "schema_version": "1.0",
         "run_id": episode_id,
@@ -271,12 +296,7 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
         "source": _public_source(source),
         "quality": _quality_summary(run_paths),
         "media": _audio_probe(audio_target),
-        "artifacts": {
-            "metadata": "metadata.json",
-            "transcript_en": "transcript.en.json",
-            "script_zh": "transcript.zh.json",
-            "feed": "../../feed.xml",
-        },
+        "artifacts": artifact_paths,
         "speakers": _speaker_summaries(script, speaker_voices),
         "asr": _asr_summary(run_paths, source),
         "ui": {
@@ -324,8 +344,11 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
         "transcript.en.json",
         "transcript.zh.json",
         "artifact.json",
+        "speaker-profiles.json",
     ]:
-        shutil.copy2(episode_dir / name, stable_episode_dir / name)
+        source_path = episode_dir / name
+        if source_path.exists():
+            shutil.copy2(source_path, stable_episode_dir / name)
     shutil.copy2(feed_path, run_paths.stable_feed)
     _write_published_index(run_paths.stable_publish_dir, published_at)
     return str(feed_path)
