@@ -25,6 +25,9 @@ TRANSCRIPT_BOILERPLATE_PHRASES = (
     "authoritative record is the audio record",
     "authoritative record of",
 )
+TIMED_FRAGMENT_MERGE_MAX_GAP_MS = 1_500
+TIMED_FRAGMENT_MERGE_MAX_CHARS = 280
+TIMED_FRAGMENT_MERGE_MAX_DURATION_MS = 45_000
 
 
 def parse_timestamp_ms(value: str) -> int:
@@ -226,6 +229,14 @@ def _infer_speaker_labels_for_run(run_paths: RunPaths) -> bool:
     return source.get("source_type") != "youtube_captions"
 
 
+def _source_type_for_run(run_paths: RunPaths) -> str | None:
+    if not run_paths.source_json.exists():
+        return None
+    source = read_json(run_paths.source_json)
+    source_type = source.get("source_type")
+    return str(source_type) if source_type else None
+
+
 def _youtube_start_ms_for_run(run_paths: RunPaths) -> int | None:
     if not run_paths.source_json.exists():
         return None
@@ -258,6 +269,54 @@ def _filter_non_spoken_segments(segments: list[dict]) -> list[dict]:
     return _renumber_segments(kept)
 
 
+def _can_merge_timed_fragments(current: dict, next_segment: dict) -> bool:
+    if current.get("speaker") != next_segment.get("speaker"):
+        return False
+    if current.get("end_ms") is None or next_segment.get("start_ms") is None:
+        return False
+    if current.get("start_ms") is None or next_segment.get("end_ms") is None:
+        return False
+
+    gap_ms = int(next_segment["start_ms"]) - int(current["end_ms"])
+    if gap_ms < 0 or gap_ms > TIMED_FRAGMENT_MERGE_MAX_GAP_MS:
+        return False
+
+    merged_text = " ".join(
+        [
+            str(current.get("text", "")).strip(),
+            str(next_segment.get("text", "")).strip(),
+        ]
+    ).strip()
+    if len(merged_text) > TIMED_FRAGMENT_MERGE_MAX_CHARS:
+        return False
+    if (
+        int(next_segment["end_ms"]) - int(current["start_ms"])
+        > TIMED_FRAGMENT_MERGE_MAX_DURATION_MS
+    ):
+        return False
+    return True
+
+
+def _merge_timed_fragments(segments: list[dict]) -> list[dict]:
+    merged: list[dict] = []
+    for segment in segments:
+        if merged and _can_merge_timed_fragments(merged[-1], segment):
+            previous = merged[-1]
+            merged[-1] = {
+                **previous,
+                "end_ms": segment["end_ms"],
+                "text": " ".join(
+                    [
+                        str(previous.get("text", "")).strip(),
+                        str(segment.get("text", "")).strip(),
+                    ]
+                ).strip(),
+            }
+        else:
+            merged.append({**segment})
+    return _renumber_segments(merged)
+
+
 def _apply_youtube_start_offset(run_paths: RunPaths, segments: list[dict]) -> list[dict]:
     youtube_start_ms = _youtube_start_ms_for_run(run_paths)
     if youtube_start_ms is None:
@@ -275,12 +334,20 @@ def normalize_transcript(run_paths: RunPaths, raw_path: str | Path) -> Path:
     content = source.read_text(encoding="utf-8")
     suffix = source.suffix.lower()
     infer_speaker_labels = _infer_speaker_labels_for_run(run_paths)
-    if suffix in {".vtt", ".srt"}:
+    is_timed_transcript = suffix in {".vtt", ".srt"}
+    if is_timed_transcript:
         segments = parse_timed_text(content, infer_speaker_labels=infer_speaker_labels)
     else:
         segments = parse_plain_text(content, infer_speaker_labels=infer_speaker_labels)
     segments = _apply_youtube_start_offset(run_paths, segments)
     segments = _filter_non_spoken_segments(segments)
+    source_type = _source_type_for_run(run_paths)
+    if (
+        is_timed_transcript
+        and source_type is not None
+        and source_type != "youtube_captions"
+    ):
+        segments = _merge_timed_fragments(segments)
     if not segments:
         raise ValueError(f"No transcript segments parsed from {source}")
     output = {

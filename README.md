@@ -85,6 +85,11 @@ conda create -p ./.conda/babelecho-dev python=3.12 pip setuptools wheel pytest p
 
 See [docs/backend-mvp0-runbook.md](docs/backend-mvp0-runbook.md).
 
+For current self-use with one provided URL, use
+[docs/单URL自用运行手册.md](docs/单URL自用运行手册.md). It covers YouTube,
+episode pages, Apple Podcasts/iTunes, direct RSS feed URLs, and the
+pre-DeepSeek quality gate.
+
 ## On-demand Episode Convert
 
 Convert one episode by exact input:
@@ -135,6 +140,7 @@ The real 5090D run expects:
 - [Backend MVP-0 design](docs/backend-mvp.md)
 - [Backend MVP-0 tech stack](docs/backend-mvp0-tech-stack.md)
 - [Backend MVP-0 runbook](docs/backend-mvp0-runbook.md)
+- [Single URL self-use runbook](docs/单URL自用运行手册.md)
 - [Voice calibration explainer](docs/voice-calibration-explainer.md)
 - [Plan index](docs/plans/README.md)
 - [Implementation plan](docs/superpowers/plans/2026-06-16-backend-mvp0.md)

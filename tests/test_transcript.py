@@ -155,6 +155,114 @@ def test_normalize_srt(tmp_path: Path):
     assert data["segments"][1]["text"] == "This is the second subtitle."
 
 
+def test_normalize_merges_fragmented_vtt_cues_before_quality_report(tmp_path: Path):
+    run_paths = create_run(tmp_path, "fragmented-vtt-run")
+    write_json(
+        run_paths.source_json,
+        {
+            "source_type": "podcast_rss",
+            "raw_transcript": "transcript/raw.vtt",
+        },
+    )
+    raw = run_paths.transcript_dir / "raw.vtt"
+    cues = []
+    for index in range(24):
+        start_ms = index * 1_200
+        end_ms = start_ms + 1_000
+        cues.append(
+            "\n".join(
+                [
+                    (
+                        f"00:00:{start_ms // 1000:02d}.{start_ms % 1000:03d}"
+                        f" --> 00:00:{end_ms // 1000:02d}.{end_ms % 1000:03d}"
+                    ),
+                    f"Short update {index:02d} about agent workflow checks.",
+                ]
+            )
+        )
+    raw.write_text("WEBVTT\n\n" + "\n\n".join(cues) + "\n", encoding="utf-8")
+
+    data = read_json(normalize_transcript(run_paths, raw))
+    quality = read_json(run_paths.transcript_quality_json)
+
+    assert len(data["segments"]) < 20
+    assert data["segments"][0]["start_ms"] == 0
+    assert data["segments"][-1]["end_ms"] == 28_600
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert quality["flags"]["too_fragmented"] is False
+
+
+def test_normalize_timed_fragment_merge_does_not_cross_speakers(tmp_path: Path):
+    run_paths = create_run(tmp_path, "speaker-fragmented-vtt-run")
+    write_json(
+        run_paths.source_json,
+        {
+            "source_type": "podcast_rss",
+            "raw_transcript": "transcript/raw.vtt",
+        },
+    )
+    raw = run_paths.transcript_dir / "raw.vtt"
+    raw.write_text(
+        """WEBVTT
+
+00:00:00.000 --> 00:00:01.000
+<v Alice>First Alice fragment.
+
+00:00:01.200 --> 00:00:02.000
+<v Alice>Second Alice fragment.
+
+00:00:02.200 --> 00:00:03.000
+<v Bob>First Bob fragment.
+
+00:00:03.200 --> 00:00:04.000
+<v Alice>Third Alice fragment.
+""",
+        encoding="utf-8",
+    )
+
+    data = read_json(normalize_transcript(run_paths, raw))
+
+    assert [(segment["speaker"], segment["text"]) for segment in data["segments"]] == [
+        ("Alice", "First Alice fragment. Second Alice fragment."),
+        ("Bob", "First Bob fragment."),
+        ("Alice", "Third Alice fragment."),
+    ]
+    assert data["segments"][0]["start_ms"] == 0
+    assert data["segments"][0]["end_ms"] == 2000
+
+
+def test_normalize_youtube_captions_do_not_use_timed_fragment_merge(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path, "youtube-fragmented-vtt-run")
+    write_json(
+        run_paths.source_json,
+        {
+            "source_type": "youtube_captions",
+            "raw_transcript": "transcript/raw.vtt",
+        },
+    )
+    raw = run_paths.transcript_dir / "raw.vtt"
+    raw.write_text(
+        """WEBVTT
+
+00:00:00.000 --> 00:00:01.000
+First short YouTube cue.
+
+00:00:01.200 --> 00:00:02.000
+Second short YouTube cue.
+""",
+        encoding="utf-8",
+    )
+
+    data = read_json(normalize_transcript(run_paths, raw))
+
+    assert [segment["text"] for segment in data["segments"]] == [
+        "First short YouTube cue.",
+        "Second short YouTube cue.",
+    ]
+
+
 def test_normalize_youtube_captions_keeps_technical_colons_in_text(tmp_path: Path):
     run_paths = create_run(tmp_path, "youtube-caption-run")
     write_json(
