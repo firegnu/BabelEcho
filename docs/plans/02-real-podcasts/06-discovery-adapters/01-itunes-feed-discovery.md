@@ -45,3 +45,5 @@ Out:
 - `babelecho itunes search --query ...` 已可列出 podcast show、artist、feed URL 和 Apple URL。
 - `--select-index ... --source-config-out ...` 已可写出 `source.type=podcast_rss` YAML。
 - fake server CLI fixture 已覆盖 search -> source config 输出。
+- `babelecho itunes episodes --url <Apple Podcasts URL>` 已可从 Apple Podcasts/iTunes URL 解析节目 id，lookup 出 RSS `feedUrl`，复用 `rss episodes` 列表与 `--select-index ... --source-config-out ...` 生成明确单集的 `podcast_rss` YAML。
+- 真实 smoke `itunes-url-practical-ai-zero-trust-deepseek-adapt-20260619` 使用 Practical AI Apple Podcasts URL，选中 `Zero Trust for AI Agents`，normalize 后 103 段、3 speaker、quality=`safe_to_adapt`，DeepSeek adapt 和 script QA 通过，未进入 TTS。

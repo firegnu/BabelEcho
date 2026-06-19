@@ -1,11 +1,14 @@
 import json
+import re
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import parse_qs, urlencode, urlparse
 from urllib.request import Request, urlopen
 
 
 DEFAULT_SEARCH_URL = "https://itunes.apple.com/search"
+DEFAULT_LOOKUP_URL = "https://itunes.apple.com/lookup"
 DEFAULT_USER_AGENT = "BabelEcho/0.1"
+APPLE_PODCAST_ID_PATTERN = re.compile(r"(?:^|/)id(\d+)(?:$|/)")
 
 
 def build_itunes_search_url(config: dict[str, Any]) -> str:
@@ -17,6 +20,32 @@ def build_itunes_search_url(config: dict[str, Any]) -> str:
         "limit": str(int(config.get("max", 10))),
     }
     base_url = str(config.get("api_base_url") or DEFAULT_SEARCH_URL)
+    return f"{base_url}?{urlencode(query)}"
+
+
+def parse_apple_podcast_collection_id(url: str) -> str:
+    parsed = urlparse(url)
+    match = APPLE_PODCAST_ID_PATTERN.search(parsed.path.rstrip("/") + "/")
+    if match:
+        return match.group(1)
+    query_id = parse_qs(parsed.query).get("id")
+    if query_id and query_id[0]:
+        return query_id[0]
+    raise ValueError("Apple Podcasts URL must contain a podcast id like /id123")
+
+
+def build_itunes_lookup_url(config: dict[str, Any]) -> str:
+    collection_id = (
+        str(config["id"])
+        if config.get("id") is not None
+        else parse_apple_podcast_collection_id(_required_config_value(config, "url"))
+    )
+    query = {
+        "id": collection_id,
+        "country": str(config.get("country") or "US"),
+        "entity": "podcast",
+    }
+    base_url = str(config.get("api_base_url") or DEFAULT_LOOKUP_URL)
     return f"{base_url}?{urlencode(query)}"
 
 
@@ -75,6 +104,17 @@ def fetch_itunes_podcast_search(config: dict[str, Any]) -> list[dict[str, str]]:
     with urlopen(request, timeout=30) as response:
         payload = json.loads(response.read())
     return parse_itunes_podcast_results(payload)
+
+
+def fetch_itunes_podcast_lookup(config: dict[str, Any]) -> dict[str, str]:
+    url = build_itunes_lookup_url(config)
+    request = Request(
+        url,
+        headers={"User-Agent": config.get("user_agent") or DEFAULT_USER_AGENT},
+    )
+    with urlopen(request, timeout=30) as response:
+        payload = json.loads(response.read())
+    return parse_itunes_podcast_results(payload)[0]
 
 
 def build_podcast_rss_source_config(result: dict[str, str]) -> dict[str, dict[str, str]]:

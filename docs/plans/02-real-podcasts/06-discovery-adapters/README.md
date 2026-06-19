@@ -54,6 +54,7 @@ Out:
 
 - `babelecho itunes search --query ...` 能列出节目和 `feed_url`。
 - `babelecho itunes search --query ... --select-index ... --source-config-out ...` 能生成可给 `babelecho run --source-config ...` 使用的 `podcast_rss` YAML。
+- `babelecho itunes episodes --url <Apple Podcasts URL> --select-index ... --source-config-out ...` 能从 Apple URL 反查 RSS，列出 episodes，并生成明确单集的 `podcast_rss` YAML。
 - `babelecho rss episodes --feed-url ... --select-index ... --source-config-out ...` 能生成带 `episode_url` 的 `podcast_rss` YAML。
 - `babelecho run --source-config <youtube-source.yaml> --to-stage adapt` 能从 fixture YouTube subtitle source 走到中文脚本。
 - 真实 YouTube smoke 只拉字幕，不下载音频，不调用 LLM/TTS。
@@ -62,6 +63,7 @@ Out:
 ## 完成记录
 
 - 已新增 `src/babelecho/itunes.py` 和 `babelecho itunes search`。
+- 已新增 `babelecho itunes episodes --url ...`，把 Apple Podcasts/iTunes URL 收敛到 RSS episode 人工选择流程，不自动转换 show。
 - 已新增 `babelecho rss episodes`，把 feed 内人工选择的 episode 落成 `podcast_rss` source config。
 - 已新增 `src/babelecho/youtube.py` 和 `source.type=youtube_captions` ingest。
 - iTunes 输出标准 `source.type=podcast_rss`；YouTube 输出标准 transcript raw 文件并继续复用 normalize/adapt。

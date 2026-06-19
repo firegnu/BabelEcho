@@ -106,6 +106,11 @@ Supported exact inputs in the first version:
 
 If no transcript is available, the command fails clearly instead of falling back to ASR.
 
+For Apple Podcasts/iTunes URLs, keep the discovery step explicit: use
+`babelecho itunes episodes --url "<apple-podcasts-url>"` to list RSS episodes,
+then `--select-index ... --source-config-out ...` to create a single-episode
+`podcast_rss` source config for `episode convert --source-config`.
+
 For YouTube inputs, run to `normalize` first when validating a new URL. The CLI prints transcript candidate details plus quality metrics, and the full deterministic report is stored at `workspace/runs/<run-id>/transcript/quality.json`.
 
 The real 5090D run expects:

@@ -10,7 +10,11 @@ from .checks import CheckError, check_run_artifacts
 from .config import load_yaml, require_keys
 from .episode_convert import build_on_demand_source_config
 from .ingest import ingest_transcript_source
-from .itunes import build_podcast_rss_source_config, fetch_itunes_podcast_search
+from .itunes import (
+    build_podcast_rss_source_config,
+    fetch_itunes_podcast_lookup,
+    fetch_itunes_podcast_search,
+)
 from .jsonio import read_json
 from .overrides import apply_script_overrides
 from .paths import create_run
@@ -147,6 +151,15 @@ def build_parser() -> argparse.ArgumentParser:
     itunes_search.add_argument("--api-base-url")
     itunes_search.add_argument("--select-index", type=int)
     itunes_search.add_argument("--source-config-out")
+    itunes_episodes = itunes_subparsers.add_parser(
+        "episodes",
+        help="List RSS episodes from an Apple Podcasts URL.",
+    )
+    itunes_episodes.add_argument("--url", required=True)
+    itunes_episodes.add_argument("--country", default="US")
+    itunes_episodes.add_argument("--api-base-url")
+    itunes_episodes.add_argument("--select-index", type=int)
+    itunes_episodes.add_argument("--source-config-out")
 
     rss = subparsers.add_parser(
         "rss",
@@ -756,6 +769,31 @@ def main(argv: list[str] | None = None) -> int:
                         raise ValueError(f"--select-index out of range: {args.select_index}")
                     source_config = build_podcast_rss_source_config(
                         results[args.select_index - 1]
+                    )
+                    if args.source_config_out:
+                        _write_yaml(args.source_config_out, source_config)
+                        print(f"source config: {args.source_config_out}")
+                    else:
+                        print(yaml.safe_dump(source_config, allow_unicode=True, sort_keys=False))
+                return 0
+            if args.itunes_command == "episodes":
+                lookup_config = {
+                    "url": args.url,
+                    "country": args.country,
+                }
+                if args.api_base_url:
+                    lookup_config["api_base_url"] = args.api_base_url
+                result = fetch_itunes_podcast_lookup(lookup_config)
+                feed_url = result["feed_url"]
+                episodes = fetch_podcast_episodes(feed_url)
+                print(f"feed_url={feed_url}")
+                print(_format_rss_episodes(episodes))
+                if args.select_index is not None:
+                    if args.select_index < 1 or args.select_index > len(episodes):
+                        raise ValueError(f"--select-index out of range: {args.select_index}")
+                    source_config = build_podcast_rss_episode_source_config(
+                        feed_url=feed_url,
+                        episode=episodes[args.select_index - 1],
                     )
                     if args.source_config_out:
                         _write_yaml(args.source_config_out, source_config)

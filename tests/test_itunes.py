@@ -3,9 +3,11 @@ from urllib.parse import parse_qs, urlparse
 import pytest
 
 from babelecho.itunes import (
+    build_itunes_lookup_url,
     build_itunes_search_url,
     build_podcast_rss_source_config,
     parse_itunes_podcast_results,
+    parse_apple_podcast_collection_id,
 )
 
 
@@ -27,6 +29,39 @@ def test_build_itunes_search_url_for_podcasts():
         "media": ["podcast"],
         "entity": ["podcast"],
         "limit": ["5"],
+    }
+
+
+def test_parse_apple_podcast_collection_id_from_show_or_episode_url():
+    assert (
+        parse_apple_podcast_collection_id(
+            "https://podcasts.apple.com/us/podcast/99-invisible/id394775318"
+        )
+        == "394775318"
+    )
+    assert (
+        parse_apple_podcast_collection_id(
+            "https://podcasts.apple.com/us/podcast/99-invisible/id394775318?i=1000651234567"
+        )
+        == "394775318"
+    )
+
+
+def test_build_itunes_lookup_url_for_apple_podcast_url():
+    url = build_itunes_lookup_url(
+        {
+            "api_base_url": "http://127.0.0.1:9999/lookup",
+            "url": "https://podcasts.apple.com/us/podcast/99-invisible/id394775318",
+            "country": "US",
+        }
+    )
+
+    parsed = urlparse(url)
+    assert parsed.geturl().startswith("http://127.0.0.1:9999/lookup")
+    assert parse_qs(parsed.query) == {
+        "id": ["394775318"],
+        "country": ["US"],
+        "entity": ["podcast"],
     }
 
 

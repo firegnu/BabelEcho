@@ -9,6 +9,7 @@ TIME_RE = re.compile(
     r"(?P<start>\d{2}:\d{2}:\d{2}[,.]\d{3})\s+-->\s+"
     r"(?P<end>\d{2}:\d{2}:\d{2}[,.]\d{3})"
 )
+WEBVTT_VOICE_RE = re.compile(r"^\s*<v(?:\s+([^>]+))?>(.*)$")
 SPEAKER_LABEL_RE = re.compile(
     r"(?P<prefix>^|(?<=[.!?])\s+)"
     r"(?P<speaker>"
@@ -107,6 +108,15 @@ def _segments_from_text(
     return segments
 
 
+def _extract_webvtt_voice(text: str) -> tuple[str | None, str]:
+    match = WEBVTT_VOICE_RE.match(text)
+    if not match:
+        return None, text
+    speaker = match.group(1).strip() if match.group(1) else None
+    content = re.sub(r"</v>\s*$", "", match.group(2)).strip()
+    return speaker, content
+
+
 def _is_stage_marker(text: str) -> bool:
     return bool(STAGE_MARKER_RE.fullmatch(" ".join(text.split())))
 
@@ -184,10 +194,23 @@ def parse_timed_text(content: str, *, infer_speaker_labels: bool = True) -> list
         text_lines = lines[time_index + 1 :]
         if not text_lines:
             continue
+        text = " ".join(text_lines)
+        voice_speaker, voice_text = _extract_webvtt_voice(text)
+        if infer_speaker_labels and voice_speaker:
+            segments.append(
+                _segment(
+                    len(segments) + 1,
+                    voice_text,
+                    parse_timestamp_ms(match.group("start")),
+                    parse_timestamp_ms(match.group("end")),
+                    voice_speaker,
+                )
+            )
+            continue
         segments.extend(
             _segments_from_text(
                 len(segments) + 1,
-                " ".join(text_lines),
+                text,
                 parse_timestamp_ms(match.group("start")),
                 parse_timestamp_ms(match.group("end")),
                 infer_speaker_labels=infer_speaker_labels,

@@ -106,6 +106,7 @@
 - 已支持第一版 PodcastIndex 搜索/选择 CLI：`babelecho podcast-index search --query ...` 可搜索 feed，`babelecho podcast-index episodes --feed-id ... --select-index ... --source-config-out ...` 可生成现有 `source.type=podcast_index_api` 配置。
 - 已支持 `source.type=episode_page`，可从播客官网 episode 页面发现 transcript 链接或 transcript 正文，并保存为干净 `transcript/raw.txt`；99% Invisible 真实 smoke 已通过到 `ingest`。
 - 已支持第一版 iTunes feed discovery：`babelecho itunes search --query ...` 可从 iTunes Search API 找 podcast RSS `feedUrl`，并写出 `source.type=podcast_rss`。
+- 已支持 Apple Podcasts/iTunes URL 自用入口：`babelecho itunes episodes --url ...` 可从 URL 解析节目 id，经 iTunes lookup 拿 RSS `feedUrl`，列出 episodes，并把人工选中的单集写成带 `episode_url` 的 `source.type=podcast_rss`。该入口不自动选择 show 内最新集，不直接转换整档节目。
 - 已支持第一版 RSS episode selection：`babelecho rss episodes --feed-url ...` 可列出 feed 内 episodes，标记 transcript yes/no，并把选中 episode 写成 `source.type=podcast_rss`。
 - 已支持第一版 `source.type=youtube_captions`：用 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
 - 已完成 YouTube 单链接 pre-DeepSeek 清洗和质量门槛第一版：`babelecho episode convert --url ... --to-stage normalize` 对单个 YouTube 视频或 YouTube Podcasts 单集 URL 写出 `transcript/raw.vtt`、`transcript/cleaned.vtt`、`transcript/candidates.json`、`transcript/normalized.json` 和 `transcript/quality.json`；带 `t=` / `start=` 的 URL 会记录 `youtube_start_ms` 并裁剪 normalized 输入；YouTube 标题会写入 source metadata；CLI 会输出 `safe_to_adapt` / `inspect_first` / `reject` 建议和关键指标；字幕说话人箭头 `>>` 会在 deterministic cleaning 阶段移除；会拒绝 playlist/channel/show 类 URL，不做订阅扫描。

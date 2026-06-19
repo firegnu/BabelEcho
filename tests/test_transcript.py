@@ -183,6 +183,36 @@ AI: problem definition matters when API: calls are involved.
     )
 
 
+def test_normalize_vtt_voice_tags_extracts_speakers(tmp_path: Path):
+    run_paths = create_run(tmp_path, "vtt-voice-run")
+    write_json(
+        run_paths.source_json,
+        {
+            "source_type": "podcast_rss",
+            "raw_transcript": "transcript/raw.vtt",
+        },
+    )
+    raw = run_paths.transcript_dir / "raw.vtt"
+    raw.write_text(
+        """WEBVTT
+
+00:00:00.000 --> 00:00:02.000
+<v Daniel>Hello, Chris.
+
+00:00:02.500 --> 00:00:04.000
+<v Chris>Hi, Daniel.
+""",
+        encoding="utf-8",
+    )
+
+    data = read_json(normalize_transcript(run_paths, raw))
+
+    assert [(segment["speaker"], segment["text"]) for segment in data["segments"]] == [
+        ("Daniel", "Hello, Chris."),
+        ("Chris", "Hi, Daniel."),
+    ]
+
+
 def test_normalize_youtube_captions_applies_start_offset(tmp_path: Path):
     run_paths = create_run(tmp_path, "youtube-start-run")
     write_json(

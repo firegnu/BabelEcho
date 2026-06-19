@@ -898,6 +898,131 @@ def test_itunes_cli_searches_and_writes_podcast_rss_source_config(
     }
 
 
+def test_itunes_cli_lists_episodes_from_apple_url_and_writes_source_config(
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    source_config_out = tmp_path / "itunes-episode-source.yaml"
+    transcript = tmp_path / "episode.vtt"
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+    transcript.write_text(
+        "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nHello.\n",
+        encoding="utf-8",
+    )
+    routes: dict[str, str] = {}
+    server = run_route_server(routes)
+    feed_url = f"http://127.0.0.1:{server.server_port}/feed.xml"
+    routes["/lookup"] = json.dumps(
+        {
+            "results": [
+                {
+                    "wrapperType": "track",
+                    "kind": "podcast",
+                    "collectionName": "99% Invisible",
+                    "artistName": "Roman Mars",
+                    "feedUrl": feed_url,
+                    "collectionViewUrl": "https://podcasts.apple.com/us/podcast/99pi/id394775318",
+                }
+            ]
+        }
+    )
+    routes["/feed.xml"] = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>Fixture Feed</title>
+    <item>
+      <title>Panel Episode</title>
+      <link>https://example.com/panel</link>
+      <guid>panel-guid</guid>
+      <podcast:transcript url="{transcript}" type="text/vtt" language="en" />
+    </item>
+  </channel>
+</rss>
+"""
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "itunes",
+                "episodes",
+                "--url",
+                "https://podcasts.apple.com/us/podcast/99pi/id394775318?i=1000651234567",
+                "--api-base-url",
+                f"http://127.0.0.1:{server.server_port}/lookup",
+                "--select-index",
+                "1",
+                "--source-config-out",
+                str(source_config_out),
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        convert_result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "episode",
+                "convert",
+                "--workspace",
+                str(workspace),
+                "--run-id",
+                "itunes-url-flow",
+                "--source-config",
+                str(source_config_out),
+                "--local-config",
+                str(local_config),
+                "--to-stage",
+                "normalize",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert result.returncode == 0, result.stderr
+    assert convert_result.returncode == 0, convert_result.stderr
+    assert f"feed_url={feed_url}" in result.stdout
+    assert "1. Panel Episode (transcript=yes)" in result.stdout
+    assert f"source config: {source_config_out}" in result.stdout
+    source_config = yaml.safe_load(source_config_out.read_text(encoding="utf-8"))
+    assert source_config == {
+        "source": {
+            "type": "podcast_rss",
+            "feed_url": feed_url,
+            "episode_url": "https://example.com/panel",
+            "title": "Panel Episode",
+            "original_url": "https://example.com/panel",
+        }
+    }
+    run_dir = workspace / "runs" / "itunes-url-flow"
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "podcast_rss"
+    assert source["feed_url"] == feed_url
+    assert (run_dir / "transcript" / "normalized.json").exists()
+
+
 def test_rss_cli_lists_episodes_and_writes_source_config(tmp_path: Path):
     feed = tmp_path / "feed.xml"
     transcript = tmp_path / "episode.vtt"
