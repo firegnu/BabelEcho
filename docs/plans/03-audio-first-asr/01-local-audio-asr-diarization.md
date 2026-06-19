@@ -842,11 +842,23 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py::test_local_cli_asr_invokes_wrapper_and_writes_canonical_raw_json tests/test_audio_pipeline.py::test_audio_convert_asr_stage_supports_local_cli_provider -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py tests/test_audio_pipeline.py -q`
-- 注意：这一步只证明真实 OpenAI Whisper ASR runtime 和 `local_cli` 接口可用；尚未完成真实音频通过 `babelecho audio convert --to-stage asr/normalize` 的端到端远程验证，也尚未接真实 diarization 或声纹。
+- 5090D 已同步 `1741179 feat: add local cli asr wrapper` 后完成真实 `babelecho audio convert` smoke：
+  - run-id：`audio-asr-jfk-localcli-20260619`
+  - audio：`workspace/sources/asr-smoke-jfk.flac`
+  - config：`workspace/config/local-audio-asr-smoke.yaml`，ignored runtime config
+  - `--to-stage asr` 成功写入 `asr/raw.json`
+  - `provider=openai_whisper`
+  - `model=tiny.en`
+  - `language=en`
+  - `segment_count=2`
+  - transcript：`And so my fellow Americans... ask what you can do for your country.`
+  - 从 `--from-stage diarize --to-stage normalize` 继续成功，`quality.recommendation=safe_to_adapt`
+  - 当前 `diarization.provider=none`，所以 `quality.warnings=["diarization_disabled"]`
+- 注意：这一步证明真实 OpenAI Whisper ASR runtime、`local_cli` 接口和 audio-first `asr -> normalize` 桥接可用；尚未接真实 diarization 或声纹。
 
 ## 后续
 
-- 下一步把当前代码提交并同步到 5090D 后，用 `babelecho audio convert` + `asr.provider=local_cli` 跑真实英文短音频到 `asr` 或 `normalize`，不急着 TTS。
+- 下一步用更接近播客的英文短样本验证 `base.en` 或 `small.en`，再决定是否进入 faster-whisper；不急着跑 TTS。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
 - 同一节目跨 episode speaker profile 复用。
