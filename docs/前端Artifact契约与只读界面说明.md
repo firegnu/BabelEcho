@@ -60,6 +60,24 @@ workspace/published/
 
 `index.json` 是前端列表页入口；`artifact.json` 是单集详情页入口。
 
+## 当前实现状态
+
+当前 `schema_version=1.0` 已在 `src/babelecho/publish.py` 的 publish 阶段实现。每次成功 publish 时，后端会自动写入：
+
+- `workspace/published/episodes/<run-id>/artifact.json`
+- `workspace/published/index.json`
+
+这一步只追加前端 sidecar，不改变现有 MP3、RSS feed、metadata、transcript 或前面各阶段的业务语义。
+
+当前本机 `workspace/published/` 已有两条真实前端测试数据：
+
+| run_id | 来源 | 标题 | segments | speakers | 时长 | 音频 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `frontend-publish-practical-ai-faithful-sidecar-20260619` | Practical AI RSS | The AI engineer skills gap | 103 | 5 | 2372.179592 秒 | 22050 Hz mono MP3 |
+| `frontend-publish-podnews-sidecar-20260619` | Podnews RSS | A new AMP member | 18 | 0 | 231.523265 秒 | 22050 Hz mono MP3 |
+
+两条样本的 `quality.recommendation` 都是 `safe_to_adapt`。前端 agent 可以直接以这两条作为列表、播放器、脚本、英文对照、质量报告和多人 speaker 展示的 fixture。
+
 ## 路径原则
 
 - 所有面向前端的路径都使用相对 `workspace/published/` 的相对路径。
@@ -87,22 +105,35 @@ workspace/published/index.json
 ```json
 {
   "schema_version": "1.0",
-  "generated_at": "2026-06-19T08:27:33Z",
+  "generated_at": "2026-06-19T10:13:37Z",
   "title": "BabelEcho",
   "description": "Locally generated Chinese podcast artifacts.",
   "episodes": [
     {
-      "run_id": "rss-podnews-single-url-full-20260619",
+      "run_id": "frontend-publish-practical-ai-faithful-sidecar-20260619",
+      "title": "The AI engineer skills gap",
+      "route": "transcript_first",
+      "status": "succeeded",
+      "source_type": "podcast_rss",
+      "quality_recommendation": "safe_to_adapt",
+      "speaker_count": 5,
+      "duration_seconds": 2372.179592,
+      "published_at": "2026-06-19T10:13:37Z",
+      "audio_path": "episodes/frontend-publish-practical-ai-faithful-sidecar-20260619/audio.mp3",
+      "artifact_path": "episodes/frontend-publish-practical-ai-faithful-sidecar-20260619/artifact.json"
+    },
+    {
+      "run_id": "frontend-publish-podnews-sidecar-20260619",
       "title": "A new AMP member",
       "route": "transcript_first",
       "status": "succeeded",
       "source_type": "podcast_rss",
       "quality_recommendation": "safe_to_adapt",
       "speaker_count": 0,
-      "duration_seconds": 233.535,
-      "published_at": "2026-06-19T08:27:33Z",
-      "audio_path": "episodes/rss-podnews-single-url-full-20260619/audio.mp3",
-      "artifact_path": "episodes/rss-podnews-single-url-full-20260619/artifact.json"
+      "duration_seconds": 231.523265,
+      "published_at": "2026-06-19T10:00:57Z",
+      "audio_path": "episodes/frontend-publish-podnews-sidecar-20260619/audio.mp3",
+      "artifact_path": "episodes/frontend-publish-podnews-sidecar-20260619/artifact.json"
     }
   ]
 }
@@ -148,19 +179,20 @@ workspace/published/episodes/<run-id>/artifact.json
 ```json
 {
   "schema_version": "1.0",
-  "run_id": "rss-podnews-single-url-full-20260619",
+  "run_id": "frontend-publish-podnews-sidecar-20260619",
   "route": "transcript_first",
   "status": "succeeded",
   "title": "A new AMP member",
   "summary": null,
-  "created_at": "2026-06-19T08:26:27Z",
-  "published_at": "2026-06-19T08:27:33Z",
+  "created_at": null,
+  "published_at": "2026-06-19T10:00:57Z",
   "source": {
     "type": "podcast_rss",
     "provider": "rss",
     "input_url": "https://podnews.net/rss",
-    "episode_url": "https://example.com/episode",
-    "transcript_url": "https://example.com/transcript"
+    "episode_url": "https://podnews.net/update/amp-member",
+    "transcript_url": "https://podnews.net/audio/podnews260618.mp3.vtt",
+    "feed_url": "https://podnews.net/rss"
   },
   "quality": {
     "recommendation": "safe_to_adapt",
@@ -173,16 +205,18 @@ workspace/published/episodes/<run-id>/artifact.json
       "avg_chars_per_segment": 236.2,
       "max_chars_per_segment": 279,
       "dirty_markup_count": 0,
-      "html_entity_count": 0
+      "html_entity_count": 0,
+      "repeated_line_score": 0.0,
+      "repeated_phrase_score": 0.003
     }
   },
   "media": {
     "audio_path": "audio.mp3",
     "mime_type": "audio/mpeg",
-    "duration_seconds": 233.535,
+    "duration_seconds": 231.523265,
     "sample_rate": 22050,
     "channels": 1,
-    "file_size_bytes": 3741234
+    "file_size_bytes": 3704834
   },
   "artifacts": {
     "metadata": "metadata.json",
@@ -209,7 +243,7 @@ workspace/published/episodes/<run-id>/artifact.json
 | `status` | string | yes | `succeeded`、`partial`、`failed`。 |
 | `title` | string | yes | 单集标题。 |
 | `summary` | string/null | no | 后续可由 LLM 或 RSS metadata 提供，第一版可为 `null`。 |
-| `created_at` | string | no | run 创建时间。 |
+| `created_at` | string/null | no | run 创建时间；旧 run 或缺失 metadata 时可为 `null`。 |
 | `published_at` | string | no | publish 完成时间。 |
 | `source` | object | yes | 来源信息。只放公开 URL 和类型，不放内部 config。 |
 | `quality` | object | no | 质量报告摘要。来自 `transcript/quality.json` 或 ASR 路线质量报告。 |
@@ -221,7 +255,7 @@ workspace/published/episodes/<run-id>/artifact.json
 
 ## Source Contract
 
-`source.type` 建议值：
+`source.type` 当前已使用或预留值：
 
 | 值 | 含义 |
 | --- | --- |
@@ -231,7 +265,7 @@ workspace/published/episodes/<run-id>/artifact.json
 | `transcript_file` | 用户本地 transcript file。 |
 | `audio_file` | Phase 2 audio-first 本地音频文件。 |
 
-`source.provider` 建议值：
+`source.provider` 当前已使用或预留值：
 
 | 值 | 含义 |
 | --- | --- |
@@ -240,6 +274,8 @@ workspace/published/episodes/<run-id>/artifact.json
 | `itunes_lookup` | Apple Podcasts/iTunes URL 经 iTunes Lookup 找到 RSS。 |
 | `episode_page` | 官网页面。 |
 | `local_file` | 本地文件。 |
+
+当前 Apple Podcasts/iTunes URL 会先解析成 RSS，再进入同一条标准播客后流程；发布后的 artifact 目前表现为 `source.type=podcast_rss`、`source.provider=rss`。`itunes_lookup` 只作为以后想显式展示原始解析器时的预留值。
 
 前端只展示这些字段，不根据 provider 决定业务逻辑。
 
@@ -254,16 +290,14 @@ workspace/published/episodes/<run-id>/artifact.json
     "display_name": "Jerod",
     "voice_role": "male_a",
     "inferred_gender": "male",
-    "segment_count": 42,
-    "duration_seconds": 820.2
+    "segment_count": 2
   },
   {
     "id": "speaker_2",
     "display_name": "Daniel",
     "voice_role": "male_b",
     "inferred_gender": "male",
-    "segment_count": 39,
-    "duration_seconds": 760.8
+    "segment_count": 14
   }
 ]
 ```
@@ -273,6 +307,7 @@ workspace/published/episodes/<run-id>/artifact.json
 - `display_name` 可以来自 transcript speaker label，也可以是 `speaker_1`。
 - `voice_role` 是 BabelEcho 固定中文音色角色，例如 `female_a`、`male_a`、`female_b`、`male_b`。
 - `inferred_gender` 仅用于辅助展示，可为 `male`、`female`、`unknown` 或 `null`。
+- 当前实现生成 `segment_count`；speaker 级 `duration_seconds` 暂不生成，前端如遇到该字段可展示，缺失时应忽略。
 - 不暴露声纹 embedding。
 - 不暴露原始 speaker profile 文件。
 - 不暗示真实身份识别。
@@ -380,18 +415,12 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 
 ## 后端生成策略
 
-为了不修改现有业务逻辑，建议后端只追加一个 artifact 生成步骤：
+当前后端已经在 publish 阶段追加 artifact 生成步骤：
 
 1. 读取现有 `run.json`、`source.json`、`transcript/quality.json`、`segments/manifest.json`、`output/audio.mp3` 和 publish 目录文件。
 2. 生成 `workspace/published/episodes/<run-id>/artifact.json`。
 3. 扫描或维护 `workspace/published/episodes/*/artifact.json`。
 4. 生成 `workspace/published/index.json`。
-
-这个步骤可以放在 publish 之后，也可以做成独立命令：
-
-```text
-babelecho artifacts refresh --workspace workspace
-```
 
 要求：
 
@@ -399,6 +428,7 @@ babelecho artifacts refresh --workspace workspace
 - 只写公开 sidecar JSON。
 - 不改变 `episode convert`、`run`、`normalize`、`adapt`、`synthesize`、`assemble` 的现有语义。
 - 缺失可选字段时写 `null` 或省略，不让旧 run 无法发布。
+- 如果以后需要给历史 published 目录补 sidecar，可以再做独立 refresh 命令；第一版前端不依赖这个命令。
 
 ## 只读前端设计 Brief
 
@@ -453,6 +483,8 @@ babelecho artifacts refresh --workspace workspace
 这是 BabelEcho 的只读前端。它不负责转换播客，不提交 URL，不触发后端任务，只读取已经生成的静态产物。
 
 数据入口是 workspace/published/index.json。列表项里的 artifact_path 指向每集详情 JSON，audio_path 指向 MP3。详情 JSON 是 workspace/published/episodes/<run-id>/artifact.json，里面包含 source、quality、media、speakers、asr 和 transcript/script 文件路径。
+
+当前可用于 mock 和联调的真实数据有两条：frontend-publish-practical-ai-faithful-sidecar-20260619 是多人 Practical AI 标准播客样本；frontend-publish-podnews-sidecar-20260619 是短 Podnews 标准播客样本。
 
 前端第一版需要：episode 列表、音频播放页、中文脚本查看、英文 transcript 对照、quality report 展示、metadata/source 展示、MP3 下载。不要做登录、任务队列、URL 输入、转换按钮或后台管理。
 
