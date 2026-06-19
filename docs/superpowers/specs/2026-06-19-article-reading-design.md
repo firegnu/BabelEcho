@@ -132,6 +132,19 @@ babelecho article convert --file <path/to/article.md> --title <title> --run-id <
 extract/ingest -> clean/normalize -> pre-adapt quality gate -> adapt -> pre-TTS script validation -> synthesize -> assemble -> publish
 ```
 
+长期可选增强可以在 `pre-adapt quality gate` 后加入 LLM cleaner fallback，但它不是第一版默认路径：
+
+```text
+extract/ingest
+  -> programmatic clean/normalize
+  -> pre-adapt quality gate
+      -> safe_to_adapt: adapt
+      -> inspect_first and fixable_noise: llm_clean -> quality gate again -> adapt
+      -> reject: stop
+  -> pre-TTS script validation
+  -> synthesize -> assemble -> publish
+```
+
 它有两道硬门槛：
 
 1. `normalize` 后的 extraction/quality gate：article pipeline 写入 `transcript/quality.json`，使用和现有门禁相同的 `safe_to_adapt` / `inspect_first` / `reject` 决策方式，判断抽取正文是否可靠，是否允许进入 DeepSeek。
@@ -212,6 +225,22 @@ reject
 - 单段是否过长。
 
 只有 `safe_to_adapt` 默认进入 DeepSeek。`inspect_first` 需要用户显式确认或先停在 `normalize` 人工检查；`reject` 直接失败，不调用 LLM/TTS。
+
+长期可选的 LLM cleaner 只处理 `inspect_first` 中明确可修复的抽取噪声，不处理正文质量不足、登录墙、付费墙、错误页或内容过短。它必须满足：
+
+- 不翻译，不总结，不评论，不扩写。
+- 不改变作者观点、事实、数字、引用、例子和段落顺序。
+- 只移除页面噪声、转写噪声、格式噪声、重复噪声和明显界面残留。
+- 输出清洗报告，说明删除/合并/保留的类型。
+- 清洗后必须重新生成 quality report；只有再次达到 `safe_to_adapt` 才进入 DeepSeek。
+
+建议产物：
+
+```text
+transcript/llm-cleaned.json
+transcript/llm-cleaning-report.json
+transcript/quality-after-cleaning.json
+```
 
 ### 4. Adapt
 

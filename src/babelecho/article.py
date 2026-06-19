@@ -21,6 +21,35 @@ class ArticleExtraction:
 
 FRONT_MATTER_RE = re.compile(r"\A---\s*\n.*?\n---\s*\n", re.DOTALL)
 MARKDOWN_HEADING_RE = re.compile(r"^#{1,6}\s+")
+TECHNICAL_TAG_RE = re.compile(r"</?([A-Za-z][A-Za-z0-9_-]{0,60})>")
+CODE_COPY_LINE_RE = re.compile(r"(?m)^\s*Copy\s*$")
+CODE_COPY_SUFFIX_RE = re.compile(r"(?<=[)}\];])Copy(?=\s*(?:\n|$))")
+GPT_VERSION_RE = re.compile(
+    r"\bGPT-(?P<major>\d+)(?:\.(?P<minor>\d+))?(?P<suffix>(?:-[A-Za-z][A-Za-z0-9]*)*)\b"
+)
+FILE_EXTENSION_RE = re.compile(
+    r"\b(?P<stem>[A-Za-z][A-Za-z0-9_-]{0,80})"
+    r"\.(?P<ext>md|json|py|ts|tsx|js|jsx|html|xml|yaml|yml)\b",
+    re.IGNORECASE,
+)
+P_VALUE_RE = re.compile(r"\bp\s*<\s*(?P<value>\d+(?:\.\d+)?)", re.IGNORECASE)
+ACRONYM_RE = re.compile(
+    r"\b(API|ASR|CLI|CPU|GPU|GPT|HTML|IDE|JSON|LLM|MCP|OOM|RSS|SDK|SWE|TTS|URL|XML|YAML)\b"
+)
+
+FILE_EXTENSION_SPEECH = {
+    "html": "H T M L",
+    "json": "J S O N",
+    "js": "J S",
+    "jsx": "J S X",
+    "md": "M D",
+    "py": "P Y",
+    "ts": "T S",
+    "tsx": "T S X",
+    "xml": "X M L",
+    "yaml": "Y A M L",
+    "yml": "Y M L",
+}
 
 
 class _ReadableHtmlParser(HTMLParser):
@@ -86,8 +115,15 @@ def _collapse_text(value: str) -> str:
     return "\n\n".join(paragraphs)
 
 
+def _clean_article_technical_markup(value: str) -> str:
+    text = TECHNICAL_TAG_RE.sub(lambda match: match.group(1), value)
+    text = CODE_COPY_LINE_RE.sub("", text)
+    return CODE_COPY_SUFFIX_RE.sub("", text)
+
+
 def _clean_article_text(value: str, title: str | None = None) -> str:
     text = FRONT_MATTER_RE.sub("", value).strip()
+    text = _clean_article_technical_markup(text)
     lines = []
     normalized_title = " ".join((title or "").split()).casefold()
     has_content = False
@@ -255,6 +291,7 @@ def _write_article_ingest(
 
 
 def _article_segments(text: str) -> list[dict]:
+    text = _clean_article_technical_markup(text)
     paragraphs = [
         " ".join(part.split())
         for part in re.split(r"\n\s*\n", text)
@@ -293,3 +330,42 @@ def normalize_article(run_paths: RunPaths, raw_path: str | Path | None = None) -
         quality["metrics"]["extractor"] = source_info.get("provider", "unknown")
     write_json(run_paths.transcript_quality_json, quality)
     return run_paths.normalized_transcript_json
+
+
+def _spell_letters(value: str) -> str:
+    return " ".join(value.upper())
+
+
+def prepare_article_tts_text(text: str) -> str:
+    def speak_gpt_version(match: re.Match[str]) -> str:
+        pieces = ["G P T", match.group("major")]
+        minor = match.group("minor")
+        if minor:
+            pieces.extend(["点", minor])
+        suffix = " ".join(part for part in match.group("suffix").split("-") if part)
+        if suffix:
+            pieces.append(suffix)
+        return " ".join(pieces)
+
+    def speak_file_extension(match: re.Match[str]) -> str:
+        extension = match.group("ext").casefold()
+        return f"{match.group('stem')} {FILE_EXTENSION_SPEECH[extension]}"
+
+    def speak_p_value(match: re.Match[str]) -> str:
+        return f"p 值小于 {match.group('value')}"
+
+    prepared = GPT_VERSION_RE.sub(speak_gpt_version, text)
+    prepared = FILE_EXTENSION_RE.sub(speak_file_extension, prepared)
+    prepared = re.sub(r"\bSWE-bench\b", "S W E Bench", prepared)
+    prepared = re.sub(r"\bTerminal-Bench\b", "Terminal Bench", prepared)
+    prepared = P_VALUE_RE.sub(speak_p_value, prepared)
+    prepared = ACRONYM_RE.sub(lambda match: _spell_letters(match.group(1)), prepared)
+    return " ".join(prepared.split())
+
+
+def prepare_article_tts_script(run_paths: RunPaths) -> Path:
+    script = read_json(run_paths.chinese_script_json)
+    for segment in script.get("segments") or []:
+        segment["text"] = prepare_article_tts_text(str(segment.get("text") or ""))
+    write_json(run_paths.chinese_script_json, script)
+    return run_paths.chinese_script_json

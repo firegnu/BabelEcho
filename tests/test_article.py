@@ -6,6 +6,8 @@ from babelecho.article import (
     extract_web_article,
     ingest_article_source,
     normalize_article,
+    prepare_article_tts_script,
+    prepare_article_tts_text,
 )
 from babelecho.jsonio import read_json
 from babelecho.jsonio import write_json
@@ -231,3 +233,92 @@ def test_normalize_article_has_no_speaker_and_does_not_infer_speaker_labels(
     quality = read_json(run_paths.transcript_quality_json)
     assert quality["metrics"]["source_type"] == "article_file"
     assert quality["metrics"]["extractor"] == "local_file"
+
+
+def test_normalize_article_cleans_technical_markup_before_quality_check(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "article-technical-markup")
+    write_json(
+        run_paths.source_json,
+        {
+            "run_id": "article-technical-markup",
+            "source_type": "web_article",
+            "provider": "trafilatura",
+            "title": "Technical Article",
+            "raw_transcript": "transcript/raw.txt",
+        },
+    )
+    raw_path = run_paths.transcript_dir / "raw.txt"
+    raw_path.write_text(
+        "Teams often organize prompts with <background_information> and "
+        "</instructions> sections so the agent has a predictable frame of "
+        "reference. The names are meaningful article content, but the angle "
+        "brackets are markup-like noise for the transcript quality gate and "
+        "for a Chinese reading workflow.\n\n"
+        "TOOL CALL: salesforce.updateRecord({ data: { Notes: \"Discussed Q4 "
+        "goals and follow-up actions with the customer success lead.\" } })Copy\n\n"
+        "The surrounding explanation remains useful. It describes why an "
+        "example may ask a model to write a full transcript into context, why "
+        "that can be expensive, and how the workflow should keep the article "
+        "faithful without reading interface labels as part of the narrative.",
+        encoding="utf-8",
+    )
+
+    normalize_article(run_paths, raw_path)
+
+    normalized = read_json(run_paths.normalized_transcript_json)
+    joined_text = "\n".join(segment["text"] for segment in normalized["segments"])
+    assert "<background_information>" not in joined_text
+    assert "</instructions>" not in joined_text
+    assert "background_information" in joined_text
+    assert "instructions" in joined_text
+    assert "})Copy" not in joined_text
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert quality["metrics"]["dirty_markup_count"] == 0
+
+
+def test_prepare_article_tts_text_normalizes_technical_reading():
+    prepared = prepare_article_tts_text(
+        "GPT-5.3-Codex used Prompt.md with SWE-bench, Terminal-Bench 2.0, "
+        "p<0.01, OOM, API, and MCP logs."
+    )
+
+    assert "G P T 5 点 3 Codex" in prepared
+    assert "Prompt M D" in prepared
+    assert "S W E Bench" in prepared
+    assert "Terminal Bench 2.0" in prepared
+    assert "p 值小于 0.01" in prepared
+    assert "O O M" in prepared
+    assert "A P I" in prepared
+    assert "M C P" in prepared
+    assert "GPT-" not in prepared
+    assert ".md" not in prepared
+
+
+def test_prepare_article_tts_script_preserves_no_speaker_article_segments(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "article-tts-script")
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "article-tts-script",
+            "language": "zh",
+            "segments": [
+                {
+                    "id": "0001",
+                    "speaker": None,
+                    "text": "GPT-5-Codex 读取 Prompt.md 后报告 p<0.01。",
+                }
+            ],
+        },
+    )
+
+    prepare_article_tts_script(run_paths)
+
+    script = read_json(run_paths.chinese_script_json)
+    segment = script["segments"][0]
+    assert segment["speaker"] is None
+    assert segment["text"] == "G P T 5 Codex 读取 Prompt M D 后报告 p 值小于 0.01。"

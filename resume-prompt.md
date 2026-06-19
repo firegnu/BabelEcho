@@ -59,6 +59,7 @@
 - MVP-0 收口已完成：speaker label 解析/清洗、NASA 样本 `normalize -> adapt -> synthesize -> assemble -> publish` 回归、docs 标记完成。
 - `docs/roadmap.md` 已记录从 MVP-0 Acceptance、MVP-0.5 Self-use 到 MVP-1 Single URL Self-use、Phase 2 ASR + Product Surface、Phase 3 Automation 的产品路线；MVP-1 已完成，Phase 2 架构计划见 `docs/Phase2双轨后端与静态前端架构.md`。前端只读 artifact 契约与设计 brief 见 `docs/前端Artifact契约与只读界面说明.md`；当前 publish 阶段会同步稳定 `workspace/published/feed.xml`、episode MP3/metadata/transcript，并额外生成前端入口 `workspace/published/index.json` 与 `workspace/published/episodes/<run-id>/artifact.json`。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
+- 长期路线已记录可选 LLM 清洗 fallback：先程序抽取/程序清洗并跑 quality gate；只有 `inspect_first` 且属于可修复噪声时，才考虑独立 LLM cleaner 清洗，清洗后必须再次通过 quality gate 才能进入 DeepSeek adapt。它不是当前默认链路，也不应破坏 YouTube/RSS/iTunes/Article 已验证路径。
 - Python 环境必须使用项目内 .conda/babelecho-dev，不要使用 base env。
 - 真实 runtime config、workspace/runs、生成音频、模型缓存、本地配置和 API key 不要提交。
 - 单 URL 自用入口操作手册见 `docs/单URL自用运行手册.md`：先按 URL 类型选择 YouTube / episode page / Apple Podcasts / direct RSS 入口，先跑到 `normalize` 读 `quality.json`，只有 `safe_to_adapt` 才进入 DeepSeek/TTS。

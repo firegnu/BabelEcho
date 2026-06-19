@@ -25,7 +25,7 @@
 | MVP-1 Single URL Self-use | 用户提供单个 URL 后，手动选集并生成对应中文播客 | done |
 | Phase 2 ASR + Product Surface | ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App | next |
 | Phase 3 Automation | 订阅扫描、多 episode 批处理、PodcastIndex 多 candidate 自动选择、YouTube playlist/channel/show 自动展开、远程运维自动化 | later |
-| Later | 微调 `CosyVoice-300M-SFT` 扩展多个中文男声/女声、授权参考音色扩展、本地 LLM 替换 | deferred |
+| Later | 可选 LLM 清洗 fallback、微调 `CosyVoice-300M-SFT` 扩展多个中文男声/女声、授权参考音色扩展、本地 LLM 替换 | deferred |
 
 当前阶段边界：
 
@@ -33,6 +33,7 @@
 - MVP-1 不做订阅扫描、多 episode 批处理、ASR、声纹、ASR speaker diarization、Web UI 或 App。
 - Phase 2 进入音频获取和产品化：ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App。
 - Phase 3 再做自动化扩展：订阅扫描、多 episode 批处理、PodcastIndex 多 candidate 自动选择、YouTube playlist/channel/show 自动展开。
+- 可选 LLM 清洗 fallback 不进入当前默认链路：先程序抽取和程序清洗，再由质量门禁判断；只有 `inspect_first` 且属于可修复噪声时，才考虑用独立 LLM cleaner 清洗后再次过门禁，再进入 DeepSeek adapt。
 
 ## MVP-0 Acceptance
 
@@ -187,6 +188,7 @@
 
 这些能力有价值，但不应该阻塞自用版本：
 
+- 可选 LLM 清洗 fallback：用于程序清洗后仍有网页/转写/格式噪声、但正文看起来可挽救的样本。它不是默认三连调用，也不替代 DeepSeek adapt；推荐流程是 `programmatic normalize -> quality gate -> llm_clean_if_needed -> quality gate again -> DeepSeek adapt`。LLM cleaner 必须限制为不翻译、不总结、不改写观点、不补全内容，只移除页面噪声、格式噪声和重复噪声，并写清洗报告。
 - 后续固定音色扩展：先明确替换或新增哪个固定 role；它是固定音色扩展，不是原主播 voice clone。
 - 微调 `CosyVoice-300M-SFT`，目标是增加多个可长期使用的中文男声和中文女声，逐步减少当前借用 `英文女` / `英文男` speaker id 作为中文角色的临时性，并在试听确认后再决定是否替换现有 `male_a` CosyVoice2 路线。
 - 本地 LLM 替代 DeepSeek。

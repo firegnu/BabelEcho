@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from .adapt import adapt_to_chinese
-from .article import ingest_article_source, normalize_article
+from .article import ingest_article_source, normalize_article, prepare_article_tts_script
 from .audio import assemble_audio
 from .checks import check_run_artifacts
 from .config import load_yaml, require_keys
@@ -149,6 +149,7 @@ def run_article_pipeline(
     if stage_index <= ARTICLE_PIPELINE_STAGES.index("synthesize") <= stop_index:
         def synthesize_stage() -> tuple[dict, str, dict]:
             override_result = apply_script_overrides(run_paths, local_config.get("overrides"))
+            prepare_article_tts_script(run_paths)
             manifest_path = synthesize_segments(
                 run_paths,
                 local_config["tts"],
