@@ -81,7 +81,10 @@ workspace/published/
 
 ## 路径原则
 
-- 所有面向前端的路径都使用相对 `workspace/published/` 的相对路径。
+- 路径都是相对路径，但 base 目录按文件区分：
+  - `index.json` 里的 `audio_path` / `artifact_path` 相对 `workspace/published/`，例如 `episodes/<run-id>/audio.mp3`。
+  - `artifact.json` 里的 `media.audio_path`、`artifacts.*` 相对该集自身目录 `workspace/published/episodes/<run-id>/`，例如 `audio.mp3`、`../../feed.xml`。
+  - 同名字段 `audio_path` 在两个文件里 base 不同，前端解析时不要混用。
 - 不在公开 JSON 里写本机绝对路径。
 - 不在公开 JSON 里写远端 5090D 路径。
 - 不在公开 JSON 里写 API key、env 文件、模型路径或真实 config 路径。
@@ -100,16 +103,30 @@ workspace/published/index.json
 - 前端启动时读取。
 - 渲染 episode 列表。
 - 提供每一集的最小展示信息和详情入口。
+- 列表默认按 `published_at` 倒序排列（最新在前）；当前本机文件即按此顺序，article 集在最前。
 
 示例：
 
 ```json
 {
   "schema_version": "1.0",
-  "generated_at": "2026-06-19T10:13:37Z",
+  "generated_at": "2026-06-19T13:01:30Z",
   "title": "BabelEcho",
   "description": "Locally generated Chinese podcast artifacts.",
   "episodes": [
+    {
+      "run_id": "article-anthropic-infra-noise-20260619",
+      "title": "Quantifying infrastructure noise in agentic coding evals \\ Anthropic",
+      "route": "article_reading",
+      "status": "succeeded",
+      "source_type": "web_article",
+      "quality_recommendation": "safe_to_adapt",
+      "speaker_count": 0,
+      "duration_seconds": 684.849342,
+      "published_at": "2026-06-19T13:01:30Z",
+      "audio_path": "episodes/article-anthropic-infra-noise-20260619/audio.mp3",
+      "artifact_path": "episodes/article-anthropic-infra-noise-20260619/artifact.json"
+    },
     {
       "run_id": "frontend-publish-practical-ai-faithful-sidecar-20260619",
       "title": "The AI engineer skills gap",
@@ -247,12 +264,14 @@ workspace/published/episodes/<run-id>/artifact.json
 | `created_at` | string/null | no | run 创建时间；旧 run 或缺失 metadata 时可为 `null`。 |
 | `published_at` | string | no | publish 完成时间。 |
 | `source` | object | yes | 来源信息。只放公开 URL 和类型，不放内部 config。 |
-| `quality` | object | no | 质量报告摘要。来自 `transcript/quality.json` 或 ASR 路线质量报告。 |
-| `media` | object | yes | 最终可播放音频信息。 |
-| `artifacts` | object | yes | 前端可读的相对文件路径。 |
+| `quality` | object | no | 质量报告摘要。来自 `transcript/quality.json` 或 ASR 路线质量报告。`metrics` 是开放字段集，不同 route 可能含额外 key（如 `web_article` 多出 `source_type`、`extractor`），前端按字段存在性渲染，未知字段忽略。 |
+| `media` | object | yes | 最终可播放音频信息；`media.audio_path` 相对该集目录（如 `audio.mp3`）。 |
+| `artifacts` | object | yes | 前端可读的相对文件路径，均相对该集目录 `episodes/<run-id>/`（如 `audio.mp3`、`transcript.zh.json`、`../../feed.xml`）。 |
 | `speakers` | array | yes | speaker 展示信息；无 speaker 时为空数组。 |
 | `asr` | object/null | no | audio-first 路线的 ASR/diarization 摘要。transcript-first 路线为 `null`。 |
 | `ui` | object | no | 非业务关键的前端提示，例如默认 tab、badge。 |
+
+关于 `metadata.json`：当前只含最小字段（如 `episode_id`、`title`、`original_url`、`transcript_url`、`audio_url`），其中 `audio_url` 可能是占位值（例如 `https://example.com/...`）。前端播放只使用 `index.json` / `artifact.json` 里的 `audio_path`，不要依赖 `metadata.audio_url`。可下载产物以 MP3（`audio_path`）为主；`transcript.*.json` 与 `feed.xml` 建议以「查看 / 打开链接」形式提供，不必都做成下载按钮。
 
 ## Source Contract
 

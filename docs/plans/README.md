@@ -87,3 +87,7 @@ docs/plans/
 
 - Authorized male/neutral reference wav comparison - `deferred`: use the same `cross_lingual` route with a local authorized `prompt_wav`; this is fixed-voice expansion, not original-host voice clone.
 - Original-host voice clone - `deferred`.
+
+### Phase 2 Audio-first ASR
+
+- [03.01 Audio-first 本地音频 ASR 与说话人分离计划](./03-audio-first-asr/01-local-audio-asr-diarization.md) - `ready`

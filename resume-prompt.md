@@ -199,6 +199,7 @@ MVP-0.5 self-use acceptance 已在 5090D 上完成：
 18. `workspace/config/overrides.example.yaml`
 19. `docs/Phase2双轨后端与静态前端架构.md`
 20. `docs/前端Artifact契约与只读界面说明.md`
+21. `docs/plans/03-audio-first-asr/01-local-audio-asr-diarization.md`
 
 ## 当前项目事实
 
