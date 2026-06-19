@@ -880,7 +880,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 安装后只在克隆环境中移除了与 NumPy 2.x 不兼容的旧 `onnxruntime-gpu 1.18.0`
   - `babelecho-tts` 保持不动，继续负责 OpenAI Whisper ASR 和 CosyVoice TTS
 - 5090D 真实 pyannote smoke 已执行：
-  - run-id：`audio-diarization-practicalai-zero-trust-8min-20260619`
+  - run-id：`audio-diarization-practicalai-zero-trust-8min-qualitygate-20260619`
   - audio：`workspace/sources/asr-practicalai-zero-trust-8min.wav`，8 分钟，16 kHz mono
   - ASR：OpenAI Whisper `small.en`，`raw_segment_count=123`
   - Diarization：pyannote Community-1，`speaker_count=2`、`turn_count=23`、`avg_turn_ms=20735.7`
@@ -897,7 +897,12 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - quality metrics 新增 `cross_speaker_segment_count/ratio`、`ambiguous_speaker_segment_count/ratio`、`min_primary_speaker_overlap_ratio`、`avg_primary_speaker_overlap_ratio`
   - 主 speaker overlap 小于 `0.60` 的 crossing 计为 ambiguous
   - ambiguous segment 数量达到 3 个或比例达到 5% 时，写 `ambiguous_speaker_assignments` 并 `inspect_first`
-  - Practical AI 8 分钟样本已用新代码离线复算为 `safe_to_adapt`，metrics 为 9/123 crossing、2/123 ambiguous、`min_primary_speaker_overlap_ratio=0.537`、`avg_primary_speaker_overlap_ratio=0.781`
+  - Practical AI 8 分钟样本已用新代码在 5090D 实际复跑为 `safe_to_adapt`，metrics 为 9/123 crossing、2/123 ambiguous、`min_primary_speaker_overlap_ratio=0.537`、`avg_primary_speaker_overlap_ratio=0.781`
+  - 同一 run 已继续跑通 `audio-first -> DeepSeek -> TTS -> publish`
+  - script/manifest 均 32 段，voice roles 为 `female_a/male_a`
+  - 最终 MP3 为 `22050 Hz` mono、约 `370.55s`、约 `5.9 MB`
+  - MP3 已拷回本机 ignored `workspace/runs/audio-diarization-practicalai-zero-trust-8min-qualitygate-20260619/output/audio.mp3`
+  - 用户试听反馈“整体可以接受”
 - 已新增/扩展测试：
   - `tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json`
   - `tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider`
@@ -911,8 +916,8 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 
 ## 后续
 
-- 用最新代码在 5090D 重跑 `audio-diarization-practicalai-zero-trust-8min-20260619` 或新 run-id，确认 crossing policy 下 quality 是否为 `safe_to_adapt`。
-- 如果通过，再选择是否跑一小段 `audio-first -> DeepSeek -> TTS` 试听，不要直接上长音频。
+- 进入真实 ASR 模型横评，同一样本优先比较 `small.en` 与 `medium.en`。
+- 横评重点看专名错词、断句、speaker 边界附近文本质量，以及 normalize 后是否仍为 `safe_to_adapt`。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
 - 同一节目跨 episode speaker profile 复用。
