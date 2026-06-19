@@ -103,13 +103,18 @@ def _adapt_segments_one_by_one(transcript: dict, llm_config: dict) -> list[dict]
     return segments
 
 
+def _llm_config_with_adapt_style(llm_config: dict, adapt_config: dict) -> dict:
+    style = str(adapt_config.get("style", "faithful_spoken"))
+    return {**llm_config, "adapt_style": style}
+
+
 def _adapt_segments_in_chunks(
     run_paths: RunPaths,
     transcript: dict,
     llm_config: dict,
     adapt_config: dict,
 ) -> list[dict]:
-    client = build_llm_client(llm_config)
+    client = build_llm_client(_llm_config_with_adapt_style(llm_config, adapt_config))
     max_segments = max(1, int(adapt_config.get("chunk_max_segments", 20)))
     max_chars = max(1, int(adapt_config.get("chunk_max_chars", 8000)))
     retry_attempts = max(1, int(adapt_config.get("chunk_retry_attempts", 2)))
@@ -176,7 +181,10 @@ def adapt_to_chinese(
             config,
         )
     else:
-        segments = _adapt_segments_one_by_one(transcript, llm_config)
+        segments = _adapt_segments_one_by_one(
+            transcript,
+            _llm_config_with_adapt_style(llm_config, config),
+        )
     script = {
         "episode_id": transcript["episode_id"],
         "language": "zh-CN",

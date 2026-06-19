@@ -27,7 +27,7 @@
 - `overrides.path` 和 `babelecho overrides` 可以在 TTS 前对 `script/zh.json` 做本地精确替换；示例词表是 tracked `workspace/config/overrides.example.yaml`，真实词表继续放 ignored `workspace/config/overrides.yaml`。
 - 5090D 上 fixture 全链路已经跑通：ingest -> normalize -> adapt(fixture) -> synthesize(fixture) -> assemble -> publish。
 - 当前已有 DeepSeek API 生成中文口播稿的真实 adapt 基线，也已有 5090D 本地 TTS 生成真实 wav/MP3 的真实基线，但还没有 voice clone、ASR 或完整真实播客来源接入。
-- 自制长样本、NASA 真实 podcast transcript 和 MVP-0.5 自用回归都已经生成可听中文 MP3；MVP-1 单 URL 自用版已完成，下一步进入 Phase 2 方案设计：ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App。
+- 自制长样本、NASA 真实 podcast transcript 和 MVP-0.5 自用回归都已经生成可听中文 MP3；MVP-1 单 URL 自用版已完成，Phase 2 方案已落到 `docs/Phase2双轨后端与静态前端架构.md`：后续按双轨后端和只读前端推进，现有 transcript-first 路线保持稳定，新 audio-first 路线独立处理 ASR、声纹/voice profile 和 ASR speaker diarization。
 - MVP-1 当前 TTS 运行默认使用 `tts.voice=sft_builtin_4role` 固定角色 profile，但渲染 backend 是本地双模型：`male_a` 走 `CosyVoice2-0.5B` 的 `cross_lingual + speed=1.1`，优先使用 ignored runtime asset `workspace/config/tts-assets/male_a_cosyvoice2_calm_prompt.wav`，缺失时回退 `cross_lingual_prompt.wav`，并做 `male_a` 专用文本平稳化；`female_a / female_b / male_b` 走 `CosyVoice-300M-SFT`，不经过这段逻辑；不做原主播 voice clone。
 - 2026-06-18 用户已试听 Practical AI `Model Context Protocol Deep Dive` 全路径输出，反馈“基本还可以”。run-id 是 `llm-practicalai-mcp-real-20260618`：101 段，DeepSeek chunk 6 次，speaker 推断一次，`Jerod -> male_a`、`Daniel -> male_b`、`Chris -> male_a`，最终 MP3 为 `22050 Hz` mono、约 `1819.5s`，本机产物在 ignored `workspace/runs/llm-practicalai-mcp-real-20260618/`。
 - 后续音色方向：用户计划微调 `CosyVoice-300M-SFT`，目标是增加多个稳定中文男声和中文女声。这属于固定角色音色扩展，不是原主播 voice clone；当前默认双模型路由不变，等微调模型试听确认后再决定是否替换 `male_a` CosyVoice2 或 `female_b/male_b` 角色。
@@ -46,7 +46,7 @@
 - 2026-06-19 三个标准播客 full-chain 样本（Practical AI、Radiolab、99% Invisible）用户试听反馈达到预期；试听暴露的 `[掌声]` / 片头音乐、版权/转写说明、`predictionguard。com` 和 `MP三` 已做第一轮清理：`normalize` 丢弃纯舞台提示和常见免责声明，DeepSeek adapt prompt 增加清理约束，`local_cli` TTS 写 `.txt` 前规范化域名点号和 `MP3` / `MP4` 读法。真实广告口播、制作名单、复杂 URL 仍按后续样本窄规则处理。
 - 多角色压力样本 `full-99pi-anniversary-20260619` 已在 5090D 跑通：来源 `https://99percentinvisible.org/episode/641-99pi-anniversary-special-15-for-15/`，normalize 后 157 段、10 speaker、quality=`safe_to_adapt`，DeepSeek adapt 完成后曾被 script QA 误判制作名单英文人名过多；已修复 QA 规则，允许中文制作名单中夹带英文专名但仍拦截整段英文残留。最终 `synthesize -> assemble -> publish` 成功，manifest 157 段，使用 `female_a/female_b/male_a/male_b` 四个 voice role，MP3 为 `22050 Hz` mono、约 `2876.3s`、约 `46 MB`，已拷回本机 ignored `workspace/runs/full-99pi-anniversary-20260619/output/audio.mp3`。
 - YouTube 单链接探索已先收口；官网 episode page 标准播客页面解析也完成第一轮真实 normalize 验证。iTunes/RSS 自用入口已补齐到单步 CLI 编排：`babelecho episode convert --url ... --select-index ...` 对 Apple Podcasts/iTunes URL 会经 iTunes Lookup -> RSS -> 人工选集，对直接 RSS feed URL 会直接列集并选中指定 index；两者都写出 `source.type=podcast_rss` source config，然后复用现有 normalize/adapt/TTS 后流程，不新增 iTunes/RSS 专用 pipeline，不做订阅扫描。真实 full-chain `itunes-url-practical-ai-zero-trust-full-20260619` 使用 Practical AI 的 Apple Podcasts URL，选中 `Zero Trust for AI Agents`，经 iTunes Lookup -> RSS -> `podcast_rss` -> normalize -> DeepSeek adapt -> 5090D TTS -> assemble -> publish 全链路成功；normalize 后 103 段、3 speaker、quality=`safe_to_adapt`、dirty markup=0，最终 MP3 约 `2176.4s`、约 `33 MB`，已拷回本机 ignored `workspace/runs/itunes-url-practical-ai-zero-trust-full-20260619/output/audio.mp3` 便于试听。单步 normalize smoke `rss-podnews-single-url-20260619` 使用 `https://podnews.net/rss` 第 1 集 `A new AMP member`，18 段、quality=`safe_to_adapt`；`apple-practical-ai-single-url-20260619` 使用 Practical AI Apple Podcasts URL 第 1 集，103 段、3 speaker、quality=`safe_to_adapt`。MVP-1 收口 full-chain `rss-podnews-single-url-full-20260619` 已在 5090D 跑通：18 段、quality=`safe_to_adapt`，DeepSeek adapt、TTS、assemble、publish 成功，MP3 约 `233.535s`、`22050 Hz` mono，已拷回本机 ignored `workspace/runs/rss-podnews-single-url-full-20260619/output/audio.mp3`。订阅扫描、多 episode 批处理、RSS/PodcastIndex 多 candidate 扩展仍后移到 Phase 3；ASR、声纹、ASR speaker diarization、Web UI 和 App 进入 Phase 2。
-- MVP-1 Chunked DeepSeek Adapt 已完成：可在 local config 设置 `adapt.mode: chunked`、`chunk_max_segments`、`chunk_max_chars`，将多个完整 transcript segment 合并到一次 DeepSeek 请求；不切开单个 segment，返回必须保留原始 id，最终 `script/zh.json` 按原始 id 顺序合并，TTS 不依赖 chunk 返回顺序。chunk 结果会写入 run-local `script/adapt-chunks/` 便于排查。
+- MVP-1 Chunked DeepSeek Adapt 已完成：可在 local config 设置 `adapt.mode: chunked`、`chunk_max_segments`、`chunk_max_chars`，将多个完整 transcript segment 合并到一次 DeepSeek 请求；不切开单个 segment，返回必须保留原始 id，最终 `script/zh.json` 按原始 id 顺序合并，TTS 不依赖 chunk 返回顺序。chunk 结果会写入 run-local `script/adapt-chunks/` 便于排查。当前默认 `adapt.style` 是 `faithful_spoken`：尽量忠实保留原 transcript 的信息、顺序、语气、问题、数字、人名和观点组织，只做字幕噪声、舞台提示、转写说明、URL/缩写读法等轻清理；`polished_spoken` 保留为显式可选的宽松中文播客化改写风格。
 - MVP-1 TTS 执行效率优化已完成：`local_cli` synthesis 现在写 `segments/tts-batch.json` 并一次启动 `tts-wrapper --batch-file ...`，wrapper 按本批次需要延迟加载 300M SFT 和/或 CosyVoice2 后循环生成所有 segment wav；旧的 `--text-file --output` 单段 wrapper 调用仍兼容。5090D `batch-wrapper-smoke-20260617` 两段真实 CosyVoice smoke 已通过。
 - MVP-1 固定音色规则已选定并实现：运行默认使用 `tts.voice=sft_builtin_4role` 固定角色 profile。未启用 speaker voice 推断时，0/1 个 distinct speaker 且没有显式性别标签使用 `female_a`；单个 speaker 标签包含 `male` / `男` 时使用 `male_a`，包含 `female` / `女` 时使用 `female_a`；2 个及以上 distinct speaker 按首次出现顺序映射到 `female_a / male_a / female_b / male_b`。实际渲染时 `male_a` 调用 `CosyVoice2 cross_lingual + speed=1.1`、本地 calm prompt asset 和专用文本平稳化，其余三路调用 `CosyVoice-300M-SFT`。后续 300M 微调只影响未来可选 role/model，不自动改变当前默认。
 - `male_a / 中文男` 清亮度实验是历史 SFT 男声校准：5090D run `male-a-brightness-experiment-20260618` 产出 A 当前中文男、B 更强 EQ、C 更强 EQ + 半音升调、D 基于 B 再加亮、E 最大亮度试探，用户当时选择 D；后续 `male_a` 已改走 CosyVoice2，试听文件仍保存在本机 ignored `workspace/runs/male-a-brightness-experiment-20260618/variants/`。
@@ -57,7 +57,7 @@
 - `sft_builtin_4role` 仍是四个固定 role：`female_a -> 300M SFT 中文女`，`male_a -> CosyVoice2 cross_lingual speed 1.1 + calm prompt if present + text smoothing`，`female_b -> 300M SFT 英文女`，`male_b -> 300M SFT 英文男`；同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。不做原主播 voice clone。
 - 本机测试计数以当前 `pytest -q` 为准；5090D 历史 wrapper smoke 已验证四角色真实 SFT wav 输出均为 `22050 Hz` mono；最终混合 `male_a` 代码路径也已验证：`four-role-hybrid-code-preview-20260618-1736` 使用正式 `synthesize -> assemble`，manifest/batch roles 均为 `female_a / male_a / female_b / male_b`，MP3 为 `22050 Hz` mono、约 `17.7s`，已拷回本机 ignored `workspace/runs/four-role-hybrid-code-preview-20260618-1736/output/audio.mp3`。计划记录见 `docs/plans/02-real-podcasts/03-sft-builtin-4role-voice-profile.md`。
 - MVP-0 收口已完成：speaker label 解析/清洗、NASA 样本 `normalize -> adapt -> synthesize -> assemble -> publish` 回归、docs 标记完成。
-- `docs/roadmap.md` 已记录从 MVP-0 Acceptance、MVP-0.5 Self-use 到 MVP-1 Single URL Self-use、Phase 2 ASR + Product Surface、Phase 3 Automation 的产品路线；MVP-1 已完成，下一步先制定 Phase 2 方案。
+- `docs/roadmap.md` 已记录从 MVP-0 Acceptance、MVP-0.5 Self-use 到 MVP-1 Single URL Self-use、Phase 2 ASR + Product Surface、Phase 3 Automation 的产品路线；MVP-1 已完成，Phase 2 架构计划见 `docs/Phase2双轨后端与静态前端架构.md`。前端只读 artifact 契约与设计 brief 见 `docs/前端Artifact契约与只读界面说明.md`。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
 - Python 环境必须使用项目内 .conda/babelecho-dev，不要使用 base env。
 - 真实 runtime config、workspace/runs、生成音频、模型缓存、本地配置和 API key 不要提交。
@@ -196,6 +196,8 @@ MVP-0.5 self-use acceptance 已在 5090D 上完成：
 16. `tests/test_overrides.py`
 17. `workspace/config/local.example.yaml`
 18. `workspace/config/overrides.example.yaml`
+19. `docs/Phase2双轨后端与静态前端架构.md`
+20. `docs/前端Artifact契约与只读界面说明.md`
 
 ## 当前项目事实
 
@@ -243,11 +245,13 @@ MVP-0 acceptance 和 MVP-0.5 Self-use 已完成：
 真实英文 transcript -> normalized.json -> DeepSeek 中文口播稿 -> 5090D 混合本地 TTS -> wav segments -> MP3 -> publish/feed.xml
 ```
 
-下一步进入 Phase 2 方案设计：
+下一步按 Phase 2 双轨架构推进：
 
-1. 先讨论并落文档：ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App 的边界、顺序和验收标准。
+1. 先按 `docs/Phase2双轨后端与静态前端架构.md` 固化 artifact manifest 和 Route A 来源矩阵回归。
 2. Phase 2 不应破坏 MVP-1 单 URL CLI；任何来源入口改动先跑来源矩阵回归。
-3. 订阅扫描、多 episode 批处理、PodcastIndex 多 candidate 自动选择、YouTube playlist/channel/show 自动展开继续放到 Phase 3。
+3. 再做独立 audio-first 路线：本地音频文件 -> ASR -> speaker diarization / 声纹 profile -> `normalized.json` -> 现有 adapt/TTS/publish 后流程。
+4. 前端和 App 第一版只读消费已经生成的音频、feed、metadata 和质量报告，不作为转换服务入口。
+5. 订阅扫描、多 episode 批处理、PodcastIndex 多 candidate 自动选择、YouTube playlist/channel/show 自动展开继续放到 Phase 3。
 
 不要进入：
 

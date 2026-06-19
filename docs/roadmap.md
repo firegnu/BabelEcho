@@ -140,12 +140,14 @@
 
 目标：从 transcript-first 扩展到音频输入，并提供可日常使用的操作界面。
 
+详细架构计划见 `docs/Phase2双轨后端与静态前端架构.md`。Phase 2 的核心边界是双轨后端和只读前端：现有 transcript-first 路线保持稳定，新 audio-first 路线独立处理 ASR、声纹/voice profile 和 speaker diarization；前端只消费已经生成的音频和 metadata artifacts，不作为转换服务入口。
+
 需要做：
 
 - ASR fallback，用于没有 transcript 的 episode。
 - ASR speaker diarization / 声纹分离：ASR 解决“说了什么”，diarization 解决“谁在说”。两者结合后生成带 `speaker_1` / `speaker_2` 时间段的结构化 transcript，再进入现有 `normalize -> adapt -> TTS` 链路。
 - Speaker diarization / 声纹分离只用于多人音频的说话人分段和固定中文音色映射，不默认做真实身份识别，也不等同于原主播 voice clone。
-- Web UI：提交 URL、查看 run 状态、预览 `quality.json` / 中文脚本、触发 TTS、浏览产物。
+- Web UI：第一版只读浏览已生成产物、播放/下载 MP3、查看 `quality.json` / 中文脚本 / metadata；不提交 URL，不触发 DeepSeek/TTS/ASR。
 - App：先作为 thin client 消费已发布的中文播客 artifacts，不把复杂转换逻辑塞进客户端。
 
 验收标准：
@@ -193,6 +195,6 @@
 
 ## 当前最高优先级
 
-1. MVP-1 Single URL Self-use 已完成，下一步先设计 Phase 2：ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App 的边界与顺序。
+1. MVP-1 Single URL Self-use 已完成，Phase 2 先按 `docs/Phase2双轨后端与静态前端架构.md` 执行：固化 artifact manifest、建立 Route A 来源矩阵回归，再做 Route B 本地音频最小骨架。
 2. Phase 2 开始前，保持现有 YouTube、episode page、Apple/RSS 单 URL 路径稳定；任何来源改动先跑来源矩阵回归。
 3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。

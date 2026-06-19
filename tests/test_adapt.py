@@ -110,6 +110,52 @@ def test_adapt_to_chinese_batches_complete_segments_and_merges_by_original_id(
     ]
 
 
+def test_adapt_to_chinese_passes_adapt_style_to_llm_client(
+    tmp_path: Path,
+    monkeypatch,
+):
+    run_paths = create_run(tmp_path, "adapt-style-run")
+    write_json(
+        run_paths.normalized_transcript_json,
+        {
+            "episode_id": "adapt-style-run",
+            "language": "en",
+            "segments": [
+                {
+                    "id": "0001",
+                    "start_ms": None,
+                    "end_ms": None,
+                    "speaker": "HOST",
+                    "text": "First sentence.",
+                    "source": "transcript",
+                }
+            ],
+        },
+    )
+    seen_configs = []
+
+    class FakeBatchClient:
+        def adapt_segment(self, text: str) -> str:
+            raise AssertionError("chunked adapt should not call adapt_segment")
+
+        def adapt_segments(self, segments: list[dict]) -> list[dict]:
+            return [{"id": segment["id"], "text": f"中文 {segment['id']}"} for segment in segments]
+
+    def fake_build_llm_client(config):
+        seen_configs.append(config)
+        return FakeBatchClient()
+
+    monkeypatch.setattr("babelecho.adapt.build_llm_client", fake_build_llm_client)
+
+    adapt_to_chinese(
+        run_paths,
+        {"provider": "fake"},
+        {"mode": "chunked", "style": "polished_spoken"},
+    )
+
+    assert seen_configs == [{"provider": "fake", "adapt_style": "polished_spoken"}]
+
+
 def test_adapt_to_chinese_rejects_chunk_response_with_missing_segment_id(
     tmp_path: Path,
     monkeypatch,

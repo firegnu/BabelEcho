@@ -260,6 +260,9 @@ def test_openai_compatible_client_adapts_segments_in_one_json_request(monkeypatc
     assert "Return only JSON" in prompt
     assert "Do not merge" in prompt
     assert "Return exactly 2 segments" in prompt
+    assert "faithful Simplified Chinese spoken translation" in prompt
+    assert "Keep the original order of ideas inside each segment" in prompt
+    assert "Do not summarize, condense, embellish, or reorganize" in prompt
     assert "Clean transcript artifacts" in prompt
     assert "stage directions" in prompt
     assert "copyright" in prompt
@@ -268,6 +271,34 @@ def test_openai_compatible_client_adapts_segments_in_one_json_request(monkeypatc
     assert "Preserve factual content" in prompt
     assert "0001" in prompt
     assert "0002" in prompt
+
+
+def test_openai_compatible_client_supports_polished_adapt_style(monkeypatch):
+    requests = []
+
+    def fake_urlopen(request, timeout):
+        requests.append((request, timeout))
+        return FakeAdaptSegmentsResponse()
+
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "test-deepseek-key")
+    monkeypatch.setattr(llm, "urlopen", fake_urlopen)
+
+    client = build_llm_client(
+        {
+            "provider": "openai_compatible",
+            "base_url": "https://api.deepseek.com",
+            "model": "deepseek-v4-pro",
+            "api_key_env": "DEEPSEEK_API_KEY",
+            "adapt_style": "polished_spoken",
+        }
+    )
+
+    client.adapt_segments([{"id": "0001", "speaker": "HOST", "text": "First sentence."}])
+
+    payload = json.loads(requests[0][0].data.decode("utf-8"))
+    prompt = payload["messages"][0]["content"]
+    assert "natural Simplified Chinese spoken-script text" in prompt
+    assert "Preserve factual content" in prompt
 
 
 def test_openai_compatible_client_requires_configured_api_key(monkeypatch):

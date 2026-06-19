@@ -11,6 +11,11 @@ llm:
 
 adapt:
   mode: chunked
+  # Default: faithful_spoken keeps the Chinese spoken script close to the
+  # source transcript while still cleaning subtitle/podcast transcript noise.
+  # Use polished_spoken only when you explicitly want a looser, more natural
+  # Chinese podcast-style rewrite.
+  style: faithful_spoken
   chunk_max_segments: 20
   chunk_max_chars: 8000
 

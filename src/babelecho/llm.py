@@ -23,6 +23,29 @@ ADAPT_CLEANUP_INSTRUCTIONS = (
     "for example MP3 as M P 3 and MP4 as M P 4. "
 )
 
+FAITHFUL_ADAPT_INSTRUCTIONS = (
+    "You are producing a faithful Simplified Chinese spoken translation of "
+    "English podcast transcript segments.\n"
+    "Keep the original order of ideas inside each segment. "
+    "Preserve factual content, named entities, numbers, claims, questions, "
+    "causal links, and meaningful emphasis. "
+    "Preserve speaker intent, tone, hedging, repetition that carries meaning, "
+    "and examples. "
+    "Do not summarize, condense, embellish, or reorganize the speaker's ideas. "
+    "Do not add background explanation that was not present in the input. "
+    "Use natural Chinese suitable for TTS, but stay close to the source wording "
+    "and sentence structure when possible. "
+)
+
+POLISHED_ADAPT_INSTRUCTIONS = (
+    "You are adapting English podcast transcript segments into natural "
+    "Simplified Chinese spoken-script text.\n"
+    "Preserve factual content, named entities, numbers, claims, questions, "
+    "causal links, and meaningful emphasis. "
+    "Do not summarize across segments. "
+    "Keep each output text suitable for Chinese TTS. "
+)
+
 
 class LLMClient(Protocol):
     def adapt_segment(self, text: str) -> str:
@@ -76,6 +99,7 @@ class OpenAICompatibleClient:
         max_tokens: int,
         api_key: str | None = None,
         extra_body: dict[str, Any] | None = None,
+        adapt_style: str = "faithful_spoken",
     ):
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -83,6 +107,7 @@ class OpenAICompatibleClient:
         self.max_tokens = max_tokens
         self.api_key = api_key
         self.extra_body = extra_body or {}
+        self.adapt_style = adapt_style
 
     def _chat_completion(self, prompt: str) -> str:
         payload = {
@@ -117,20 +142,21 @@ class OpenAICompatibleClient:
         return body["choices"][0]["message"]["content"].strip()
 
     def adapt_segment(self, text: str) -> str:
+        style_instructions = _adapt_style_instructions(self.adapt_style)
         prompt = (
-            "请把下面英文播客片段改写成自然、适合口播的简体中文。"
-            "清理字幕噪声、舞台提示、版权或转写免责声明；"
-            "URL 和域名要适合中文 TTS 朗读，MP3/MP4 等缩写要避免被读成中文数字。"
-            "只输出中文正文，不要解释。\n\n"
+            f"{style_instructions}"
+            f"{ADAPT_CLEANUP_INSTRUCTIONS}"
+            "Output only the Chinese text for this one segment. "
+            "Do not include explanations or markdown.\n\n"
             f"{text}"
         )
         return self._chat_completion(prompt)
 
     def adapt_segments(self, segments: list[dict[str, Any]]) -> list[dict[str, str]]:
         expected_count = len(segments)
+        style_instructions = _adapt_style_instructions(self.adapt_style)
         prompt = (
-            "You are adapting English podcast transcript segments into natural "
-            "Simplified Chinese spoken-script text.\n"
+            f"{style_instructions}"
             "Return only JSON with shape "
             '{"segments":[{"id":"0001","text":"中文口播正文"}]}.\n'
             f"Return exactly {expected_count} segments, one output item for each input id. "
@@ -138,10 +164,6 @@ class OpenAICompatibleClient:
             "If an input segment is a fragment or continuation, still return one "
             "Chinese spoken-script fragment for that exact id. "
             f"{ADAPT_CLEANUP_INSTRUCTIONS}"
-            "Preserve factual content, named entities, numbers, claims, questions, "
-            "causal links, and meaningful emphasis. "
-            "Do not summarize across segments. "
-            "Keep each output text suitable for Chinese TTS. "
             "Do not include explanations or markdown.\n\n"
             f"{json.dumps({'segments': segments}, ensure_ascii=False)}"
         )
@@ -181,6 +203,17 @@ def _extract_json_object(text: str) -> str:
     if start == -1 or end == -1 or end < start:
         raise ValueError("LLM speaker gender response did not contain a JSON object")
     return cleaned[start:end + 1]
+
+
+def _adapt_style_instructions(style: str) -> str:
+    if style == "faithful_spoken":
+        return FAITHFUL_ADAPT_INSTRUCTIONS
+    if style == "polished_spoken":
+        return POLISHED_ADAPT_INSTRUCTIONS
+    raise ValueError(
+        "Unsupported adapt style: "
+        f"{style}. Expected faithful_spoken or polished_spoken."
+    )
 
 
 def _parse_speaker_gender_response(text: str) -> list[dict[str, Any]]:
@@ -275,6 +308,7 @@ def build_llm_client(config: dict) -> LLMClient:
             model=config["model"],
             temperature=float(config.get("temperature", 0.3)),
             max_tokens=int(config.get("max_tokens", 4096)),
+            adapt_style=str(config.get("adapt_style", "faithful_spoken")),
         )
     if provider == "openai_compatible":
         return OpenAICompatibleClient(
@@ -284,5 +318,6 @@ def build_llm_client(config: dict) -> LLMClient:
             max_tokens=int(config.get("max_tokens", 4096)),
             api_key=resolve_api_key(config),
             extra_body=config.get("extra_body"),
+            adapt_style=str(config.get("adapt_style", "faithful_spoken")),
         )
     raise ValueError(f"Unsupported llm.provider: {provider}")

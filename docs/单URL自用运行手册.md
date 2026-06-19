@@ -217,6 +217,18 @@ PY
 
 只有 `safe_to_adapt` 才进入真实 LLM。
 
+当前默认改写风格是 `adapt.style: faithful_spoken`：尽量忠实保留原 transcript 的信息、顺序、语气、问题、数字、人名和观点组织，只做字幕噪声、舞台提示、转写说明、URL/缩写读法等轻清理，并让中文适合 TTS 朗读。
+
+如果明确想要更像中文播客的宽松润色，可在 ignored local config 中设置：
+
+```yaml
+adapt:
+  mode: chunked
+  style: polished_spoken
+```
+
+`polished_spoken` 不作为默认。日常自用优先使用 `faithful_spoken`，避免 LLM 过度压缩、补充或重组原文。
+
 本机只跑到 DeepSeek adapt，不跑 TTS：
 
 ```bash
