@@ -166,6 +166,12 @@ asr:
   model: "tiny.en"
   language: "en"
   device: "cuda"
+  # 可选，仅用于人工确认后的 audio-first ASR 专名修正。
+  replacements:
+    - from: "cloud code"
+      to: "Claude Code"
+    - from: "Daniel White Knack"
+      to: "Daniel Whitenack"
 
 diarization:
   provider: local_cli
@@ -914,7 +920,14 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - `medium.en`：首次下载后 cached normalize 约 `28.7s`，粗略 WER `0.178`，quality=`safe_to_adapt`。
   - 专名表现：`small.en` 多把 `Claude` 写成 `cloud`；`medium.en` 抓到 1 次 `Claude Code`，但也多次写成 `Clod`，并把 `Whitenack` 写成 `Witek`。
   - 当前不把默认 ASR 从 `small.en` 升到 `medium.en`。
+- ASR 专名纠错第一版：
+  - 已新增 `asr.replacements`，仅在 audio-first `fixture` / `local_cli` ASR 输出归一化后执行。
+  - 默认不开启，只支持显式短语 `from -> to`，按配置顺序应用，不做自动词典和宽泛 `cloud` 替换。
+  - 命中摘要写入 `asr/raw.json` 的 `metadata.asr_replacements`。
+  - 5090D 临时 worktree 已用 Practical AI 8 分钟样本验证：`tests/test_asr.py` 通过，`small.en` ASR 仍输出 123 段；3 条窄规则命中 4 次，修正 `Daniel White Knack`、`cloud code`、`cloud co-worker`，同时保留未确认的普通 `cloud security`。
 - 本机验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py tests/test_audio_pipeline.py tests/test_audio_normalize.py -q`
   - `.conda/babelecho-dev/bin/python tools/pyannote_diarization_wrapper.py --help`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py tests/test_audio_pipeline.py tests/test_audio_normalize.py -q`
@@ -922,7 +935,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 
 ## 后续
 
-- 先设计 ASR 专名纠错策略，覆盖 `Claude/cloud/Clod`、`Whitenack/Witek/White Knack`、`Anthropic` 等高频 AI podcast 专名。
+- 用真实 5090D 样本验证 `asr.replacements` 对 `Claude/cloud/Clod`、`Whitenack/Witek/White Knack` 等高频 AI podcast 专名的改善幅度。
 - 或继续横评 `large-v3` / faster-whisper，但必须继续只在 audio-first 路线验证，不作为 Route A fallback。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。

@@ -75,6 +75,51 @@ def _normalize_raw_asr(
     return normalized
 
 
+def _replacement_rules(asr_config: dict[str, Any]) -> list[tuple[str, str]]:
+    replacements = asr_config.get("replacements") or []
+    if not isinstance(replacements, list):
+        raise ValueError("asr.replacements must be a list")
+
+    rules: list[tuple[str, str]] = []
+    for index, replacement in enumerate(replacements, start=1):
+        item = _require_mapping(replacement, f"asr.replacements[{index}]")
+        source = item.get("from")
+        target = item.get("to")
+        if not isinstance(source, str) or not source:
+            raise ValueError(f"asr.replacements[{index}].from must be a non-empty string")
+        if not isinstance(target, str):
+            raise ValueError(f"asr.replacements[{index}].to must be a string")
+        rules.append((source, target))
+    return rules
+
+
+def _apply_replacements(raw: dict[str, Any], rules: list[tuple[str, str]]) -> dict[str, Any]:
+    if not rules:
+        return raw
+
+    replacement_count = 0
+    for segment in raw["segments"]:
+        text = segment["text"]
+        for source, target in rules:
+            replacement_count += text.count(source)
+            text = text.replace(source, target)
+        segment["text"] = text
+
+    metadata = raw.get("metadata")
+    if metadata is None:
+        metadata = {}
+    elif isinstance(metadata, dict):
+        metadata = dict(metadata)
+    else:
+        metadata = {"original_metadata": metadata}
+    metadata["asr_replacements"] = {
+        "rules": len(rules),
+        "replacements": replacement_count,
+    }
+    raw["metadata"] = metadata
+    return raw
+
+
 def _resolve_audio_input(run_paths: RunPaths) -> Path:
     source = _require_mapping(read_json(run_paths.source_json), "audio source")
     audio_input = source.get("audio_input")
@@ -145,6 +190,7 @@ def run_fixture_asr(
         default_model="fixture",
         default_language=str(asr_config.get("language") or "en"),
     )
+    raw = _apply_replacements(raw, _replacement_rules(asr_config))
 
     asr_path = _asr_dir(run_paths) / "raw.json"
     write_json(asr_path, raw)
@@ -184,6 +230,7 @@ def run_local_cli_asr(
         default_model=str(asr_config.get("model") or "local_cli"),
         default_language=str(asr_config.get("language") or "en"),
     )
+    raw = _apply_replacements(raw, _replacement_rules(asr_config))
     write_json(asr_path, raw)
     return asr_path
 

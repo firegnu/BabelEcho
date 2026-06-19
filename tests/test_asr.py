@@ -107,6 +107,134 @@ Path(args.output_json).write_text(json.dumps({
     }
 
 
+def test_fixture_asr_applies_explicit_replacements(tmp_path: Path):
+    fixture = tmp_path / "asr.json"
+    write_json(
+        fixture,
+        {
+            "provider": "fixture",
+            "model": "fixture",
+            "language": "en",
+            "duration_seconds": 4.0,
+            "segments": [
+                {
+                    "start_ms": 0,
+                    "end_ms": 2000,
+                    "text": "Cloud code and Clod coworker were mentioned.",
+                },
+                {
+                    "start_ms": 2000,
+                    "end_ms": 4000,
+                    "text": "Daniel White Knack joined the discussion.",
+                },
+            ],
+        },
+    )
+    run_paths = create_run(tmp_path / "workspace", "asr-replacements")
+
+    asr_path = run_fixture_asr(
+        {
+            "provider": "fixture",
+            "fixture_path": str(fixture),
+            "replacements": [
+                {"from": "Cloud code", "to": "Claude Code"},
+                {"from": "Clod coworker", "to": "Claude coworker"},
+                {"from": "Daniel White Knack", "to": "Daniel Whitenack"},
+            ],
+        },
+        run_paths,
+        config_path=fixture,
+    )
+
+    raw = read_json(asr_path)
+    assert [segment["text"] for segment in raw["segments"]] == [
+        "Claude Code and Claude coworker were mentioned.",
+        "Daniel Whitenack joined the discussion.",
+    ]
+    assert raw["metadata"]["asr_replacements"] == {
+        "rules": 3,
+        "replacements": 3,
+    }
+
+
+def test_local_cli_asr_applies_explicit_replacements(tmp_path: Path):
+    wrapper = tmp_path / "fake_asr_wrapper.py"
+    wrapper.write_text(
+        """
+import argparse
+import json
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--audio-file", required=True)
+parser.add_argument("--output-json", required=True)
+args = parser.parse_args()
+
+Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
+Path(args.output_json).write_text(json.dumps({
+    "provider": "fake_asr",
+    "model": "fake",
+    "language": "en",
+    "duration_seconds": 2.0,
+    "segments": [
+        {
+            "start_ms": 0,
+            "end_ms": 2000,
+            "text": "cloud code was discussed",
+        }
+    ],
+}), encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    run_paths = create_run(tmp_path / "workspace", "local-cli-asr-replacements")
+    audio_dir = run_paths.run_dir / "audio"
+    audio_dir.mkdir(parents=True)
+    (audio_dir / "input.wav").write_bytes(b"fake audio")
+    write_json(
+        run_paths.source_json,
+        {
+            "source_type": "audio_file",
+            "audio_input": "audio/input.wav",
+        },
+    )
+
+    asr_path = run_asr(
+        {
+            "provider": "local_cli",
+            "command": f"{sys.executable} {wrapper}",
+            "replacements": [
+                {"from": "cloud code", "to": "Claude Code"},
+            ],
+        },
+        run_paths,
+        config_path=tmp_path / "local-audio.yaml",
+    )
+
+    raw = read_json(asr_path)
+    assert raw["segments"][0]["text"] == "Claude Code was discussed"
+    assert raw["metadata"]["asr_replacements"] == {
+        "rules": 1,
+        "replacements": 1,
+    }
+
+
+def test_fixture_asr_rejects_invalid_replacement_config(tmp_path: Path):
+    fixture = Path("tests/fixtures/asr/two-speaker-asr.json")
+    run_paths = create_run(tmp_path / "workspace", "bad-asr-replacements")
+
+    with pytest.raises(ValueError, match="asr.replacements must be a list"):
+        run_fixture_asr(
+            {
+                "provider": "fixture",
+                "fixture_path": str(fixture),
+                "replacements": {"from": "cloud", "to": "Claude"},
+            },
+            run_paths,
+            config_path=Path.cwd() / "local-audio.yaml",
+        )
+
+
 @pytest.mark.parametrize("missing_key", ["start_ms", "end_ms", "text"])
 def test_fixture_asr_rejects_segment_missing_required_fields(
     tmp_path: Path,
