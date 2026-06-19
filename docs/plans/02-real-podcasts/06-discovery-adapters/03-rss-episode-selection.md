@@ -46,3 +46,4 @@ Out:
 - 已新增 RSS episode listing 和 source config builder。
 - 已新增 `babelecho rss episodes` CLI。
 - fixture 已覆盖 list/select/write source config。
+- 真实短 smoke `rss-podnews-amp-member-normalize-20260619` 使用 `https://podnews.net/rss` 第 1 集 `A new AMP member`，约 `296s`；`rss episodes --select-index 1` 写出 `podcast_rss` source config，`episode convert --source-config ... --to-stage normalize` 成功。normalize 后 88 段、dirty markup=0、html entities=0，质量门槛为 `inspect_first`，原因是原始 VTT cue `too_fragmented`；未进入 DeepSeek/TTS。

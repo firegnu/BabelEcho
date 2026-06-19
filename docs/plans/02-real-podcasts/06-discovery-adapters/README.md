@@ -67,3 +67,5 @@ Out:
 - 已新增 `babelecho rss episodes`，把 feed 内人工选择的 episode 落成 `podcast_rss` source config。
 - 已新增 `src/babelecho/youtube.py` 和 `source.type=youtube_captions` ingest。
 - iTunes 输出标准 `source.type=podcast_rss`；YouTube 输出标准 transcript raw 文件并继续复用 normalize/adapt。
+- 真实 5090D full-chain `itunes-url-practical-ai-zero-trust-full-20260619` 已验证 Apple Podcasts URL -> iTunes Lookup -> RSS -> `podcast_rss` -> normalize -> DeepSeek adapt -> TTS -> assemble -> publish，全程不新增 iTunes 专用后流程。
+- 真实短 RSS smoke `rss-podnews-amp-member-normalize-20260619` 已验证 direct RSS feed URL -> episode selection -> `podcast_rss` -> normalize；样本约 `296s`，质量门槛返回 `inspect_first` / `too_fragmented`，因此未送入 DeepSeek。

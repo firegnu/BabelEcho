@@ -111,6 +111,12 @@ For Apple Podcasts/iTunes URLs, keep the discovery step explicit: use
 then `--select-index ... --source-config-out ...` to create a single-episode
 `podcast_rss` source config for `episode convert --source-config`.
 
+For direct RSS feed URLs, use
+`babelecho rss episodes --feed-url "<rss-feed-url>"` to list episodes, then
+`--select-index ... --source-config-out ...` to create the same single-episode
+`podcast_rss` source config. This keeps RSS and iTunes on the same downstream
+pipeline.
+
 For YouTube inputs, run to `normalize` first when validating a new URL. The CLI prints transcript candidate details plus quality metrics, and the full deterministic report is stored at `workspace/runs/<run-id>/transcript/quality.json`.
 
 The real 5090D run expects:
