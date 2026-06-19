@@ -305,7 +305,7 @@ ffprobe -v error -show_entries format=duration,size:stream=codec_name,sample_rat
 - YouTube 单视频：已跑过 normalize、DeepSeek、5090D TTS full-chain。
 - 标准 episode page：已跑过多个真实标准播客 normalize，99PI/Practical AI 等样本已跑过 full-chain。
 - Apple Podcasts/iTunes URL：`itunes-url-practical-ai-zero-trust-full-20260619` 已在 5090D full-chain 通过；单步 `episode convert --url ... --select-index ...` smoke `apple-practical-ai-single-url-20260619` 已跑到 normalize，103 段、3 speaker、quality=`safe_to_adapt`。
-- 直接 RSS feed URL：单步 `episode convert --url ... --select-index ...` smoke `rss-podnews-single-url-20260619` 已跑到 normalize；Podnews timed transcript 样本经碎段合并后从 88 段降到 18 段，quality=`safe_to_adapt`，未进入 DeepSeek/TTS。
+- 直接 RSS feed URL：单步 `episode convert --url ... --select-index ...` smoke `rss-podnews-single-url-20260619` 已跑到 normalize；Podnews timed transcript 样本经碎段合并后从 88 段降到 18 段，quality=`safe_to_adapt`。收口 full-chain `rss-podnews-single-url-full-20260619` 已在 5090D 跑通 DeepSeek/TTS/assemble/publish，MP3 约 `233.535s`、`22050 Hz` mono，已拷回本机 ignored run 目录。
 
 ## 失败时先看哪里
 

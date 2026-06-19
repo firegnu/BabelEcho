@@ -22,7 +22,7 @@
 | --- | --- | --- |
 | MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | done |
 | MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | done |
-| MVP-1 Single URL Self-use | 用户提供单个 URL 后，手动选集并生成对应中文播客 | active |
+| MVP-1 Single URL Self-use | 用户提供单个 URL 后，手动选集并生成对应中文播客 | done |
 | Phase 2 ASR + Product Surface | ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App | next |
 | Phase 3 Automation | 订阅扫描、多 episode 批处理、PodcastIndex 多 candidate 自动选择、YouTube playlist/channel/show 自动展开、远程运维自动化 | later |
 | Later | 微调 `CosyVoice-300M-SFT` 扩展多个中文男声/女声、授权参考音色扩展、本地 LLM 替换 | deferred |
@@ -116,9 +116,11 @@
 - 已支持第一版 iTunes feed discovery：`babelecho itunes search --query ...` 可从 iTunes Search API 找 podcast RSS `feedUrl`，并写出 `source.type=podcast_rss`。
 - 已支持 Apple Podcasts/iTunes URL 自用入口：`babelecho itunes episodes --url ...` 可从 URL 解析节目 id，经 iTunes lookup 拿 RSS `feedUrl`，列出 episodes，并把人工选中的单集写成带 `episode_url` 的 `source.type=podcast_rss`。该入口不自动选择 show 内最新集，不直接转换整档节目。
 - 已支持第一版 RSS episode selection：`babelecho rss episodes --feed-url ...` 可列出 feed 内 episodes，标记 transcript yes/no，并把选中 episode 写成 `source.type=podcast_rss`。
+- 已支持 MVP-1 最终单步入口：`babelecho episode convert --url ... --select-index ...` 对 Apple Podcasts/iTunes URL 和直接 RSS feed URL 做人工选集编排，然后写 `source.type=podcast_rss` 并复用现有后流程。
 - 已支持第一版 `source.type=youtube_captions`：用 `yt-dlp --skip-download` 拉公开视频字幕/自动字幕作为 transcript source，不下载音频，不做 ASR。
 - 已完成 YouTube 单链接 pre-DeepSeek 清洗和质量门槛第一版：`babelecho episode convert --url ... --to-stage normalize` 对单个 YouTube 视频或 YouTube Podcasts 单集 URL 写出 `transcript/raw.vtt`、`transcript/cleaned.vtt`、`transcript/candidates.json`、`transcript/normalized.json` 和 `transcript/quality.json`；带 `t=` / `start=` 的 URL 会记录 `youtube_start_ms` 并裁剪 normalized 输入；YouTube 标题会写入 source metadata；CLI 会输出 `safe_to_adapt` / `inspect_first` / `reject` 建议和关键指标；字幕说话人箭头 `>>` 会在 deterministic cleaning 阶段移除；会拒绝 playlist/channel/show 类 URL，不做订阅扫描。
 - 点播式单集转换入口已完成：用户给一个 episode URL、已有 source YAML 或 transcript file，系统只转换这一集。
+- MVP-1 收口 full-chain 样本 `rss-podnews-single-url-full-20260619` 已在 5090D 跑通：`episode convert --url https://podnews.net/rss --select-index 1` 经 RSS 选集、normalize、DeepSeek adapt、本地 TTS、assemble、publish 成功；18 段、quality=`safe_to_adapt`，MP3 约 `233.535s`、`22050 Hz` mono。
 - YouTube 单链接探索已先收口；当前真实瓶颈转向标准播客点播来源对接：YouTube Podcasts 单集、RSS/iTunes feed、PodcastIndex episode 和官网 episode 页面之间的 URL 归一、transcript discovery、candidate 选择和清洗诊断。
 - 多 episode 批处理和跳过已处理 episode 后移，不作为当前主流程。
 - Spotify 和 Apple Podcasts 页面不在 `episode_page` 范围内；YouTube 只走字幕 source，不走页面正文解析。
@@ -191,7 +193,6 @@
 
 ## 当前最高优先级
 
-1. 完成 MVP-1 最后一块：`episode convert --url ... --select-index ...` 统一支持 Apple Podcasts/iTunes URL 和直接 RSS feed URL，复用现有 `podcast_rss` 后流程。
-2. 保持 YouTube 单视频 / YouTube Podcasts 单集视频、标准 episode page、Apple/RSS 四类单 URL 入口相互隔离，任何改动先跑来源矩阵回归。
-3. 再跑一个短 Apple/RSS 代表样本的 5090D full-chain，确认单 URL 自用版可以收口。
-4. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。
+1. MVP-1 Single URL Self-use 已完成，下一步先设计 Phase 2：ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App 的边界与顺序。
+2. Phase 2 开始前，保持现有 YouTube、episode page、Apple/RSS 单 URL 路径稳定；任何来源改动先跑来源矩阵回归。
+3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。
