@@ -69,14 +69,15 @@ workspace/published/
 
 这一步只追加前端 sidecar，不改变现有 MP3、RSS feed、metadata、transcript 或前面各阶段的业务语义。
 
-当前本机 `workspace/published/` 已有两条真实前端测试数据：
+当前本机 `workspace/published/` 已有三条真实前端测试数据：
 
 | run_id | 来源 | 标题 | segments | speakers | 时长 | 音频 |
 | --- | --- | --- | --- | --- | --- | --- |
+| `article-anthropic-infra-noise-20260619` | Anthropic 技术文章 | Quantifying infrastructure noise in agentic coding evals \ Anthropic | 33 | 0 | 684.849342 秒 | 22050 Hz mono MP3 |
 | `frontend-publish-practical-ai-faithful-sidecar-20260619` | Practical AI RSS | The AI engineer skills gap | 103 | 5 | 2372.179592 秒 | 22050 Hz mono MP3 |
 | `frontend-publish-podnews-sidecar-20260619` | Podnews RSS | A new AMP member | 18 | 0 | 231.523265 秒 | 22050 Hz mono MP3 |
 
-两条样本的 `quality.recommendation` 都是 `safe_to_adapt`。前端 agent 可以直接以这两条作为列表、播放器、脚本、英文对照、质量报告和多人 speaker 展示的 fixture。
+三条样本的 `quality.recommendation` 都是 `safe_to_adapt`。前端 agent 可以直接以这三条作为列表、播放器、脚本、英文对照、质量报告、多 speaker 展示和无 speaker 文章朗读展示的 fixture。
 
 ## 路径原则
 
@@ -484,6 +485,100 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 - 错误或缺失字段要优雅降级。
 - 移动端至少能播放和查看脚本；桌面端优先支持并排查看播放器和脚本。
 
+## 高保真 Mockup 设计 Brief
+
+本节可以直接交给设计 agent，用来产出高保真 mockup。目标是设计图，不是生产代码；可以用静态 HTML、Figma 或图片稿表达，但必须基于本文契约里的真实字段和三条 fixture。
+
+### 输出要求
+
+- 至少产出桌面端主界面，推荐尺寸 `1440x900`。
+- 至少补一张移动端关键页，推荐尺寸 `390x844`。
+- 优先做 3 个核心画面：
+  1. Library 列表页：展示三条真实 episode，支持按 route/source/quality/speaker count 筛选的视觉状态。
+  2. Episode 播放详情页：以音频播放器、中文脚本和 source/quality 信息为核心。
+  3. Transcript 对照/质量检查页或详情侧栏：展示英文 transcript、中文脚本、quality metrics、warnings/reasons 和 metadata。
+- 如要做设计方向探索，可以出 2-3 个视觉方向，但每个方向都必须使用同一批真实 fixture，不要编造新节目。
+
+### 视觉方向
+
+- 气质：私有、安静、清晰、偏工具型的播客资料库。
+- 不要做 landing page、营销 hero、宣传页或大幅说明页。
+- 不要把页面做成 SaaS 官网；第一屏就是可用的资料库/播放器。
+- 以信息密度和可扫读性为优先：标题、来源、时长、质量状态、route/source、speaker 数要容易比较。
+- 颜色克制，避免大面积紫蓝渐变、装饰光斑、背景 orb、花哨插画。
+- 可以用小图标辅助导航、播放、下载、筛选、展开/折叠和状态 badge。
+- 卡片只用于 episode item 或详情面板，不要卡片套卡片；主页面结构应更像应用 shell。
+- UI 文字建议用中文；episode 标题、source title、专有名词和 URL 保持原始文本。
+
+### 布局建议
+
+桌面端推荐三栏或两栏应用布局：
+
+```text
+左侧导航/筛选
+  Library
+  Route: transcript_first / article_reading / audio_first
+  Source: podcast_rss / web_article / ...
+  Quality: safe_to_adapt / inspect_first / reject
+
+中间 episode 列表
+  标题
+  route/source badge
+  duration
+  speaker count
+  quality
+  published_at
+
+右侧详情/播放器
+  标题 + source
+  audio player
+  tabs: 中文脚本 / 英文原文 / 质量 / Metadata
+```
+
+移动端推荐单列：
+
+```text
+顶部：Library 标题 + 筛选按钮
+列表：episode cards
+详情页：播放器固定在上方，脚本作为主内容，source/quality 折叠展示
+```
+
+### 三条 Fixture 的设计用途
+
+| run_id | 设计用途 |
+| --- | --- |
+| `frontend-publish-practical-ai-faithful-sidecar-20260619` | 多 speaker 标准播客。用于展示 speaker 列表、speaker badge、多人脚本段落和较长音频。 |
+| `frontend-publish-podnews-sidecar-20260619` | 短标准播客，无 speaker。用于展示简单 episode、短音频和无 speaker 的降级状态。 |
+| `article-anthropic-infra-noise-20260619` | 技术文章朗读，`route=article_reading`、`source_type=web_article`、`speakers=[]`。用于展示文章 route、网页 source metadata、无 speaker 的详情页。 |
+
+### 必须体现的状态
+
+- `safe_to_adapt` 是正常可播放状态，但不要设计成“绝对正确”。
+- `speakers=[]` 时隐藏 speaker 列表，或展示轻量的“无角色分段”状态。
+- `article_reading` 不展示主持人/嘉宾概念。
+- `asr=null` 时不展示 ASR 模块；可以在 metadata/quality 页显示“未使用 ASR”。
+- 缺失可选字段时界面要留白或隐藏，不要显示 `null`。
+- 未知 `route` / `source_type` 应按通用 episode 展示。
+
+### 不要设计的功能
+
+- URL 输入框。
+- 转换按钮。
+- 任务队列。
+- 实时日志。
+- 登录/账号。
+- 后端配置管理。
+- DeepSeek、TTS、ASR 的启动/停止控制。
+- 订阅扫描或批处理管理。
+
+### 可交付物建议
+
+- `Library` 桌面高保真图。
+- `Episode Detail - Podcast` 桌面高保真图，使用 Practical AI 多人样本。
+- `Episode Detail - Article` 桌面高保真图，使用 Anthropic 技术文章样本。
+- `Mobile Episode Detail` 移动端高保真图。
+- 可选：一个简短交互说明，描述列表选择 episode、tab 切换、播放器和下载按钮。
+
 ## 给前端 Agent 的最短上下文
 
 可以把下面这段直接交给前端或设计 agent：
@@ -493,7 +588,7 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 
 数据入口是 workspace/published/index.json。列表项里的 artifact_path 指向每集详情 JSON，audio_path 指向 MP3。详情 JSON 是 workspace/published/episodes/<run-id>/artifact.json，里面包含 source、quality、media、speakers、asr 和 transcript/script 文件路径。
 
-当前可用于 mock 和联调的真实数据有两条：frontend-publish-practical-ai-faithful-sidecar-20260619 是多人 Practical AI 标准播客样本；frontend-publish-podnews-sidecar-20260619 是短 Podnews 标准播客样本。
+当前可用于 mock 和联调的真实数据有三条：frontend-publish-practical-ai-faithful-sidecar-20260619 是多人 Practical AI 标准播客样本；frontend-publish-podnews-sidecar-20260619 是短 Podnews 标准播客样本；article-anthropic-infra-noise-20260619 是 article_reading/web_article 技术文章朗读样本，speakers 为空，前端应隐藏 speaker 区域或显示无角色状态。
 
 前端第一版需要：episode 列表、音频播放页、中文脚本查看、英文 transcript 对照、quality report 展示、metadata/source 展示、MP3 下载。不要做登录、任务队列、URL 输入、转换按钮或后台管理。
 
