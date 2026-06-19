@@ -286,6 +286,101 @@ publish:
     assert status["outputs"]["asr_diarization"] == "asr/diarization.json"
 
 
+def test_audio_convert_diarize_stage_supports_local_cli_provider(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    audio = tmp_path / "sample.wav"
+    audio.write_bytes(b"fixture audio bytes")
+    asr_fixture = Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-asr.json"
+    wrapper = tmp_path / "fake_diarization_wrapper.py"
+    wrapper.write_text(
+        """
+import argparse
+import json
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--audio-file", required=True)
+parser.add_argument("--output-json", required=True)
+parser.add_argument("--model")
+parser.add_argument("--min-speakers")
+parser.add_argument("--max-speakers")
+args = parser.parse_args()
+
+source = Path(args.audio_file)
+Path(args.output_json).parent.mkdir(parents=True, exist_ok=True)
+Path(args.output_json).write_text(json.dumps({
+    "provider": "fake_diarization",
+    "model": args.model,
+    "speaker_count": 2,
+    "segments": [
+        {"start_ms": 0, "end_ms": 4200, "speaker": "speaker_1"},
+        {"start_ms": 4300, "end_ms": 9200, "speaker": "speaker_2"},
+    ],
+    "metadata": {"audio_name": source.name},
+}), encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    local_config = tmp_path / "local-audio.yaml"
+    local_config.write_text(
+        f"""
+asr:
+  provider: fixture
+  fixture_path: "{asr_fixture}"
+diarization:
+  provider: local_cli
+  command: "{sys.executable} {wrapper}"
+  model: fake-diarizer
+  min_speakers: 1
+  max_speakers: 3
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "audio",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "audio-local-cli-diarization",
+            "--audio-file",
+            str(audio),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "diarize",
+        ],
+        text=True,
+        capture_output=True,
+        env=worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "diarize:" in result.stdout
+    run_dir = workspace / "runs" / "audio-local-cli-diarization"
+    diarization = read_json(run_dir / "asr" / "diarization.json")
+    status = read_json(run_dir / "run.json")
+    assert diarization["provider"] == "fake_diarization"
+    assert diarization["model"] == "fake-diarizer"
+    assert diarization["speaker_count"] == 2
+    assert diarization["segments"] == [
+        {"start_ms": 0, "end_ms": 4200, "speaker": "speaker_1"},
+        {"start_ms": 4300, "end_ms": 9200, "speaker": "speaker_2"},
+    ]
+    assert diarization["metadata"]["audio_name"] == "input.wav"
+    assert status["status"] == "succeeded"
+    assert status["to_stage"] == "diarize"
+    assert status["outputs"]["asr_diarization"] == "asr/diarization.json"
+
+
 def test_audio_convert_normalize_stage_writes_transcript_artifacts(
     tmp_path: Path,
 ):

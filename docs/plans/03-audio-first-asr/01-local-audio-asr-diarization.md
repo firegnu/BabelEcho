@@ -169,7 +169,8 @@ asr:
 
 diarization:
   provider: local_cli
-  command: "/home/th5090d/miniforge3/envs/babelecho-asr/bin/diarization-wrapper"
+  command: "/home/th5090d/miniforge3/envs/babelecho-diarization/bin/python tools/pyannote_diarization_wrapper.py"
+  model: "pyannote/speaker-diarization-community-1"
   min_speakers: 1
   max_speakers: 6
 
@@ -856,9 +857,40 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 当前 `diarization.provider=none`，所以 `quality.warnings=["diarization_disabled"]`
 - 注意：这一步证明真实 OpenAI Whisper ASR runtime、`local_cli` 接口和 audio-first `asr -> normalize` 桥接可用；尚未接真实 diarization 或声纹。
 
+### 2026-06-19：阶段 7 Diarization local_cli 接入口
+
+- 已新增 `diarization.provider=local_cli`：
+  - core pipeline 只调用本地命令并校验 `asr/diarization.json`
+  - 普通本机测试不导入、不安装真实 diarization 模型
+  - fixture 和 none provider 保持兼容
+- `local_cli` wrapper 调用约定：
+  - 输入：`--audio-file`
+  - 输出：`--output-json`
+  - 可选：`--model`、`--min-speakers`、`--max-speakers`
+  - 支持 `diarization.extra_args`
+- 已新增可选真实 wrapper：
+  - `tools/pyannote_diarization_wrapper.py`
+  - 默认模型：`pyannote/speaker-diarization-community-1`
+  - 默认从 `HF_TOKEN` 环境变量读取 Hugging Face token，避免 token 出现在命令行
+  - 也可把 `--model` 指向本地下载好的 pyannote pipeline 目录，供离线运行
+  - wrapper 输出 BabelEcho canonical `asr/diarization.json`，speaker 名统一映射为 `speaker_1`、`speaker_2` 等稳定标签
+- 5090D 当前环境检查：
+  - `/home/th5090d/miniforge3/envs/babelecho-tts` 已有 `torch`、`torchaudio`、`sklearn`
+  - 尚未安装 `pyannote.audio`、`whisperx`、`nemo`、`speechbrain`
+  - 尚未发现本地 diarization 模型缓存
+- 真实 pyannote smoke 尚未执行，因为 `Community-1` 需要先接受 Hugging Face 模型条款并准备 token，或先把模型按条款下载到本地目录。
+- 已新增/扩展测试：
+  - `tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json`
+  - `tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider`
+- 本机验证通过：
+  - `.conda/babelecho-dev/bin/python tools/pyannote_diarization_wrapper.py --help`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py tests/test_audio_pipeline.py tests/test_audio_normalize.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest -q`
+
 ## 后续
 
-- 下一步用更接近播客的英文短样本验证 `base.en` 或 `small.en`，再决定是否进入 faster-whisper；不急着跑 TTS。
+- 下一步先准备独立 5090D diarization 环境，再用 8 分钟 Practical AI 样本跑 `pyannote` diarization 到 `normalize`；不急着跑 TTS。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
 - 同一节目跨 episode speaker profile 复用。
