@@ -1,4 +1,8 @@
+import json
 import shutil
+import subprocess
+from datetime import datetime, timezone
+from pathlib import Path
 from xml.etree import ElementTree
 
 from .jsonio import read_json, write_json
@@ -11,9 +15,192 @@ def _text(parent: ElementTree.Element, tag: str, value: str) -> ElementTree.Elem
     return child
 
 
+def _utc_timestamp() -> str:
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
+
+
+def _read_optional_json(path: Path) -> dict | None:
+    if not path.exists():
+        return None
+    return read_json(path)
+
+
+def _source_type(source: dict) -> str:
+    return str(source.get("source_type") or source.get("type") or "unknown")
+
+
+def _source_provider(source: dict) -> str:
+    if source.get("provider"):
+        return str(source["provider"])
+    source_type = _source_type(source)
+    providers = {
+        "youtube_captions": "youtube",
+        "episode_page": "episode_page",
+        "podcast_rss": "rss",
+        "transcript_file": "local_file",
+        "audio_file": "local_file",
+    }
+    return providers.get(source_type, source_type)
+
+
+def _route_for_source(source: dict) -> str:
+    if _source_type(source) == "audio_file":
+        return "audio_first"
+    return "transcript_first"
+
+
+def _public_source(source: dict) -> dict:
+    return {
+        "type": _source_type(source),
+        "provider": _source_provider(source),
+        "input_url": (
+            source.get("input_url")
+            or source.get("url")
+            or source.get("feed_url")
+            or source.get("original_url")
+        ),
+        "episode_url": source.get("episode_url") or source.get("original_url"),
+        "transcript_url": source.get("transcript_url"),
+        "feed_url": source.get("feed_url"),
+    }
+
+
+def _audio_probe(audio_path: Path) -> dict:
+    media = {
+        "audio_path": "audio.mp3",
+        "mime_type": "audio/mpeg",
+        "duration_seconds": None,
+        "sample_rate": None,
+        "channels": None,
+        "file_size_bytes": audio_path.stat().st_size,
+    }
+    command = [
+        "ffprobe",
+        "-v",
+        "error",
+        "-show_entries",
+        "format=duration",
+        "-show_entries",
+        "stream=sample_rate,channels",
+        "-of",
+        "json",
+        str(audio_path),
+    ]
+    try:
+        completed = subprocess.run(command, check=True, text=True, capture_output=True)
+        probed = json.loads(completed.stdout)
+    except (FileNotFoundError, subprocess.CalledProcessError, json.JSONDecodeError):
+        return media
+    streams = probed.get("streams", [])
+    if streams:
+        stream = streams[0]
+        if stream.get("sample_rate") is not None:
+            media["sample_rate"] = int(stream["sample_rate"])
+        if stream.get("channels") is not None:
+            media["channels"] = int(stream["channels"])
+    duration = probed.get("format", {}).get("duration")
+    if duration is not None:
+        media["duration_seconds"] = float(duration)
+    return media
+
+
+def _quality_summary(run_paths: RunPaths) -> dict:
+    quality = _read_optional_json(run_paths.transcript_quality_json) or {}
+    return {
+        "recommendation": quality.get("recommendation", "unknown"),
+        "warnings": quality.get("warnings", []),
+        "reasons": quality.get("reasons", []),
+        "metrics": quality.get("metrics", {}),
+    }
+
+
+def _speaker_inference_map(speaker_voices: dict | None) -> dict:
+    if not speaker_voices:
+        return {}
+    return {
+        item.get("speaker"): item
+        for item in speaker_voices.get("inferences", [])
+        if item.get("speaker")
+    }
+
+
+def _speaker_summaries(script: dict, speaker_voices: dict | None) -> list[dict]:
+    ordered_speakers: list[str] = []
+    segment_counts: dict[str, int] = {}
+    for segment in script.get("segments", []):
+        speaker = segment.get("speaker")
+        if not speaker:
+            continue
+        speaker = str(speaker)
+        if speaker not in segment_counts:
+            ordered_speakers.append(speaker)
+            segment_counts[speaker] = 0
+        segment_counts[speaker] += 1
+
+    voice_roles = (speaker_voices or {}).get("speaker_voices", {})
+    inferences = _speaker_inference_map(speaker_voices)
+    speakers = []
+    for index, speaker in enumerate(ordered_speakers, start=1):
+        summary = {
+            "id": f"speaker_{index}",
+            "display_name": speaker,
+            "segment_count": segment_counts[speaker],
+        }
+        if speaker in voice_roles:
+            summary["voice_role"] = voice_roles[speaker]
+        inference = inferences.get(speaker)
+        if inference and inference.get("gender"):
+            summary["inferred_gender"] = inference["gender"]
+        speakers.append(summary)
+    return speakers
+
+
+def _write_published_index(stable_publish_dir: Path, generated_at: str) -> None:
+    episodes = []
+    for artifact_path in sorted((stable_publish_dir / "episodes").glob("*/artifact.json")):
+        artifact = read_json(artifact_path)
+        episodes.append(
+            {
+                "run_id": artifact["run_id"],
+                "title": artifact["title"],
+                "route": artifact["route"],
+                "status": artifact["status"],
+                "source_type": artifact["source"]["type"],
+                "quality_recommendation": artifact.get("quality", {}).get(
+                    "recommendation", "unknown"
+                ),
+                "speaker_count": len(artifact.get("speakers", [])),
+                "duration_seconds": artifact.get("media", {}).get("duration_seconds"),
+                "published_at": artifact.get("published_at"),
+                "audio_path": f"episodes/{artifact['run_id']}/audio.mp3",
+                "artifact_path": f"episodes/{artifact['run_id']}/artifact.json",
+            }
+        )
+    episodes.sort(
+        key=lambda episode: (episode.get("published_at") or "", episode["run_id"]),
+        reverse=True,
+    )
+    write_json(
+        stable_publish_dir / "index.json",
+        {
+            "schema_version": "1.0",
+            "generated_at": generated_at,
+            "title": "BabelEcho",
+            "description": "Locally generated Chinese podcast artifacts.",
+            "episodes": episodes,
+        },
+    )
+
+
 def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
     base_url = publish_config["base_url"].rstrip("/")
     source = read_json(run_paths.source_json)
+    script = read_json(run_paths.chinese_script_json)
     episode_id = run_paths.run_id
     episode_dir = run_paths.publish_dir / "episodes" / episode_id
     episode_dir.mkdir(parents=True, exist_ok=True)
@@ -31,6 +218,38 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
     write_json(episode_dir / "metadata.json", metadata)
     shutil.copy2(run_paths.normalized_transcript_json, episode_dir / "transcript.en.json")
     shutil.copy2(run_paths.chinese_script_json, episode_dir / "transcript.zh.json")
+    published_at = _utc_timestamp()
+    speaker_voices = _read_optional_json(run_paths.script_dir / "speaker-voices.json")
+    artifact = {
+        "schema_version": "1.0",
+        "run_id": episode_id,
+        "route": _route_for_source(source),
+        "status": "succeeded",
+        "title": metadata["title"],
+        "summary": source.get("summary"),
+        "created_at": None,
+        "published_at": published_at,
+        "source": _public_source(source),
+        "quality": _quality_summary(run_paths),
+        "media": _audio_probe(audio_target),
+        "artifacts": {
+            "metadata": "metadata.json",
+            "transcript_en": "transcript.en.json",
+            "script_zh": "transcript.zh.json",
+            "feed": "../../feed.xml",
+        },
+        "speakers": _speaker_summaries(script, speaker_voices),
+        "asr": None,
+        "ui": {
+            "default_tab": "script",
+            "badges": [_route_for_source(source).replace("_", "-")],
+        },
+    }
+    if artifact["quality"]["recommendation"] != "unknown":
+        artifact["ui"]["badges"].append(
+            artifact["quality"]["recommendation"].replace("_", "-")
+        )
+    write_json(episode_dir / "artifact.json", artifact)
 
     rss = ElementTree.Element("rss", {"version": "2.0"})
     channel = ElementTree.SubElement(rss, "channel")
@@ -60,7 +279,14 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
 
     stable_episode_dir = run_paths.stable_publish_dir / "episodes" / episode_id
     stable_episode_dir.mkdir(parents=True, exist_ok=True)
-    for name in ["audio.mp3", "metadata.json", "transcript.en.json", "transcript.zh.json"]:
+    for name in [
+        "audio.mp3",
+        "metadata.json",
+        "transcript.en.json",
+        "transcript.zh.json",
+        "artifact.json",
+    ]:
         shutil.copy2(episode_dir / name, stable_episode_dir / name)
     shutil.copy2(feed_path, run_paths.stable_feed)
+    _write_published_index(run_paths.stable_publish_dir, published_at)
     return str(feed_path)

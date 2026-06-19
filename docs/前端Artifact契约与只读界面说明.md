@@ -33,20 +33,22 @@ Phase 2 的前端第一版是只读界面：浏览、播放、下载和检查已
 
 ## 现有公开产物
 
-当前后端已经会在 publish 阶段生成或同步这些文件：
+当前后端会在 publish 阶段生成或同步这些文件：
 
 ```text
 workspace/published/
   feed.xml
+  index.json
   episodes/
     <run-id>/
       audio.mp3
       metadata.json
       transcript.en.json
       transcript.zh.json
+      artifact.json
 ```
 
-这些文件可以保留。Phase 2 建议在不改变现有逻辑的前提下追加两个 JSON sidecar：
+其中 `index.json` 和 `artifact.json` 是前端 sidecar。它们不改变现有 `feed.xml`、MP3、metadata 和 transcript 文件，只为只读前端提供稳定入口：
 
 ```text
 workspace/published/

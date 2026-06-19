@@ -57,7 +57,7 @@
 - `sft_builtin_4role` 仍是四个固定 role：`female_a -> 300M SFT 中文女`，`male_a -> CosyVoice2 cross_lingual speed 1.1 + calm prompt if present + text smoothing`，`female_b -> 300M SFT 英文女`，`male_b -> 300M SFT 英文男`；同名 speaker 复用同一角色，超过 4 个 speaker 循环复用。不做原主播 voice clone。
 - 本机测试计数以当前 `pytest -q` 为准；5090D 历史 wrapper smoke 已验证四角色真实 SFT wav 输出均为 `22050 Hz` mono；最终混合 `male_a` 代码路径也已验证：`four-role-hybrid-code-preview-20260618-1736` 使用正式 `synthesize -> assemble`，manifest/batch roles 均为 `female_a / male_a / female_b / male_b`，MP3 为 `22050 Hz` mono、约 `17.7s`，已拷回本机 ignored `workspace/runs/four-role-hybrid-code-preview-20260618-1736/output/audio.mp3`。计划记录见 `docs/plans/02-real-podcasts/03-sft-builtin-4role-voice-profile.md`。
 - MVP-0 收口已完成：speaker label 解析/清洗、NASA 样本 `normalize -> adapt -> synthesize -> assemble -> publish` 回归、docs 标记完成。
-- `docs/roadmap.md` 已记录从 MVP-0 Acceptance、MVP-0.5 Self-use 到 MVP-1 Single URL Self-use、Phase 2 ASR + Product Surface、Phase 3 Automation 的产品路线；MVP-1 已完成，Phase 2 架构计划见 `docs/Phase2双轨后端与静态前端架构.md`。前端只读 artifact 契约与设计 brief 见 `docs/前端Artifact契约与只读界面说明.md`。
+- `docs/roadmap.md` 已记录从 MVP-0 Acceptance、MVP-0.5 Self-use 到 MVP-1 Single URL Self-use、Phase 2 ASR + Product Surface、Phase 3 Automation 的产品路线；MVP-1 已完成，Phase 2 架构计划见 `docs/Phase2双轨后端与静态前端架构.md`。前端只读 artifact 契约与设计 brief 见 `docs/前端Artifact契约与只读界面说明.md`；当前 publish 阶段会同步稳定 `workspace/published/feed.xml`、episode MP3/metadata/transcript，并额外生成前端入口 `workspace/published/index.json` 与 `workspace/published/episodes/<run-id>/artifact.json`。
 - 当前阶段采用临时混合验证：LLM adaptation 使用 DeepSeek API，TTS 仍在 5090D 本地运行；最终方向仍是 local-first。
 - Python 环境必须使用项目内 .conda/babelecho-dev，不要使用 base env。
 - 真实 runtime config、workspace/runs、生成音频、模型缓存、本地配置和 API key 不要提交。

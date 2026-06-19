@@ -13,28 +13,109 @@ def test_publish_episode_writes_feed_and_artifacts(tmp_path: Path):
         run_paths.source_json,
         {
             "run_id": "publish-run",
+            "source_type": "podcast_rss",
             "title": "Sample Episode",
             "original_url": "https://example.com/sample",
+            "feed_url": "https://example.com/feed.xml",
+            "episode_url": "https://example.com/sample",
             "transcript_url": "https://example.com/sample.vtt",
         },
     )
     write_json(
         run_paths.normalized_transcript_json,
-        {"episode_id": "publish-run", "segments": []},
+        {
+            "episode_id": "publish-run",
+            "segments": [
+                {"id": "1", "speaker": "Alice", "text": "Hello."},
+                {"id": "2", "speaker": "Bob", "text": "Hi."},
+            ],
+        },
     )
     write_json(
         run_paths.chinese_script_json,
-        {"episode_id": "publish-run", "segments": []},
+        {
+            "episode_id": "publish-run",
+            "segments": [
+                {"id": "1", "speaker": "Alice", "text": "你好。"},
+                {"id": "2", "speaker": "Bob", "text": "嗨。"},
+            ],
+        },
+    )
+    write_json(
+        run_paths.transcript_quality_json,
+        {
+            "recommendation": "safe_to_adapt",
+            "metrics": {"segment_count": 2, "speaker_count": 2},
+            "warnings": [],
+            "reasons": [],
+        },
+    )
+    write_json(
+        run_paths.script_dir / "speaker-voices.json",
+        {
+            "speaker_voices": {"Alice": "female_a", "Bob": "male_a"},
+            "inferences": [
+                {"speaker": "Alice", "gender": "female", "confidence": 0.9},
+                {"speaker": "Bob", "gender": "male", "confidence": 0.8},
+            ],
+        },
     )
 
     feed_path = publish_episode(run_paths, {"base_url": "https://example.com/babelecho"})
 
     assert Path(feed_path).exists()
     assert (run_paths.publish_dir / "episodes" / "publish-run" / "audio.mp3").exists()
+    assert (run_paths.publish_dir / "episodes" / "publish-run" / "artifact.json").exists()
     assert (run_paths.workspace / "published" / "feed.xml").exists()
+    assert (run_paths.workspace / "published" / "index.json").exists()
     assert (run_paths.workspace / "published" / "episodes" / "publish-run" / "audio.mp3").exists()
+    assert (run_paths.workspace / "published" / "episodes" / "publish-run" / "artifact.json").exists()
     metadata = read_json(run_paths.workspace / "published" / "episodes" / "publish-run" / "metadata.json")
     assert metadata["audio_url"] == "https://example.com/babelecho/episodes/publish-run/audio.mp3"
+    artifact = read_json(run_paths.workspace / "published" / "episodes" / "publish-run" / "artifact.json")
+    assert artifact["schema_version"] == "1.0"
+    assert artifact["run_id"] == "publish-run"
+    assert artifact["route"] == "transcript_first"
+    assert artifact["status"] == "succeeded"
+    assert artifact["source"]["type"] == "podcast_rss"
+    assert artifact["source"]["provider"] == "rss"
+    assert artifact["quality"]["recommendation"] == "safe_to_adapt"
+    assert artifact["media"]["audio_path"] == "audio.mp3"
+    assert artifact["media"]["file_size_bytes"] == len(b"fake mp3")
+    assert artifact["artifacts"]["script_zh"] == "transcript.zh.json"
+    assert artifact["speakers"] == [
+        {
+            "id": "speaker_1",
+            "display_name": "Alice",
+            "voice_role": "female_a",
+            "inferred_gender": "female",
+            "segment_count": 1,
+        },
+        {
+            "id": "speaker_2",
+            "display_name": "Bob",
+            "voice_role": "male_a",
+            "inferred_gender": "male",
+            "segment_count": 1,
+        },
+    ]
+    index = read_json(run_paths.workspace / "published" / "index.json")
+    assert index["schema_version"] == "1.0"
+    assert index["episodes"] == [
+        {
+            "run_id": "publish-run",
+            "title": "Sample Episode",
+            "route": "transcript_first",
+            "status": "succeeded",
+            "source_type": "podcast_rss",
+            "quality_recommendation": "safe_to_adapt",
+            "speaker_count": 2,
+            "duration_seconds": None,
+            "published_at": artifact["published_at"],
+            "audio_path": "episodes/publish-run/audio.mp3",
+            "artifact_path": "episodes/publish-run/artifact.json",
+        }
+    ]
     root = ElementTree.parse(feed_path).getroot()
     assert root.tag == "rss"
     assert root.find("./channel/item/title").text == "Sample Episode"
