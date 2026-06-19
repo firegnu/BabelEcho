@@ -874,14 +874,35 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 默认从 `HF_TOKEN` 环境变量读取 Hugging Face token，避免 token 出现在命令行
   - 也可把 `--model` 指向本地下载好的 pyannote pipeline 目录，供离线运行
   - wrapper 输出 BabelEcho canonical `asr/diarization.json`，speaker 名统一映射为 `speaker_1`、`speaker_2` 等稳定标签
-- 5090D 当前环境检查：
-  - `/home/th5090d/miniforge3/envs/babelecho-tts` 已有 `torch`、`torchaudio`、`sklearn`
-  - 尚未安装 `pyannote.audio`、`whisperx`、`nemo`、`speechbrain`
-  - 尚未发现本地 diarization 模型缓存
-- 真实 pyannote smoke 尚未执行，因为 `Community-1` 需要先接受 Hugging Face 模型条款并准备 token，或先把模型按条款下载到本地目录。
+- 5090D 真实 diarization 环境已准备：
+  - 为避免污染 TTS 环境，已从 `/home/th5090d/miniforge3/envs/babelecho-tts` 克隆独立环境到 `/home/th5090d/miniforge3/envs/babelecho-diarization`
+  - `babelecho-diarization` 已安装 `pyannote.audio 4.0.4`
+  - 安装后只在克隆环境中移除了与 NumPy 2.x 不兼容的旧 `onnxruntime-gpu 1.18.0`
+  - `babelecho-tts` 保持不动，继续负责 OpenAI Whisper ASR 和 CosyVoice TTS
+- 5090D 真实 pyannote smoke 已执行：
+  - run-id：`audio-diarization-practicalai-zero-trust-8min-20260619`
+  - audio：`workspace/sources/asr-practicalai-zero-trust-8min.wav`，8 分钟，16 kHz mono
+  - ASR：OpenAI Whisper `small.en`，`raw_segment_count=123`
+  - Diarization：pyannote Community-1，`speaker_count=2`、`turn_count=23`、`avg_turn_ms=20735.7`
+  - Normalize：`normalized_segment_count=32`，speakers 为 `speaker_1` / `speaker_2`
+  - 旧 Quality：`recommendation=inspect_first`，warning 为 `asr_segment_crosses_speaker_turns`
+  - 运行耗时约 `36.5s`，峰值 RSS 约 `3.0GB`
+  - 与该集已有官方 speaker VTT 粗略重叠对齐，`speaker_1=Daniel`、`speaker_2=Chris`，覆盖片段 overlap accuracy 约 `99.59%`
+- 当前判断：
+  - 真实 diarization 分离结果可用
+  - `inspect_first` 来自 ASR segment 横跨 speaker turn 的旧保守 warning，不代表 pyannote 未分出人
+  - 这一步未进入 DeepSeek/TTS，仍保持 audio-first 独立验证边界
+- 已处理 `asr_segment_crosses_speaker_turns` 的质量门禁：
+  - `asr_segment_crosses_speaker_turns` 保留为 advisory warning，不再单独触发 `inspect_first`
+  - quality metrics 新增 `cross_speaker_segment_count/ratio`、`ambiguous_speaker_segment_count/ratio`、`min_primary_speaker_overlap_ratio`、`avg_primary_speaker_overlap_ratio`
+  - 主 speaker overlap 小于 `0.60` 的 crossing 计为 ambiguous
+  - ambiguous segment 数量达到 3 个或比例达到 5% 时，写 `ambiguous_speaker_assignments` 并 `inspect_first`
+  - Practical AI 8 分钟样本已用新代码离线复算为 `safe_to_adapt`，metrics 为 9/123 crossing、2/123 ambiguous、`min_primary_speaker_overlap_ratio=0.537`、`avg_primary_speaker_overlap_ratio=0.781`
 - 已新增/扩展测试：
   - `tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json`
   - `tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider`
+  - `tests/test_audio_normalize.py::test_audio_normalize_keeps_low_risk_cross_speaker_segments_safe`
+  - `tests/test_audio_normalize.py::test_audio_normalize_marks_ambiguous_cross_speaker_segments_for_inspection`
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python tools/pyannote_diarization_wrapper.py --help`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py::test_local_cli_diarization_invokes_wrapper_and_writes_canonical_json tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider -q`
@@ -890,7 +911,8 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 
 ## 后续
 
-- 下一步先准备独立 5090D diarization 环境，再用 8 分钟 Practical AI 样本跑 `pyannote` diarization 到 `normalize`；不急着跑 TTS。
+- 用最新代码在 5090D 重跑 `audio-diarization-practicalai-zero-trust-8min-20260619` 或新 run-id，确认 crossing policy 下 quality 是否为 `safe_to_adapt`。
+- 如果通过，再选择是否跑一小段 `audio-first -> DeepSeek -> TTS` 试听，不要直接上长音频。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
 - 同一节目跨 episode speaker profile 复用。

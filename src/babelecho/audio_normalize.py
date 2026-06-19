@@ -11,6 +11,9 @@ MANY_SHORT_SPEAKER_TURNS = 20
 MERGE_MAX_GAP_MS = 1_500
 MERGE_MAX_CHARS = 280
 MERGE_MAX_DURATION_MS = 45_000
+AMBIGUOUS_PRIMARY_OVERLAP_RATIO = 0.60
+AMBIGUOUS_SEGMENT_COUNT_INSPECT_THRESHOLD = 3
+AMBIGUOUS_SEGMENT_RATIO_INSPECT_THRESHOLD = 0.05
 
 
 def _asr_raw_path(run_paths: RunPaths) -> Path:
@@ -48,6 +51,7 @@ def _speaker_for_segment(
     segment: dict[str, Any],
     diarization: dict[str, Any],
     warnings: list[str],
+    cross_speaker_stats: dict[str, Any],
 ) -> str | None:
     turns = diarization.get("segments") or []
     if diarization.get("provider") == "none" or not turns:
@@ -71,6 +75,14 @@ def _speaker_for_segment(
         return None
     if len(matches) > 1:
         _add_warning(warnings, "asr_segment_crosses_speaker_turns")
+        primary_overlap = max(overlap for overlap, _speaker in matches)
+        total_overlap = sum(overlap for overlap, _speaker in matches)
+        if total_overlap > 0:
+            primary_overlap_ratio = primary_overlap / total_overlap
+            cross_speaker_stats["primary_overlap_ratios"].append(primary_overlap_ratio)
+            if primary_overlap_ratio < AMBIGUOUS_PRIMARY_OVERLAP_RATIO:
+                cross_speaker_stats["ambiguous_count"] += 1
+        cross_speaker_stats["count"] += 1
     return max(matches, key=lambda item: item[0])[1]
 
 
@@ -94,6 +106,11 @@ def _normalized_asr_segments(
     previous_end: int | None = None
     confidences: list[float] = []
     low_confidence_count = 0
+    cross_speaker_stats: dict[str, Any] = {
+        "count": 0,
+        "ambiguous_count": 0,
+        "primary_overlap_ratios": [],
+    }
 
     for raw_index, raw_segment in enumerate(raw_segments, start=1):
         item = _require_mapping(raw_segment, f"ASR segment {raw_index}")
@@ -127,9 +144,17 @@ def _normalized_asr_segments(
             "text": " ".join(text.split()),
             "source": "asr",
         }
-        segment["speaker"] = _speaker_for_segment(segment, diarization, warnings)
+        segment["speaker"] = _speaker_for_segment(
+            segment,
+            diarization,
+            warnings,
+            cross_speaker_stats,
+        )
         segments.append(segment)
 
+    cross_speaker_count = int(cross_speaker_stats["count"])
+    ambiguous_speaker_count = int(cross_speaker_stats["ambiguous_count"])
+    cross_speaker_ratios = cross_speaker_stats["primary_overlap_ratios"]
     metrics = {
         "avg_confidence": (
             round(sum(confidences) / len(confidences), 3) if confidences else None
@@ -137,6 +162,24 @@ def _normalized_asr_segments(
         "low_confidence_segment_count": low_confidence_count,
         "timestamp_error_count": timestamp_error_count,
         "empty_segment_count": empty_segment_count,
+        "cross_speaker_segment_count": cross_speaker_count,
+        "cross_speaker_segment_ratio": (
+            round(cross_speaker_count / len(raw_segments), 3) if raw_segments else 0
+        ),
+        "ambiguous_speaker_segment_count": ambiguous_speaker_count,
+        "ambiguous_speaker_segment_ratio": (
+            round(ambiguous_speaker_count / len(raw_segments), 3)
+            if raw_segments
+            else 0
+        ),
+        "min_primary_speaker_overlap_ratio": (
+            round(min(cross_speaker_ratios), 3) if cross_speaker_ratios else None
+        ),
+        "avg_primary_speaker_overlap_ratio": (
+            round(sum(cross_speaker_ratios) / len(cross_speaker_ratios), 3)
+            if cross_speaker_ratios
+            else None
+        ),
     }
     return _merge_adjacent_same_speaker_segments(segments), metrics
 
@@ -216,6 +259,13 @@ def _quality_report(
         speaker_turn_metrics["short_speaker_turn_count"] >= MANY_SHORT_SPEAKER_TURNS
     ):
         _add_warning(warnings, "too_many_short_speaker_turns")
+    ambiguous_count = int(segment_metrics.get("ambiguous_speaker_segment_count") or 0)
+    ambiguous_ratio = float(segment_metrics.get("ambiguous_speaker_segment_ratio") or 0)
+    if ambiguous_count and (
+        ambiguous_count >= AMBIGUOUS_SEGMENT_COUNT_INSPECT_THRESHOLD
+        or ambiguous_ratio >= AMBIGUOUS_SEGMENT_RATIO_INSPECT_THRESHOLD
+    ):
+        _add_warning(warnings, "ambiguous_speaker_assignments")
 
     texts = [str(segment.get("text") or "") for segment in segments]
     speakers = {
@@ -228,9 +278,9 @@ def _quality_report(
         reasons.append("empty_transcript")
 
     inspect_warnings = {
-        "asr_segment_crosses_speaker_turns",
         "low_confidence_segments",
         "missing_diarization_overlap",
+        "ambiguous_speaker_assignments",
         "timestamp_errors",
         "too_many_short_speaker_turns",
     }

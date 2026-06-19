@@ -203,6 +203,78 @@ def test_audio_normalize_marks_many_short_speaker_turns_for_inspection(
     assert "too_many_short_speaker_turns" in quality["warnings"]
 
 
+def test_audio_normalize_keeps_low_risk_cross_speaker_segments_safe(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-low-risk-crossing")
+    _write_asr(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 1000, "text": "Opening statement."},
+            {"start_ms": 1200, "end_ms": 2200, "text": "Follow up from host one."},
+            {
+                "start_ms": 2400,
+                "end_ms": 7400,
+                "text": "This ASR segment includes a tiny speaker boundary overlap.",
+            },
+            {"start_ms": 7600, "end_ms": 8600, "text": "Reply from host two."},
+        ],
+    )
+    _write_diarization(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 7000, "speaker": "speaker_1"},
+            {"start_ms": 7000, "end_ms": 8600, "speaker": "speaker_2"},
+        ],
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert "asr_segment_crosses_speaker_turns" in quality["warnings"]
+    assert quality["metrics"]["cross_speaker_segment_count"] == 1
+    assert quality["metrics"]["cross_speaker_segment_ratio"] == 0.25
+    assert quality["metrics"]["ambiguous_speaker_segment_count"] == 0
+    assert quality["metrics"]["min_primary_speaker_overlap_ratio"] == 0.92
+
+
+def test_audio_normalize_marks_ambiguous_cross_speaker_segments_for_inspection(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-ambiguous-crossing")
+    _write_asr(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 2000, "text": "Ambiguous mixed turn one."},
+            {"start_ms": 2000, "end_ms": 4000, "text": "Ambiguous mixed turn two."},
+            {"start_ms": 4000, "end_ms": 6000, "text": "Ambiguous mixed turn three."},
+            {"start_ms": 6000, "end_ms": 8000, "text": "Clean single speaker turn."},
+        ],
+    )
+    _write_diarization(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 1000, "speaker": "speaker_1"},
+            {"start_ms": 1000, "end_ms": 2000, "speaker": "speaker_2"},
+            {"start_ms": 2000, "end_ms": 3000, "speaker": "speaker_2"},
+            {"start_ms": 3000, "end_ms": 4000, "speaker": "speaker_1"},
+            {"start_ms": 4000, "end_ms": 5000, "speaker": "speaker_1"},
+            {"start_ms": 5000, "end_ms": 8000, "speaker": "speaker_2"},
+        ],
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "inspect_first"
+    assert "ambiguous_speaker_assignments" in quality["warnings"]
+    assert quality["metrics"]["cross_speaker_segment_count"] == 3
+    assert quality["metrics"]["cross_speaker_segment_ratio"] == 0.75
+    assert quality["metrics"]["ambiguous_speaker_segment_count"] == 3
+    assert quality["metrics"]["min_primary_speaker_overlap_ratio"] == 0.5
+
+
 def test_audio_normalize_rejects_empty_asr_text(tmp_path: Path):
     run_paths = create_run(tmp_path / "workspace", "audio-normalize-empty")
     _write_asr(
