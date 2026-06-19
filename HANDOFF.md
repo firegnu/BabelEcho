@@ -1,5 +1,34 @@
 # BabelEcho 交接
 
+## 0. 2026-06-20 最新接续状态
+
+新 session 优先读取 `resume-prompt.md`；本文件保留更长历史。当前本机 `main` / `origin/main` 最新提交为 `1b9c623 docs: sync claude instructions with agents`。5090D 在最近一次检查时停在 `0fce336 docs: record audio speaker profile publish smoke`，下一次远端验证前先在 `/home/th5090d/Develop/personal_project/BabelEcho` 执行 `git pull --ff-only`。5090D 仍有既有 untracked 文件 `workspace/sources/practicalai-mcp-312-transcript.txt`，不要误删。
+
+Phase 2 Route B audio-first 当前状态：
+
+- `babelecho audio convert` 已支持本地音频文件 `ingest_audio -> asr -> diarize -> normalize -> adapt -> synthesize -> assemble -> publish`。
+- ASR provider 已有 `fixture` / `local_cli`；5090D 已验证本地 OpenAI Whisper `small.en`。
+- Diarization provider 已有 `none` / `fixture` / `local_cli`；5090D 已用 pyannote Community-1 在 Practical AI 8 分钟样本上分出 `speaker_1/speaker_2`。
+- `asr.replacements` 已实现：只做显式短语 `from -> to`，默认不开启；5090D smoke 修正 `Daniel White Knack`、`cloud code`、`cloud co-worker`，不宽泛替换普通 `cloud`。
+- `asr/speaker-profiles.json` 统计 profile 已实现并跑通 full publish smoke：只含 turn 数、总时长、首尾时间、`profile_kind=diarization_stats`、`embedding_status=not_computed`，不含 voiceprint embedding；published artifact 会暴露 `speaker-profiles.json` 和摘要。
+- 最新 full publish smoke：`audio-speaker-profiles-practicalai-publish-20260620`，ASR 123 段，normalized/script/manifest 均 32 段，quality=`safe_to_adapt`，MP3 `22050 Hz` mono、约 `361.48s`。
+
+前端只读项目当前状态：
+
+- `frontend/` 已加入主分支，提交为 `ead73dc feat: add read-only frontend for published artifacts`。
+- 它是纯静态 HTML/CSS/原生 JS，无构建步骤、无依赖，只读 `workspace/published/`。
+- 本地运行：`python3 frontend/serve.py 8137`，打开 `http://127.0.0.1:8137/frontend/`。
+- 数据入口：`workspace/published/index.json` 和 `workspace/published/episodes/<run-id>/artifact.json`。
+- 前端边界：只浏览、播放、下载、查看脚本/来源/质量/metadata；不提交 URL、不触发转换、不读 config/sources/runs 内部文件。
+- 详情见 `frontend/README.md` 和 `docs/前端Artifact契约与只读界面说明.md`。前端后续工作可交给独立 agent；当前后端继续 Route B。
+
+下一步计划：
+
+- 已新增计划 `docs/plans/03-audio-first-asr/02-voice-profile-provider-contract.md`。
+- 下一步不要直接接真实声纹重模型；先实现 `voice_profile.provider=none/fixture` contract，补齐 `sample_count`、`sample_duration_ms`、`embedding_artifact` 等保留字段。
+- embedding 只能留在 ignored run-local 路径；published artifact 只允许展示摘要，不能发布向量或真实声纹文件。
+- 本阶段仍要保持 Route B 隔离，不改 Route A 的 YouTube/RSS/iTunes/Article 已验证逻辑。
+
 ## 1. 会话摘要
 
 本次会话围绕 BabelEcho 的 MVP-0 后端骨架、acceptance、MVP-0.5 自用流程、MVP-1 真实来源和 TTS 路由推进：当前混合验证路径是 LLM adaptation 使用 DeepSeek API，TTS 使用 5090D 本地混合路由。运行默认仍是 `tts.voice=sft_builtin_4role`，其中 `male_a` 使用 `CosyVoice2-0.5B cross_lingual + speed=1.1`，优先使用本地 calm prompt asset 并做 `male_a` 专用文本平稳化；`female_a / female_b / male_b` 使用 `CosyVoice-300M-SFT`。MVP-0 / MVP-0.5 均已完成，MVP-1 点播式单集转换已跑通真实全路径。
