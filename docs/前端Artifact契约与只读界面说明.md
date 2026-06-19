@@ -307,6 +307,8 @@ workspace/published/episodes/<run-id>/artifact.json
 
 文章朗读路线使用 `route=article_reading`。该路线是独立后端管道，不做 speaker 识别；`speakers` 必须是空数组。`source` 可能额外包含 `site_name`、`author`、`published_time`、`excerpt`，前端可展示这些字段，缺失时忽略。
 
+注意：当前唯一的 article fixture（`article-anthropic-infra-noise-20260619`）的 `source` 只有 `type`、`provider`、`input_url`、`episode_url`，上述 `site_name` / `author` / `published_time` / `excerpt` 全部缺失，`metadata.json` 也未提供。设计 article 详情页时应以「来源区基本只有一个 URL」为默认态，把作者 / 站点名 / 发布时间 / 摘要当作可缺失的增强字段，不要预设有富 metadata。
+
 ## Speaker Contract
 
 `speakers` 示例：
@@ -414,12 +416,17 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 }
 ```
 
+实际文件里的 segment 还可能包含 `start_ms`、`end_ms`、`source`、`source_segment_ids`。时间戳目前只在 podcast 路线的 `transcript.en.json` 里有真实值；`transcript.zh.json` 和 article 的 `transcript.en.json` 均无（为 `null`）。前端可按需使用，未知或缺失时忽略。
+
 前端展示建议：
 
 - 中文脚本为默认 tab。
 - 英文 transcript 可作为对照 tab。
 - 长文本按 segment 渲染，不一次性拼成单个段落。
 - 有 speaker 时显示 speaker 标签；无 speaker 时隐藏 speaker 列。
+- 即使是有 speaker 的集，单个 segment 的 `speaker` 也可能为 `null`（过场、旁白、赞助口播衔接），null 段直接不显标签，不要显示「null」或空角色。
+- 中文脚本段不含时间戳，无法驱动「跟读高亮 / 点击 seek」；段级播放同步在 v1 不是保证能力。如确需，只能借 podcast 的 `transcript.en.json` 时间戳再按 `id` 映射回中文。
+- `article_reading` 的中文「脚本」实际是文章正文 + 小标题段（如「我们是如何发现这一点的」这类短标题段），建议用阅读 / 正文排版，而非主持人转录行布局。
 
 ## 状态与质量展示
 
@@ -513,7 +520,7 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 - 至少产出桌面端主界面，推荐尺寸 `1440x900`。
 - 至少补一张移动端关键页，推荐尺寸 `390x844`。
 - 优先做 3 个核心画面：
-  1. Library 列表页：展示三条真实 episode，支持按 route/source/quality/speaker count 筛选的视觉状态。
+  1. Library 列表页：展示三条真实 episode，支持按 route/source/quality/speaker count 筛选的视觉状态。注意三条 fixture 的 quality 全是 `safe_to_adapt`、route 只有 `article_reading` / `transcript_first` 两种、speaker_count 为 {0, 5, 0}，真实筛选维度稀疏；筛选 UI 不必做成沉重的左栏，但 mock 仍需刻意展示 `inspect_first` / `reject` / `unknown` 这些没有 fixture 的状态。
   2. Episode 播放详情页：以音频播放器、中文脚本和 source/quality 信息为核心。
   3. Transcript 对照/质量检查页或详情侧栏：展示英文 transcript、中文脚本、quality metrics、warnings/reasons 和 metadata。
 - 如要做设计方向探索，可以出 2-3 个视觉方向，但每个方向都必须使用同一批真实 fixture，不要编造新节目。
@@ -578,6 +585,8 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 - `asr=null` 时不展示 ASR 模块；可以在 metadata/quality 页显示“未使用 ASR”。
 - 缺失可选字段时界面要留白或隐藏，不要显示 `null`。
 - 未知 `route` / `source_type` 应按通用 episode 展示。
+- `summary` 和 `created_at` 当前三条 fixture 全为 `null`，详情页头部不要依赖它们，需有无摘要的默认排版。
+- 标题可能带来源站点分隔符残留（如 `Quantifying infrastructure noise in agentic coding evals \ Anthropic` 尾部的 `\ Anthropic`）。前端按原文展示即可，不要据此报错或硬截断；如需更干净的标题由后端处理。
 
 ### 不要设计的功能
 
