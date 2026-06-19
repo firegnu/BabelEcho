@@ -44,18 +44,25 @@ def _source_provider(source: dict) -> str:
         "podcast_rss": "rss",
         "transcript_file": "local_file",
         "audio_file": "local_file",
+        "article_file": "local_file",
+        "web_article": "trafilatura",
+        "x_post": "x_api",
+        "x_thread": "x_api",
     }
     return providers.get(source_type, source_type)
 
 
 def _route_for_source(source: dict) -> str:
-    if _source_type(source) == "audio_file":
+    source_type = _source_type(source)
+    if source_type == "audio_file":
         return "audio_first"
+    if source_type in {"article_file", "web_article", "x_post", "x_thread"}:
+        return "article_reading"
     return "transcript_first"
 
 
 def _public_source(source: dict) -> dict:
-    return {
+    public_source = {
         "type": _source_type(source),
         "provider": _source_provider(source),
         "input_url": (
@@ -68,6 +75,10 @@ def _public_source(source: dict) -> dict:
         "transcript_url": source.get("transcript_url"),
         "feed_url": source.get("feed_url"),
     }
+    for key in ["site_name", "author", "published_time", "excerpt"]:
+        if source.get(key) is not None:
+            public_source[key] = source[key]
+    return public_source
 
 
 def _audio_probe(audio_path: Path) -> dict:

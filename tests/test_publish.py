@@ -119,3 +119,88 @@ def test_publish_episode_writes_feed_and_artifacts(tmp_path: Path):
     root = ElementTree.parse(feed_path).getroot()
     assert root.tag == "rss"
     assert root.find("./channel/item/title").text == "Sample Episode"
+
+
+def test_publish_episode_maps_article_route_and_public_source_metadata(tmp_path: Path):
+    run_paths = create_run(tmp_path, "article-publish-run")
+    run_paths.output_audio.write_bytes(b"fake mp3")
+    write_json(
+        run_paths.source_json,
+        {
+            "run_id": "article-publish-run",
+            "source_type": "web_article",
+            "provider": "trafilatura",
+            "title": "AI Agent Article",
+            "original_url": "https://example.com/agents",
+            "input_url": "https://example.com/agents",
+            "site_name": "Example Research",
+            "author": "Jane Author",
+            "published_time": "2026-06-18",
+            "excerpt": "A practical article about agent systems.",
+        },
+    )
+    write_json(
+        run_paths.normalized_transcript_json,
+        {
+            "episode_id": "article-publish-run",
+            "segments": [
+                {
+                    "id": "article-0001",
+                    "speaker": None,
+                    "text": "This is an article paragraph.",
+                    "source": "article",
+                }
+            ],
+        },
+    )
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "article-publish-run",
+            "segments": [
+                {
+                    "id": "article-0001",
+                    "speaker": None,
+                    "text": "这是一段文章内容。",
+                }
+            ],
+        },
+    )
+    write_json(
+        run_paths.transcript_quality_json,
+        {
+            "recommendation": "safe_to_adapt",
+            "metrics": {"segment_count": 1, "speaker_count": 0, "source_type": "web_article"},
+            "warnings": [],
+            "reasons": [],
+        },
+    )
+
+    publish_episode(run_paths, {"base_url": "https://example.com/babelecho"})
+
+    artifact = read_json(
+        run_paths.workspace
+        / "published"
+        / "episodes"
+        / "article-publish-run"
+        / "artifact.json"
+    )
+    assert artifact["route"] == "article_reading"
+    assert artifact["source"] == {
+        "type": "web_article",
+        "provider": "trafilatura",
+        "input_url": "https://example.com/agents",
+        "episode_url": "https://example.com/agents",
+        "transcript_url": None,
+        "feed_url": None,
+        "site_name": "Example Research",
+        "author": "Jane Author",
+        "published_time": "2026-06-18",
+        "excerpt": "A practical article about agent systems.",
+    }
+    assert artifact["speakers"] == []
+    assert artifact["ui"]["badges"][0] == "article-reading"
+    index = read_json(run_paths.workspace / "published" / "index.json")
+    assert index["episodes"][0]["route"] == "article_reading"
+    assert index["episodes"][0]["source_type"] == "web_article"
+    assert index["episodes"][0]["speaker_count"] == 0

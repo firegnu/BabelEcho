@@ -4,7 +4,7 @@
 
 **Goal:** Add an isolated `article_reading` backend route for faithful Chinese TTS from public article URLs and local `.txt` / `.md` files.
 
-**Architecture:** Add focused article extraction/normalization helpers and route them through the existing staged backend pipeline. Keep `web_article` / `article_file` input handling separate from YouTube, RSS, Apple/iTunes, episode page, and future audio-first routes, while reusing existing quality gate, DeepSeek adapt, script QA, TTS, assemble, and publish artifact contract.
+**Architecture:** Add focused article extraction/normalization helpers plus an independent `article_pipeline.py` orchestrator. Do not extend existing `babelecho run`, `episode convert`, or `ingest_transcript_source()` input dispatch; keep `web_article` / `article_file` input handling separate from YouTube, RSS, Apple/iTunes, episode page, and future audio-first routes. Reuse only stable downstream primitives: DeepSeek adapt, script QA, TTS, assemble, and publish artifact contract.
 
 **Tech Stack:** Python 3.12, argparse CLI, optional `trafilatura` import with deterministic fallback, existing BabelEcho run stages, pytest.
 
@@ -16,7 +16,7 @@
 - Create: `src/babelecho/article.py`
 - Test: `tests/test_article.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 Cover:
 - `extract_article_file()` reads `.txt` / `.md`, strips YAML front matter and duplicate title.
@@ -26,7 +26,7 @@ Cover:
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_article.py -q`
 Expected: FAIL because `babelecho.article` does not exist.
 
-- [ ] **Step 2: Implement minimal module**
+- [x] **Step 2: Implement minimal module**
 
 Add:
 - `ArticleExtraction` dataclass.
@@ -34,31 +34,31 @@ Add:
 - `extract_web_article(url, fetch_html=None, extractor=None)`.
 - private helpers for markdown front matter, duplicate title, and simple HTML fallback.
 
-- [ ] **Step 3: Verify tests pass**
+- [x] **Step 3: Verify tests pass**
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_article.py -q`
 Expected: PASS.
 
-### Task 2: Ingest Source Types
+### Task 2: Article Ingest Source Types
 
 **Files:**
-- Modify: `src/babelecho/ingest.py`
+- Modify: `src/babelecho/article.py`
 - Test: `tests/test_article.py`
 
-- [ ] **Step 1: Write failing ingest tests**
+- [x] **Step 1: Write failing ingest tests**
 
 Cover:
-- `source.type=article_file` writes `article/raw.txt`, `article/extracted.json`, `transcript/raw.txt`, and `source.json` without leaking absolute local paths.
-- `source.type=web_article` writes article metadata and uses provider `trafilatura`.
+- `ingest_article_source()` handles `source.type=article_file`, writes `article/raw.txt`, `article/extracted.json`, `transcript/raw.txt`, and `source.json` without leaking absolute local paths.
+- `ingest_article_source()` handles `source.type=web_article`, writes article metadata and uses provider `trafilatura`.
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_article.py -q`
-Expected: FAIL because ingest rejects article source types.
+Expected: FAIL because `ingest_article_source()` does not exist.
 
-- [ ] **Step 2: Implement ingest branches**
+- [x] **Step 2: Implement ingest branches**
 
-Add `article_file` and `web_article` branches in `ingest_transcript_source()`. Keep existing source branches unchanged. For article sources, write `source_json` fields needed by publish and set `raw_transcript` to `transcript/raw.txt`.
+Add `ingest_article_source()` in `src/babelecho/article.py`. Do not modify `src/babelecho/ingest.py`. For article sources, write `source_json` fields needed by publish and set `raw_transcript` to `transcript/raw.txt`.
 
-- [ ] **Step 3: Verify targeted tests pass**
+- [x] **Step 3: Verify targeted tests pass**
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_article.py -q`
 Expected: PASS.
@@ -66,25 +66,24 @@ Expected: PASS.
 ### Task 3: Article Normalize Behavior And Quality Metrics
 
 **Files:**
-- Modify: `src/babelecho/transcript.py`
-- Modify: `src/babelecho/transcript_quality.py`
+- Modify: `src/babelecho/article.py`
 - Test: `tests/test_article.py`
 
-- [ ] **Step 1: Write failing normalize tests**
+- [x] **Step 1: Write failing normalize tests**
 
 Cover:
-- `article_file` / `web_article` normalizes paragraphs into `speaker="Narrator"` segments.
+- `article_file` / `web_article` normalizes paragraphs without speaker labels.
 - article normalization does not infer `Title:` as a speaker label.
 - quality metrics include `source_type` and `extractor` for article sources.
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_article.py -q`
-Expected: FAIL because article segments currently have no forced narrator and no article metrics.
+Expected: FAIL because `normalize_article()` does not exist.
 
-- [ ] **Step 2: Implement minimal article normalization**
+- [x] **Step 2: Implement minimal article normalization**
 
-Add source-type checks so `web_article`, `article_file`, `x_post`, and `x_thread` disable speaker-label inference and assign `Narrator` to each normalized segment. Extend `write_transcript_quality()` to copy article extractor/source metadata into quality metrics when present.
+Add `normalize_article()` in `src/babelecho/article.py`. It should read `article/raw.txt` or `transcript/raw.txt`, split article paragraphs, write `transcript/normalized.json` with no speaker labels, build a quality report with the existing `build_transcript_quality_report()` helper plus article metrics, and write `transcript/quality.json`. Do not modify `src/babelecho/transcript.py` or `src/babelecho/transcript_quality.py`.
 
-- [ ] **Step 3: Verify targeted tests pass**
+- [x] **Step 3: Verify targeted tests pass**
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_article.py -q`
 Expected: PASS.
@@ -92,24 +91,25 @@ Expected: PASS.
 ### Task 4: CLI Article Convert Entry
 
 **Files:**
+- Create: `src/babelecho/article_pipeline.py`
 - Modify: `src/babelecho/cli.py`
 - Test: `tests/test_end_to_end_fixture.py`
 
-- [ ] **Step 1: Write failing CLI tests**
+- [x] **Step 1: Write failing CLI tests**
 
 Cover:
-- `babelecho article convert --file ... --to-stage normalize` routes to `source.type=article_file`.
-- `babelecho article convert --url ... --to-stage normalize` routes to `source.type=web_article`.
-- article route injects `speaker_voices.default_voice_role=female_a` so narrator uses the current 300M `female_a` path.
+- `babelecho article convert --file ... --to-stage normalize` uses the independent article pipeline and writes `source.type=article_file`.
+- `babelecho article convert --url ... --to-stage normalize` uses the independent article pipeline and writes `source.type=web_article`.
+- article route uses the current no-speaker TTS default, which resolves to `female_a`, and does not call speaker voice inference.
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_end_to_end_fixture.py -q -k article`
 Expected: FAIL because `article` command is missing.
 
-- [ ] **Step 2: Implement parser and dispatch**
+- [x] **Step 2: Implement parser and dispatch**
 
-Add `article convert` subcommand with `--url` / `--file`, `--title`, `--local-config`, `--from-stage`, and `--to-stage`. Extend `run_pipeline()` to accept an in-memory source config and optional local config overrides. For article route, force `speaker_voices.default_voice_role=female_a` without changing non-article runs.
+Add `article convert` subcommand with `--url` / `--file`, `--title`, `--local-config`, `--from-stage`, and `--to-stage`. Implement `run_article_pipeline()` in `src/babelecho/article_pipeline.py`. Do not call or modify the existing `run_pipeline()` for article inputs. For article route, skip speaker voice inference and rely on the existing no-speaker `sft_builtin_4role` default, which is `female_a`, without changing non-article runs.
 
-- [ ] **Step 3: Verify targeted CLI tests pass**
+- [x] **Step 3: Verify targeted CLI tests pass**
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_end_to_end_fixture.py -q -k article`
 Expected: PASS.
@@ -121,21 +121,21 @@ Expected: PASS.
 - Modify: `docs/前端Artifact契约与只读界面说明.md`
 - Test: `tests/test_publish.py`
 
-- [ ] **Step 1: Write failing publish test**
+- [x] **Step 1: Write failing publish test**
 
 Cover:
 - article source publishes `route=article_reading`.
 - artifact source includes `site_name`, `author`, `published_time`, and provider.
-- speaker summary shows `Narrator` with `voice_role=female_a`.
+- artifact speaker summary stays empty (`speakers=[]`) because article route does not identify speakers.
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_publish.py -q`
 Expected: FAIL because publish routes all non-audio sources to `transcript_first`.
 
-- [ ] **Step 2: Implement publish mapping and docs**
+- [x] **Step 2: Implement publish mapping and docs**
 
 Map `web_article`, `article_file`, `x_post`, and `x_thread` to `article_reading`. Add provider/source metadata fields to the public source object. Update the frontend artifact contract with article route/source values.
 
-- [ ] **Step 3: Verify publish tests pass**
+- [x] **Step 3: Verify publish tests pass**
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_publish.py -q`
 Expected: PASS.
@@ -145,12 +145,12 @@ Expected: PASS.
 **Files:**
 - Modify as needed from prior tasks only.
 
-- [ ] **Step 1: Run source route matrix**
+- [x] **Step 1: Run source route matrix**
 
 Run: `.conda/babelecho-dev/bin/python -m pytest tests/test_source_matrix.py -q`
 Expected: PASS.
 
-- [ ] **Step 2: Run full test suite**
+- [x] **Step 2: Run full test suite**
 
 Run: `.conda/babelecho-dev/bin/python -m pytest -q`
 Expected: PASS.
@@ -164,3 +164,5 @@ Run:
 - `git diff --cached --name-only -z | xargs -0 /opt/homebrew/bin/trufflehog filesystem --no-update --fail --force-skip-binaries --force-skip-archives`
 
 Expected: all clean.
+
+Status: deferred until commit time because no files are staged in the current implementation pass.

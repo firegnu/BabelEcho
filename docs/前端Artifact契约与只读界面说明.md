@@ -150,9 +150,9 @@ workspace/published/index.json
 | `episodes` | array | yes | 可展示 episode 列表。 |
 | `episodes[].run_id` | string | yes | 后端 run id，也是前端稳定 episode id。 |
 | `episodes[].title` | string | yes | 中文或原始 episode 标题。 |
-| `episodes[].route` | string | yes | `transcript_first` 或 `audio_first`。 |
+| `episodes[].route` | string | yes | `transcript_first`、`article_reading` 或 `audio_first`。 |
 | `episodes[].status` | string | yes | `succeeded`、`partial`、`failed`。列表页默认只展示 `succeeded`。 |
-| `episodes[].source_type` | string | yes | 例如 `youtube_captions`、`episode_page`、`podcast_rss`、`audio_file`。 |
+| `episodes[].source_type` | string | yes | 例如 `youtube_captions`、`episode_page`、`podcast_rss`、`web_article`、`article_file`、`audio_file`。 |
 | `episodes[].quality_recommendation` | string | no | `safe_to_adapt`、`inspect_first`、`reject` 或 `unknown`。 |
 | `episodes[].speaker_count` | number | no | speaker 数量，未知时可省略。 |
 | `episodes[].duration_seconds` | number | no | 最终 MP3 时长。 |
@@ -239,7 +239,7 @@ workspace/published/episodes/<run-id>/artifact.json
 | --- | --- | --- | --- |
 | `schema_version` | string | yes | 当前契约版本。 |
 | `run_id` | string | yes | 后端 run id。 |
-| `route` | string | yes | `transcript_first` 或 `audio_first`。 |
+| `route` | string | yes | `transcript_first`、`article_reading` 或 `audio_first`。 |
 | `status` | string | yes | `succeeded`、`partial`、`failed`。 |
 | `title` | string | yes | 单集标题。 |
 | `summary` | string/null | no | 后续可由 LLM 或 RSS metadata 提供，第一版可为 `null`。 |
@@ -264,6 +264,10 @@ workspace/published/episodes/<run-id>/artifact.json
 | `podcast_rss` | RSS feed item 内 transcript。Apple/iTunes 和直接 RSS 最终都归到这里。 |
 | `transcript_file` | 用户本地 transcript file。 |
 | `audio_file` | Phase 2 audio-first 本地音频文件。 |
+| `web_article` | 文章朗读路线的公开网页正文。 |
+| `article_file` | 文章朗读路线的本地 `.txt` / `.md` 正文文件。 |
+| `x_post` | Phase 2 预留：通过 X 官方 API 获取的单条 post。 |
+| `x_thread` | Phase 2 预留：通过 X 官方 API 获取的 thread。 |
 
 `source.provider` 当前已使用或预留值：
 
@@ -274,10 +278,14 @@ workspace/published/episodes/<run-id>/artifact.json
 | `itunes_lookup` | Apple Podcasts/iTunes URL 经 iTunes Lookup 找到 RSS。 |
 | `episode_page` | 官网页面。 |
 | `local_file` | 本地文件。 |
+| `trafilatura` | 文章朗读路线的网页正文抽取。 |
+| `x_api` | Phase 2 预留：X 官方 API。 |
 
 当前 Apple Podcasts/iTunes URL 会先解析成 RSS，再进入同一条标准播客后流程；发布后的 artifact 目前表现为 `source.type=podcast_rss`、`source.provider=rss`。`itunes_lookup` 只作为以后想显式展示原始解析器时的预留值。
 
 前端只展示这些字段，不根据 provider 决定业务逻辑。
+
+文章朗读路线使用 `route=article_reading`。该路线是独立后端管道，不做 speaker 识别；`speakers` 必须是空数组。`source` 可能额外包含 `site_name`、`author`、`published_time`、`excerpt`，前端可展示这些字段，缺失时忽略。
 
 ## Speaker Contract
 
@@ -308,6 +316,7 @@ workspace/published/episodes/<run-id>/artifact.json
 - `voice_role` 是 BabelEcho 固定中文音色角色，例如 `female_a`、`male_a`、`female_b`、`male_b`。
 - `inferred_gender` 仅用于辅助展示，可为 `male`、`female`、`unknown` 或 `null`。
 - 当前实现生成 `segment_count`；speaker 级 `duration_seconds` 暂不生成，前端如遇到该字段可展示，缺失时应忽略。
+- 文章朗读路线不识别 speaker，不生成角色列表，`speakers=[]`。
 - 不暴露声纹 embedding。
 - 不暴露原始 speaker profile 文件。
 - 不暗示真实身份识别。

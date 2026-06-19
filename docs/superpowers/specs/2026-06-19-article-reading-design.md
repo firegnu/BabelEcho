@@ -8,14 +8,16 @@
 
 这条路线的产物必须发布到 `workspace/published/`，并兼容现有前端 artifact contract。它不应破坏已经跑通的 YouTube、RSS、Apple Podcasts/iTunes、episode page 标准播客来源，也不应和未来 ASR、声纹、speaker diarization 路线互相污染。
 
+隔离底线：`article_reading` 是独立处理管道。它不挂到现有 `episode convert`，不扩展现有 `babelecho run` 的输入分支，不把 article source type 塞进 `ingest_transcript_source()`。文章路线可以复用稳定的后段原子能力，例如 DeepSeek adapt、script QA、TTS、assemble 和 publish，但入口、抽取、清洗、normalize 和质量报告由 article 管道自己负责。
+
 ## 非目标
 
 - 不做订阅扫描或批量文章抓取。
 - 第一版不做 X URL 自动抓取，只支持把 X/thread 内容复制为本地 `.txt` 或 `.md` 后导入；后续如做 X URL，必须作为可选 `x_api_v2` adapter，不走网页硬抓。
 - 不做网页登录、付费墙绕过、浏览器自动化或 JS 渲染。
 - 不把文章改写成主持人播客、解读节目或评论节目。
-- 不做多人 speaker 识别；文章路线第一版固定为单人 narrator。
-- 不改变 `episode convert`、`podcast_rss`、`youtube_captions`、`episode_page`、`audio_first` 的语义。
+- 不做 speaker 识别、speaker 推断或 speaker diarization；文章路线第一版不在 normalized/script 中写 speaker。
+- 不改变 `episode convert`、`babelecho run`、`podcast_rss`、`youtube_captions`、`episode_page`、`audio_first` 的语义。
 
 ## 阶段计划
 
@@ -25,7 +27,7 @@
 
 - `web_article`：普通网站、blog、技术文章、新闻文章 URL，经 `trafilatura` 抽取正文。
 - `article_file`：用户复制保存的 `.txt` / `.md`，包括 X/thread 手动复制内容。
-- 默认 narrator 音色固定 `female_a`。
+- 默认 TTS 音色固定 `female_a`。
 - 必须通过现有两道门槛：`normalize` 后 quality gate，`adapt` 后 script QA。
 - 最终产物进入 `workspace/published/`，兼容前端 artifact contract。
 
@@ -119,12 +121,12 @@ babelecho article convert --file <path/to/article.md> --title <title> --run-id <
 - `--url` 和 `--file` 二选一。
 - `--to-stage normalize` 是推荐的低成本预检入口；只有质量报告通过后才进入 DeepSeek 和 TTS。
 - `--from-stage` 后续可以复用现有 run 恢复能力，从 `adapt`、`synthesize`、`assemble` 或 `publish` 继续。
-- 第一版默认 narrator 音色固定为 `female_a`，也就是当前 `CosyVoice-300M-SFT` 的自然女声路线。文章朗读不启用 speaker voice 推断。如果需要临时换音色，优先复用现有 config 里的 default voice role 机制，不新增一套文章专用音色系统。
+- 第一版默认 TTS 音色固定为 `female_a`，也就是当前 `CosyVoice-300M-SFT` 的自然女声路线。文章朗读不启用 speaker voice 推断，也不在 normalized/script 中写 speaker。如果需要临时换音色，优先复用现有 config 里的 default voice role 机制，不新增一套文章专用音色系统。
 - Phase 2 如实现 X API adapter，应继续复用 `babelecho article convert --url <x-url>`，但 URL dispatch 到 `source.type=x_post` 或 `x_thread`，而不是 `web_article`。
 
 ## 数据流
 
-文章路线仍然是分阶段后端流水线：
+文章路线仍然是分阶段后端流水线，但由独立 article pipeline 编排：
 
 ```text
 extract/ingest -> clean/normalize -> pre-adapt quality gate -> adapt -> pre-TTS script validation -> synthesize -> assemble -> publish
@@ -132,10 +134,10 @@ extract/ingest -> clean/normalize -> pre-adapt quality gate -> adapt -> pre-TTS 
 
 它有两道硬门槛：
 
-1. `normalize` 后的 extraction/quality gate：复用现有 `transcript/quality.json` 决策方式，判断抽取正文是否可靠，是否允许进入 DeepSeek。
-2. `adapt` 后的 script validation：复用现有 `babelecho check --checks script` / run 内置脚本 QA，判断中文忠实朗读稿是否干净、完整，是否允许进入 TTS。
+1. `normalize` 后的 extraction/quality gate：article pipeline 写入 `transcript/quality.json`，使用和现有门禁相同的 `safe_to_adapt` / `inspect_first` / `reject` 决策方式，判断抽取正文是否可靠，是否允许进入 DeepSeek。
+2. `adapt` 后的 script validation：复用现有 `check_run_artifacts(..., checks=("script",))` 脚本 QA，判断中文忠实朗读稿是否干净、完整，是否允许进入 TTS。
 
-任一门槛不通过，都停止在当前阶段，不调用后续昂贵资源。文章路线只在这两个现有 checkpoint 上增加文章特有检查项，不新建一套和播客路线平行的门禁系统。
+任一门槛不通过，都停止在当前阶段，不调用后续昂贵资源。文章路线使用同样的门禁语义，但不通过现有播客入口实现。
 
 ### 1. Ingest
 
@@ -147,7 +149,7 @@ extract/ingest -> clean/normalize -> pre-adapt quality gate -> adapt -> pre-TTS 
    - `article/source.html`：原始 HTML，便于排查，可选。
    - `article/extracted.json`：抽取结果和 metadata。
    - `article/raw.txt`：抽取后的英文正文纯文本。
-4. 写入 `source.json`，只记录公开 URL、source type、provider、标题、作者、站点、发布时间、excerpt 和抽取器信息，不写本机路径、配置路径或凭证。
+4. article pipeline 写入 `source.json`，只记录公开 URL、source type、provider、标题、作者、站点、发布时间、excerpt 和抽取器信息，不写本机路径、配置路径或凭证。
 
 `article_file`：
 
@@ -166,7 +168,7 @@ extract/ingest -> clean/normalize -> pre-adapt quality gate -> adapt -> pre-TTS 
 
 ### 2. Normalize
 
-把文章正文转成现有后流程能消费的段落结构：
+article pipeline 把文章正文转成后段原子能力能消费的段落结构：
 
 ```json
 {
@@ -175,7 +177,7 @@ extract/ingest -> clean/normalize -> pre-adapt quality gate -> adapt -> pre-TTS 
   "segments": [
     {
       "id": "0001",
-      "speaker": "Narrator",
+      "speaker": null,
       "text": "..."
     }
   ]
@@ -244,19 +246,19 @@ script/zh.json
 - 不能残留明显整段英文；专有名词、产品名、代码名和短引用可以保留。
 - URL、缩写、文件格式和数字读法要适合 TTS，例如域名点号和 `MP3` 不能被错误中文化。
 - 单段长度不能超过 TTS 稳定阈值。
-- narrator speaker 必须稳定为 `Narrator`。
+- 文章路线不能新增 speaker label；segment 的 `speaker` 应为 `null` 或缺失。
 
 如果验证失败，run 停在 `adapt` 或 `check` 后，不进入 TTS。用户可以检查 `script/zh.json`，必要时人工编辑后从 `synthesize` 继续。
 
 ### 6. Synthesize / Assemble
 
-文章路线固定为单 narrator：
+文章路线固定为无 speaker 的单声线朗读：
 
-- `speaker` 固定为 `Narrator`。
+- normalized/script segment 不写 speaker，或保持 `speaker=null`。
 - 不启用 speaker voice 推断。
 - 不启用 ASR speaker diarization。
 - 不启用声纹或 voice clone。
-- 默认 `voice_role` 固定为 `female_a`，走当前 `CosyVoice-300M-SFT` 女声。
+- 默认 TTS `voice_role` 固定为 `female_a`，走当前 `CosyVoice-300M-SFT` 女声。
 - TTS 后流程复用现有 `synthesize -> assemble`。
 
 ### 7. Publish
@@ -293,20 +295,12 @@ workspace/published/episodes/<run-id>/
     "recommendation": "safe_to_adapt",
     "metrics": {
       "segment_count": 24,
-      "speaker_count": 1,
+      "speaker_count": 0,
       "total_chars": 12000,
       "extractor": "trafilatura"
     }
   },
-  "speakers": [
-    {
-      "id": "speaker_1",
-      "display_name": "Narrator",
-      "segment_count": 24,
-      "voice_role": "female_a",
-      "inferred_gender": "unknown"
-    }
-  ],
+  "speakers": [],
   "asr": null,
   "ui": {
     "default_tab": "script",
@@ -320,7 +314,7 @@ workspace/published/episodes/<run-id>/
 ```text
 route=article_reading
 source_type=web_article 或 article_file
-speaker_count=1
+speaker_count=0
 ```
 
 前端遇到未知 route/source type 已按契约要求通用展示；实现后仍应同步 `docs/前端Artifact契约与只读界面说明.md`，把 `article_reading`、`web_article` 和 `article_file` 写成正式支持值。
@@ -345,8 +339,8 @@ speaker_count=1
 - quality gate 能拦截空正文、过短正文、登录墙/错误页和明显导航噪声。
 - article adapt prompt 使用忠实朗读约束，并保持 id 一一对应。
 - pre-TTS script validation 能拦截缺段、网页噪声、HTML/Markdown 残留、明显英文残留和超长段。
-- article route 默认 narrator voice role 为 `female_a`，不调用 speaker voice 推断。
-- publish artifact 能生成 `route=article_reading`、`source.type=web_article/article_file`、单 narrator speaker 和稳定 index entry。
+- article route 默认 TTS voice role 为 `female_a`，不调用 speaker voice 推断。
+- publish artifact 能生成 `route=article_reading`、`source.type=web_article/article_file`、`speakers=[]` 和稳定 index entry。
 
 集成 smoke：
 
@@ -372,10 +366,11 @@ tests/test_article.py
 
 必要共享点：
 
-- 可以复用现有 run stage、status、checks、chunked adapt、TTS、assemble 和 publish。
+- 可以复用现有 status、checks、chunked adapt、TTS、assemble 和 publish 原子能力。
 - 可以给 publish artifact 的 route/source type 增加 article 值。
 - 不把文章 URL 自动塞进 `episode convert`。
 - 不把 `episode_page` parser 改成通用 article parser。
+- 不把 `article_file` / `web_article` 加入现有 `babelecho run` 输入分支或 `ingest_transcript_source()`。
 
 这样文章路线、transcript-first 播客路线和未来 audio-first 路线在入口和 source type 上隔离，在 publish artifact 上兼容。
 

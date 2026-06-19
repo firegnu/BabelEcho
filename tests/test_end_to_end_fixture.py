@@ -1,5 +1,6 @@
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,19 @@ import yaml
 
 from babelecho.jsonio import read_json, write_json
 from babelecho.cli import run_pipeline
+
+
+def worktree_python_env() -> dict[str, str]:
+    env = os.environ.copy()
+    src_path = str(Path.cwd() / "src")
+    env["PYTHONPATH"] = (
+        src_path
+        if not env.get("PYTHONPATH")
+        else f"{src_path}{os.pathsep}{env['PYTHONPATH']}"
+    )
+    env["NO_PROXY"] = "127.0.0.1,localhost"
+    env["no_proxy"] = "127.0.0.1,localhost"
+    return env
 
 
 def run_podcast_index_api_server(response_body: str):
@@ -269,6 +283,7 @@ publish:
         ],
         text=True,
         capture_output=True,
+        env=worktree_python_env(),
         check=False,
     )
 
@@ -303,6 +318,7 @@ publish:
         ],
         text=True,
         capture_output=True,
+        env=worktree_python_env(),
         check=False,
     )
 
@@ -324,6 +340,7 @@ publish:
         ],
         text=True,
         capture_output=True,
+        env=worktree_python_env(),
         check=False,
     )
 
@@ -370,6 +387,7 @@ publish:
         ],
         text=True,
         capture_output=True,
+        env=worktree_python_env(),
         check=False,
     )
 
@@ -680,6 +698,7 @@ publish:
             ],
             text=True,
             capture_output=True,
+            env=worktree_python_env(),
             check=False,
         )
     finally:
@@ -778,6 +797,7 @@ PODCASTINDEX_USER_AGENT=BabelEchoTest/0.1
             ],
             text=True,
             capture_output=True,
+            env=worktree_python_env(),
             check=False,
         )
 
@@ -807,6 +827,7 @@ PODCASTINDEX_USER_AGENT=BabelEchoTest/0.1
             ],
             text=True,
             capture_output=True,
+            env=worktree_python_env(),
             check=False,
         )
     finally:
@@ -877,6 +898,7 @@ def test_itunes_cli_searches_and_writes_podcast_rss_source_config(
             ],
             text=True,
             capture_output=True,
+            env=worktree_python_env(),
             check=False,
         )
     finally:
@@ -1584,6 +1606,139 @@ publish:
 
     assert result.returncode == 1
     assert "Unsupported episode input: not a url" in result.stderr
+
+
+def test_article_convert_command_accepts_article_file_without_speaker_inference(
+    tmp_path: Path,
+):
+    workspace = tmp_path / "workspace"
+    article = tmp_path / "article.md"
+    article.write_text(
+        "# 测试文章\n\n" + "\n\n".join(["这是用于测试的文章段落，内容会被直接转换为固定女声朗读。"] * 30),
+        encoding="utf-8",
+    )
+    local_config = tmp_path / "local.yaml"
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+speaker_voices:
+  mode: infer_once
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "article",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "article-file-cli",
+            "--file",
+            str(article),
+            "--title",
+            "测试文章",
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "synthesize",
+        ],
+        text=True,
+        capture_output=True,
+        env=worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "speaker voices:" not in result.stdout
+    run_dir = workspace / "runs" / "article-file-cli"
+    source = read_json(run_dir / "source.json")
+    normalized = read_json(run_dir / "transcript" / "normalized.json")
+    manifest = read_json(run_dir / "segments" / "manifest.json")
+    assert source["source_type"] == "article_file"
+    assert all(segment.get("speaker") is None for segment in normalized["segments"])
+    assert not (run_dir / "script" / "speaker-voices.json").exists()
+    assert {segment.get("voice_role") for segment in manifest["segments"]} == {"female_a"}
+
+
+def test_article_convert_command_accepts_web_article_url_to_normalize(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+    routes = {
+        "/article": """
+        <html>
+          <head><title>Public Web Article</title></head>
+          <body>
+            <nav>Navigation</nav>
+            <article>
+              <h1>Public Web Article</h1>
+              <p>Important: this is article text, not a speaker.</p>
+              <p>The second paragraph remains plain article content.</p>
+            </article>
+          </body>
+        </html>
+        """,
+    }
+    server = run_route_server(routes)
+    try:
+        url = f"http://127.0.0.1:{server.server_port}/article"
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "article",
+                "convert",
+                "--workspace",
+                str(workspace),
+                "--run-id",
+                "web-article-cli",
+                "--url",
+                url,
+                "--local-config",
+                str(local_config),
+                "--to-stage",
+                "normalize",
+            ],
+            text=True,
+            capture_output=True,
+            env=worktree_python_env(),
+            check=False,
+        )
+    finally:
+        server.shutdown()
+
+    assert result.returncode == 0, result.stderr
+    run_dir = workspace / "runs" / "web-article-cli"
+    source = read_json(run_dir / "source.json")
+    normalized = read_json(run_dir / "transcript" / "normalized.json")
+    assert source["source_type"] == "web_article"
+    assert source["provider"] == "trafilatura"
+    assert source["title"] == "Public Web Article"
+    assert source["input_url"].startswith("http://127.0.0.1:")
+    assert normalized["segments"][0]["speaker"] is None
+    assert normalized["segments"][0]["text"] == "Public Web Article"
+    assert normalized["segments"][1]["text"] == "Important: this is article text, not a speaker."
 
 
 def test_run_command_stops_at_requested_stage(tmp_path: Path):

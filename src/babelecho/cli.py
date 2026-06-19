@@ -6,6 +6,7 @@ from urllib.parse import urlparse
 import yaml
 
 from .adapt import adapt_to_chinese
+from .article_pipeline import ARTICLE_PIPELINE_STAGES, run_article_pipeline
 from .audio import assemble_audio
 from .checks import CheckError, check_run_artifacts
 from .config import load_yaml, require_keys
@@ -212,6 +213,36 @@ def build_parser() -> argparse.ArgumentParser:
     episode_convert.add_argument(
         "--to-stage",
         choices=PIPELINE_STAGES,
+        default="publish",
+    )
+
+    article = subparsers.add_parser(
+        "article",
+        help="Convert one requested article.",
+    )
+    article_subparsers = article.add_subparsers(
+        dest="article_command",
+        required=True,
+    )
+    article_convert = article_subparsers.add_parser(
+        "convert",
+        help="Convert one article URL or local article file.",
+    )
+    article_convert.add_argument("--workspace", required=True)
+    article_convert.add_argument("--run-id", required=True)
+    article_input = article_convert.add_mutually_exclusive_group(required=True)
+    article_input.add_argument("--url")
+    article_input.add_argument("--file")
+    article_convert.add_argument("--local-config", required=True)
+    article_convert.add_argument("--title")
+    article_convert.add_argument(
+        "--from-stage",
+        choices=ARTICLE_PIPELINE_STAGES,
+        default="ingest",
+    )
+    article_convert.add_argument(
+        "--to-stage",
+        choices=ARTICLE_PIPELINE_STAGES,
         default="publish",
     )
 
@@ -865,6 +896,25 @@ def main(argv: list[str] | None = None) -> int:
                         print(f"source config: {args.source_config_out}")
                     else:
                         print(yaml.safe_dump(source_config, allow_unicode=True, sort_keys=False))
+                return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
+
+    if args.command == "article":
+        try:
+            if args.article_command == "convert":
+                output = run_article_pipeline(
+                    workspace=args.workspace,
+                    run_id=args.run_id,
+                    local_config_path=args.local_config,
+                    from_stage=args.from_stage,
+                    to_stage=args.to_stage,
+                    url=args.url,
+                    article_file=args.file,
+                    title=args.title,
+                )
+                print(output)
                 return 0
         except Exception as error:
             print(str(error), file=sys.stderr)
