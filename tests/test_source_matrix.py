@@ -173,6 +173,38 @@ def test_source_entry_matrix_preserves_youtube_rss_and_itunes_routes(
     assert rss_source["feed_url"] == str(rss_feed)
     assert rss_source["episode_url"] == "https://example.com/rss-selected"
 
+    rss_direct_convert = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "episode",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "matrix-rss-direct",
+            "--url",
+            str(rss_feed),
+            "--select-index",
+            "2",
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "normalize",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    assert rss_direct_convert.returncode == 0, rss_direct_convert.stderr
+    rss_direct_source = read_json(
+        workspace / "runs" / "matrix-rss-direct" / "source.json"
+    )
+    assert rss_direct_source["source_type"] == "podcast_rss"
+    assert rss_direct_source["feed_url"] == str(rss_feed)
+    assert rss_direct_source["episode_url"] == "https://example.com/rss-selected"
+
     routes: dict[str, str] = {}
     server = run_route_server(routes)
     itunes_source_config = tmp_path / "itunes-source.yaml"
@@ -238,6 +270,43 @@ def test_source_entry_matrix_preserves_youtube_rss_and_itunes_routes(
         assert itunes_source["source_type"] == "podcast_rss"
         assert itunes_source["feed_url"] == feed_url
         assert itunes_source["episode_url"] == "https://example.com/itunes-selected"
+
+        itunes_direct_convert = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "episode",
+                "convert",
+                "--workspace",
+                str(workspace),
+                "--run-id",
+                "matrix-itunes-direct",
+                "--url",
+                "https://podcasts.apple.com/us/podcast/matrix/id123456",
+                "--itunes-api-base-url",
+                f"http://127.0.0.1:{server.server_port}/lookup",
+                "--select-index",
+                "2",
+                "--local-config",
+                str(local_config),
+                "--to-stage",
+                "normalize",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        assert itunes_direct_convert.returncode == 0, itunes_direct_convert.stderr
+        itunes_direct_source = read_json(
+            workspace / "runs" / "matrix-itunes-direct" / "source.json"
+        )
+        assert itunes_direct_source["source_type"] == "podcast_rss"
+        assert itunes_direct_source["feed_url"] == feed_url
+        assert (
+            itunes_direct_source["episode_url"]
+            == "https://example.com/itunes-selected"
+        )
     finally:
         server.shutdown()
         server.server_close()

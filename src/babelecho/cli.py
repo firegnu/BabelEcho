@@ -1,6 +1,7 @@
 import argparse
 import sys
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 
@@ -39,6 +40,7 @@ from .transcript import normalize_transcript
 
 PIPELINE_STAGES = ("ingest", "normalize", "adapt", "synthesize", "assemble", "publish")
 CHECK_NAMES = ("script", "segments", "output")
+APPLE_PODCAST_HOSTS = {"podcasts.apple.com", "itunes.apple.com"}
 
 
 def _add_podcast_index_auth_args(parser: argparse.ArgumentParser) -> None:
@@ -198,6 +200,9 @@ def build_parser() -> argparse.ArgumentParser:
     episode_convert.add_argument("--local-config", required=True)
     episode_convert.add_argument("--title")
     episode_convert.add_argument("--language", default="en")
+    episode_convert.add_argument("--select-index", type=int)
+    episode_convert.add_argument("--itunes-country", default="US")
+    episode_convert.add_argument("--itunes-api-base-url")
     episode_convert.add_argument("--source-config-out")
     episode_convert.add_argument(
         "--from-stage",
@@ -483,6 +488,44 @@ def _write_yaml(path: str | Path, data: dict) -> None:
         yaml.safe_dump(data, allow_unicode=True, sort_keys=False),
         encoding="utf-8",
     )
+
+
+def _is_apple_podcasts_url(value: str) -> bool:
+    parsed = urlparse(value)
+    return parsed.scheme in {"http", "https"} and parsed.netloc.lower() in APPLE_PODCAST_HOSTS
+
+
+def _select_episode(episodes: list, select_index: int):
+    if select_index < 1 or select_index > len(episodes):
+        raise ValueError(f"--select-index out of range: {select_index}")
+    return episodes[select_index - 1]
+
+
+def _build_rss_episode_source_from_url(feed_url: str, select_index: int) -> dict:
+    episodes = fetch_podcast_episodes(feed_url)
+    episode = _select_episode(episodes, select_index)
+    return build_podcast_rss_episode_source_config(
+        feed_url=feed_url,
+        episode=episode,
+    )
+
+
+def _build_apple_episode_source_from_url(
+    apple_url: str,
+    select_index: int,
+    *,
+    country: str,
+    api_base_url: str | None,
+) -> tuple[dict, str]:
+    lookup_config = {
+        "url": apple_url,
+        "country": country,
+    }
+    if api_base_url:
+        lookup_config["api_base_url"] = api_base_url
+    result = fetch_itunes_podcast_lookup(lookup_config)
+    feed_url = result["feed_url"]
+    return _build_rss_episode_source_from_url(feed_url, select_index), feed_url
 
 
 def run_pipeline(
@@ -835,11 +878,30 @@ def main(argv: list[str] | None = None) -> int:
                 input_info_line = None
                 input_info_extra = None
                 if args.url:
-                    source_config = build_on_demand_source_config(
-                        args.url,
-                        title=args.title,
-                        language=args.language,
-                    )
+                    feed_url = None
+                    if _is_apple_podcasts_url(args.url):
+                        if args.select_index is None:
+                            raise ValueError(
+                                "Apple Podcasts URL input requires --select-index"
+                            )
+                        source_config, feed_url = _build_apple_episode_source_from_url(
+                            args.url,
+                            args.select_index,
+                            country=args.itunes_country,
+                            api_base_url=args.itunes_api_base_url,
+                        )
+                    elif args.select_index is not None:
+                        source_config = _build_rss_episode_source_from_url(
+                            args.url,
+                            args.select_index,
+                        )
+                        feed_url = args.url
+                    else:
+                        source_config = build_on_demand_source_config(
+                            args.url,
+                            title=args.title,
+                            language=args.language,
+                        )
                     run_paths = create_run(args.workspace, args.run_id)
                     source_config_path = str(
                         Path(args.source_config_out)
@@ -848,7 +910,12 @@ def main(argv: list[str] | None = None) -> int:
                     )
                     _write_yaml(source_config_path, source_config)
                     input_info_line = f"source config: {source_config_path}"
+                    if feed_url:
+                        input_info_line = f"feed_url={feed_url}\n{input_info_line}"
                     input_info_extra = {"episode_url": args.url}
+                    if feed_url:
+                        input_info_extra["feed_url"] = feed_url
+                        input_info_extra["selected_episode_index"] = args.select_index
 
                 output = run_pipeline(
                     args.workspace,

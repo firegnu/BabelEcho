@@ -105,7 +105,21 @@ $PYTHON -m babelecho episode convert \
 
 ### Apple Podcasts/iTunes URL
 
-先列 RSS episodes：
+首选单步入口。`--select-index` 是人工选集编号；编号可先用 `itunes episodes`
+查看，也可以在你已经知道要选第几集时直接执行：
+
+```bash
+$PYTHON -m babelecho episode convert \
+  --workspace "$WORKSPACE" \
+  --run-id "<run-id>" \
+  --url "https://podcasts.apple.com/..." \
+  --select-index <n> \
+  --source-config-out "workspace/sources/<slug>.yaml" \
+  --local-config "$LOCAL_CONFIG" \
+  --to-stage normalize
+```
+
+需要先查看候选集时，仍可拆成两步排错：
 
 ```bash
 $PYTHON -m babelecho itunes episodes \
@@ -113,8 +127,6 @@ $PYTHON -m babelecho itunes episodes \
   --select-index <n> \
   --source-config-out "workspace/sources/<slug>.yaml"
 ```
-
-再用生成的 source config 跑到 `normalize`：
 
 ```bash
 $PYTHON -m babelecho episode convert \
@@ -129,7 +141,20 @@ $PYTHON -m babelecho episode convert \
 
 ### 直接 RSS Feed URL
 
-先列 RSS episodes：
+首选单步入口：
+
+```bash
+$PYTHON -m babelecho episode convert \
+  --workspace "$WORKSPACE" \
+  --run-id "<run-id>" \
+  --url "https://example.com/feed.xml" \
+  --select-index <n> \
+  --source-config-out "workspace/sources/<slug>.yaml" \
+  --local-config "$LOCAL_CONFIG" \
+  --to-stage normalize
+```
+
+需要先查看候选集时，仍可拆成两步排错：
 
 ```bash
 $PYTHON -m babelecho rss episodes \
@@ -137,8 +162,6 @@ $PYTHON -m babelecho rss episodes \
   --select-index <n> \
   --source-config-out "workspace/sources/<slug>.yaml"
 ```
-
-再用生成的 source config 跑到 `normalize`：
 
 ```bash
 $PYTHON -m babelecho episode convert \
@@ -281,8 +304,8 @@ ffprobe -v error -show_entries format=duration,size:stream=codec_name,sample_rat
 
 - YouTube 单视频：已跑过 normalize、DeepSeek、5090D TTS full-chain。
 - 标准 episode page：已跑过多个真实标准播客 normalize，99PI/Practical AI 等样本已跑过 full-chain。
-- Apple Podcasts/iTunes URL：`itunes-url-practical-ai-zero-trust-full-20260619` 已在 5090D full-chain 通过。
-- 直接 RSS feed URL：`rss-podnews-fragment-merge-20260619` 已验证列集、source config 和 normalize；该 Podnews timed transcript 样本经碎段合并后从 88 段降到 18 段，quality=`safe_to_adapt`，未进入 DeepSeek/TTS。
+- Apple Podcasts/iTunes URL：`itunes-url-practical-ai-zero-trust-full-20260619` 已在 5090D full-chain 通过；单步 `episode convert --url ... --select-index ...` smoke `apple-practical-ai-single-url-20260619` 已跑到 normalize，103 段、3 speaker、quality=`safe_to_adapt`。
+- 直接 RSS feed URL：单步 `episode convert --url ... --select-index ...` smoke `rss-podnews-single-url-20260619` 已跑到 normalize；Podnews timed transcript 样本经碎段合并后从 88 段降到 18 段，quality=`safe_to_adapt`，未进入 DeepSeek/TTS。
 
 ## 失败时先看哪里
 

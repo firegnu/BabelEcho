@@ -65,7 +65,9 @@ Out:
 - 已新增 `src/babelecho/itunes.py` 和 `babelecho itunes search`。
 - 已新增 `babelecho itunes episodes --url ...`，把 Apple Podcasts/iTunes URL 收敛到 RSS episode 人工选择流程，不自动转换 show。
 - 已新增 `babelecho rss episodes`，把 feed 内人工选择的 episode 落成 `podcast_rss` source config。
+- 已新增 `babelecho episode convert --url ... --select-index ...` 对 Apple Podcasts/iTunes URL 和直接 RSS feed URL 的单步编排；内部仍先人工选集，再写 `source.type=podcast_rss`，然后复用现有 normalize/adapt/TTS 后流程。
 - 已新增 `src/babelecho/youtube.py` 和 `source.type=youtube_captions` ingest。
 - iTunes 输出标准 `source.type=podcast_rss`；YouTube 输出标准 transcript raw 文件并继续复用 normalize/adapt。
 - 真实 5090D full-chain `itunes-url-practical-ai-zero-trust-full-20260619` 已验证 Apple Podcasts URL -> iTunes Lookup -> RSS -> `podcast_rss` -> normalize -> DeepSeek adapt -> TTS -> assemble -> publish，全程不新增 iTunes 专用后流程。
 - 真实短 RSS smoke `rss-podnews-fragment-merge-20260619` 已验证 direct RSS feed URL -> episode selection -> `podcast_rss` -> normalize；样本约 `296s`。normalize 层对非 YouTube timed transcript 增加保守碎段合并后，该样本从 88 段降到 18 段，质量门槛从 `inspect_first` / `too_fragmented` 变为 `safe_to_adapt`，未送入 DeepSeek。
+- 单步入口 smoke 已通过：`rss-podnews-single-url-20260619` 使用 `episode convert --url https://podnews.net/rss --select-index 1` 跑到 normalize，18 段、quality=`safe_to_adapt`；`apple-practical-ai-single-url-20260619` 使用 Practical AI Apple Podcasts URL 跑到 normalize，103 段、3 speaker、quality=`safe_to_adapt`。两者均未送入 DeepSeek/TTS。

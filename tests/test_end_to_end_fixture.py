@@ -1342,6 +1342,211 @@ publish:
     assert status["input"]["episode_url"] == str(episode_page)
 
 
+def test_episode_convert_command_accepts_rss_feed_url_with_select_index(
+    tmp_path: Path,
+):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    feed = tmp_path / "feed.xml"
+    transcript = tmp_path / "episode.vtt"
+    source_config_out = tmp_path / "rss-on-demand-source.yaml"
+    transcript.write_text(
+        "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nHello from RSS.\n",
+        encoding="utf-8",
+    )
+    feed.write_text(
+        f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>On Demand RSS Feed</title>
+    <item>
+      <title>Older Episode</title>
+      <link>https://example.com/older</link>
+    </item>
+    <item>
+      <title>Selected RSS Episode</title>
+      <link>https://example.com/rss-selected</link>
+      <guid>rss-selected-guid</guid>
+      <podcast:transcript url="{transcript}" type="text/vtt" language="en" />
+    </item>
+  </channel>
+</rss>
+""",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "episode",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "on-demand-rss",
+            "--url",
+            str(feed),
+            "--select-index",
+            "2",
+            "--source-config-out",
+            str(source_config_out),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "normalize",
+        ],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert f"source config: {source_config_out}" in result.stdout
+    assert "feed_url=" in result.stdout
+    assert "normalize:" in result.stdout
+    source_config = yaml.safe_load(source_config_out.read_text(encoding="utf-8"))
+    assert source_config == {
+        "source": {
+            "type": "podcast_rss",
+            "feed_url": str(feed),
+            "episode_url": "https://example.com/rss-selected",
+            "title": "Selected RSS Episode",
+            "original_url": "https://example.com/rss-selected",
+        }
+    }
+    run_dir = workspace / "runs" / "on-demand-rss"
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "podcast_rss"
+    assert source["feed_url"] == str(feed)
+    assert source["episode_url"] == "https://example.com/rss-selected"
+    assert (run_dir / "transcript" / "normalized.json").exists()
+
+
+def test_episode_convert_command_accepts_apple_url_with_select_index(
+    tmp_path: Path,
+    monkeypatch,
+):
+    monkeypatch.setenv("no_proxy", "127.0.0.1,localhost")
+    monkeypatch.setenv("NO_PROXY", "127.0.0.1,localhost")
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    transcript = tmp_path / "episode.vtt"
+    source_config_out = tmp_path / "apple-on-demand-source.yaml"
+    transcript.write_text(
+        "WEBVTT\n\n00:00:00.000 --> 00:00:02.000\nHello from Apple.\n",
+        encoding="utf-8",
+    )
+    local_config.write_text(
+        """
+llm:
+  provider: fixture
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+    routes: dict[str, str] = {}
+    server = run_route_server(routes)
+    feed_url = f"http://127.0.0.1:{server.server_port}/feed.xml"
+    routes["/lookup"] = json.dumps(
+        {
+            "results": [
+                {
+                    "wrapperType": "track",
+                    "kind": "podcast",
+                    "collectionName": "On Demand Apple Show",
+                    "artistName": "Fixture Host",
+                    "feedUrl": feed_url,
+                    "collectionViewUrl": (
+                        "https://podcasts.apple.com/us/podcast/show/id123456"
+                    ),
+                }
+            ]
+        }
+    )
+    routes["/feed.xml"] = f"""<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:podcast="https://podcastindex.org/namespace/1.0">
+  <channel>
+    <title>On Demand Apple Feed</title>
+    <item>
+      <title>Selected Apple Episode</title>
+      <link>https://example.com/apple-selected</link>
+      <guid>apple-selected-guid</guid>
+      <podcast:transcript url="{transcript}" type="text/vtt" language="en" />
+    </item>
+  </channel>
+</rss>
+"""
+
+    try:
+        result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "babelecho",
+                "episode",
+                "convert",
+                "--workspace",
+                str(workspace),
+                "--run-id",
+                "on-demand-apple",
+                "--url",
+                "https://podcasts.apple.com/us/podcast/show/id123456",
+                "--itunes-api-base-url",
+                f"http://127.0.0.1:{server.server_port}/lookup",
+                "--select-index",
+                "1",
+                "--source-config-out",
+                str(source_config_out),
+                "--local-config",
+                str(local_config),
+                "--to-stage",
+                "normalize",
+            ],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+
+    assert result.returncode == 0, result.stderr
+    assert f"feed_url={feed_url}" in result.stdout
+    assert f"source config: {source_config_out}" in result.stdout
+    source_config = yaml.safe_load(source_config_out.read_text(encoding="utf-8"))
+    assert source_config == {
+        "source": {
+            "type": "podcast_rss",
+            "feed_url": feed_url,
+            "episode_url": "https://example.com/apple-selected",
+            "title": "Selected Apple Episode",
+            "original_url": "https://example.com/apple-selected",
+        }
+    }
+    run_dir = workspace / "runs" / "on-demand-apple"
+    source = read_json(run_dir / "source.json")
+    assert source["source_type"] == "podcast_rss"
+    assert source["feed_url"] == feed_url
+    assert source["episode_url"] == "https://example.com/apple-selected"
+    assert (run_dir / "transcript" / "normalized.json").exists()
+
+
 def test_episode_convert_command_rejects_unknown_episode_input(tmp_path: Path):
     local_config = tmp_path / "local.yaml"
     local_config.write_text(

@@ -22,9 +22,17 @@
 | --- | --- | --- |
 | MVP-0 Acceptance | 完成一个真实 transcript 到可发布中文 podcast artifact 的验收闭环 | done |
 | MVP-0.5 Self-use | 手动导入 transcript 后，一条命令生成可订阅中文 feed | done |
-| MVP-1 Real Podcasts | 支持按用户指定的真实 episode 点播转换、多说话人和常见 transcript 来源 | active |
-| MVP-2 Automation | 自动扫描、批处理、状态记录和远程运维 | later |
-| Later | 微调 `CosyVoice-300M-SFT` 扩展多个中文男声/女声、授权参考音色扩展、ASR、voice clone、本地 LLM 替换、App/Web UI | deferred |
+| MVP-1 Single URL Self-use | 用户提供单个 URL 后，手动选集并生成对应中文播客 | active |
+| Phase 2 ASR + Product Surface | ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App | next |
+| Phase 3 Automation | 订阅扫描、多 episode 批处理、PodcastIndex 多 candidate 自动选择、YouTube playlist/channel/show 自动展开、远程运维自动化 | later |
+| Later | 微调 `CosyVoice-300M-SFT` 扩展多个中文男声/女声、授权参考音色扩展、本地 LLM 替换 | deferred |
+
+当前阶段边界：
+
+- MVP-1 只做单 URL 自用版：YouTube 单视频 / YouTube Podcasts 单集视频、标准 episode page、Apple Podcasts/iTunes URL + 手动选集、直接 RSS feed URL + 手动选集。
+- MVP-1 不做订阅扫描、多 episode 批处理、ASR、声纹、ASR speaker diarization、Web UI 或 App。
+- Phase 2 进入音频获取和产品化：ASR、声纹/voice profile、ASR speaker diarization、Web UI 和 App。
+- Phase 3 再做自动化扩展：订阅扫描、多 episode 批处理、PodcastIndex 多 candidate 自动选择、YouTube playlist/channel/show 自动展开。
 
 ## MVP-0 Acceptance
 
@@ -78,7 +86,7 @@
 - 同一个 run 失败后，可以从失败阶段继续。
 - 生成产物路径清楚，不需要翻日志找文件。
 
-## MVP-1 Real Podcasts
+## MVP-1 Single URL Self-use
 
 目标：开始处理真实 podcast 来源和常见访谈节目，而不只是手动样本。
 
@@ -126,7 +134,25 @@
 - 两人访谈的主持人和嘉宾可以用不同固定中文音色输出；三到四人节目可以用 `sft_builtin_4role` 输出可区分的固定角色。
 - 用户指定某一期时，可以把这一期转换成中文 MP3，并可选生成播客客户端可播放的 feed item；99% Invisible `Karaoke Videos` 已通过 `episode convert --url` 在 5090D 跑完整真实链路。
 
-## MVP-2 Automation
+## Phase 2 ASR + Product Surface
+
+目标：从 transcript-first 扩展到音频输入，并提供可日常使用的操作界面。
+
+需要做：
+
+- ASR fallback，用于没有 transcript 的 episode。
+- ASR speaker diarization / 声纹分离：ASR 解决“说了什么”，diarization 解决“谁在说”。两者结合后生成带 `speaker_1` / `speaker_2` 时间段的结构化 transcript，再进入现有 `normalize -> adapt -> TTS` 链路。
+- Speaker diarization / 声纹分离只用于多人音频的说话人分段和固定中文音色映射，不默认做真实身份识别，也不等同于原主播 voice clone。
+- Web UI：提交 URL、查看 run 状态、预览 `quality.json` / 中文脚本、触发 TTS、浏览产物。
+- App：先作为 thin client 消费已发布的中文播客 artifacts，不把复杂转换逻辑塞进客户端。
+
+验收标准：
+
+- 没有公开 transcript 的 episode 可以通过音频进入 ASR，并生成结构化 transcript。
+- 多人音频至少能稳定分出说话人段落，并映射到固定中文音色。
+- 用户不用终端也能提交单个 URL、查看状态和下载/播放产物。
+
+## Phase 3 Automation
 
 目标：减少手动操作，让 5090D 可以稳定作为转换机器使用。
 
@@ -134,6 +160,8 @@
 
 - 支持订阅清单定时扫描。
 - 支持多 episode 批处理。
+- 支持 PodcastIndex 多 candidate 自动选择。
+- 支持 YouTube playlist/channel/show 自动展开。
 - 支持 run 状态记录和失败重试。
 - 支持跳过已完成、重跑指定阶段、清理失败 run。
 - 增加 5090D 环境检查：
@@ -158,15 +186,12 @@
 - 后续固定音色扩展：先明确替换或新增哪个固定 role；它是固定音色扩展，不是原主播 voice clone。
 - 微调 `CosyVoice-300M-SFT`，目标是增加多个可长期使用的中文男声和中文女声，逐步减少当前借用 `英文女` / `英文男` speaker id 作为中文角色的临时性，并在试听确认后再决定是否替换现有 `male_a` CosyVoice2 路线。
 - 本地 LLM 替代 DeepSeek。
-- ASR fallback，用于没有 transcript 的 episode。ASR 和 speaker diarization / 声纹分离应作为同一个后期音频输入阶段来设计：ASR 解决“说了什么”，diarization 解决“谁在说”。两者结合后生成带 `speaker_1` / `speaker_2` 时间段的结构化 transcript，再进入现有 `normalize -> adapt -> TTS` 链路。
-- Speaker diarization / 声纹分离只用于多人音频的说话人分段和固定中文音色映射，不默认做真实身份识别，也不等同于原主播 voice clone。
 - 原主播 voice clone。
-- Web 管理后台。
-- macOS thin client。
 - 封面、章节、响度归一、时间轴对齐等发布增强。
 
 ## 当前最高优先级
 
-1. 继续以点播式单集转换为主入口，下一步转向标准播客来源：YouTube Podcasts 单集 URL、iTunes/RSS feed、PodcastIndex episode 和官网 episode 页面。
-2. 先对用户提供的单个标准播客 URL 做 `normalize` 前后的候选发现、transcript 质量验证和失败诊断；YouTube 单链接清洗已经完成第一版，暂不继续扩展。
-3. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。
+1. 完成 MVP-1 最后一块：`episode convert --url ... --select-index ...` 统一支持 Apple Podcasts/iTunes URL 和直接 RSS feed URL，复用现有 `podcast_rss` 后流程。
+2. 保持 YouTube 单视频 / YouTube Podcasts 单集视频、标准 episode page、Apple/RSS 四类单 URL 入口相互隔离，任何改动先跑来源矩阵回归。
+3. 再跑一个短 Apple/RSS 代表样本的 5090D full-chain，确认单 URL 自用版可以收口。
+4. 音色方向后移到 300M SFT 微调：先定义固定角色需求、样本和试听验收，不影响当前 MVP-1 默认规则。
