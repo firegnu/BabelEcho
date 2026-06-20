@@ -26,17 +26,24 @@
   const lastPlayedId = () => { try { return localStorage.getItem('be:last'); } catch (e) { return null; } };
   // visible only mid-listen: started past the intro, not yet at the end
   const midListen = (id, dur) => { const p = loadPos(id); return p >= 5 && (!dur || p < dur - 5) ? p : 0; };
+  const loadRate = () => { try { return parseFloat(localStorage.getItem('be:rate')) || 1; } catch (e) { return 1; } };
+  const saveRate = (r) => { try { localStorage.setItem('be:rate', String(r)); } catch (e) {} };
+  const fmtRate = (r) => r.toFixed(2).replace(/0$/, '') + '×';
 
   // ---------------- routing ----------------
   function parseHash() {
     const h = location.hash.replace(/^#\/?/, '');
-    if (h.indexOf('ep/') === 0) return { view: 'detail', id: decodeURIComponent(h.slice(3)) };
+    if (h.indexOf('ep/') === 0) {
+      const [path, query] = h.slice(3).split('?');
+      const m = query && query.match(/(?:^|&)t=(\d+)/);
+      return { view: 'detail', id: decodeURIComponent(path), t: m ? Number(m[1]) : null };
+    }
     return { view: 'library' };
   }
   async function route() {
     stopAudio();
     const r = parseHash();
-    if (r.view === 'detail') await renderDetail(r.id);
+    if (r.view === 'detail') await renderDetail(r.id, r.t);
     else await renderLibrary();
   }
   function stopAudio() { try { audio.pause(); } catch (e) {} audio.removeAttribute('src'); audio.load(); curEp = null; }
@@ -171,7 +178,7 @@
   }
 
   // ---------------- Detail ----------------
-  async function renderDetail(id) {
+  async function renderDetail(id, seekTo) {
     app.innerHTML = '<div class="loading">读取 artifact.json…</div>';
     let item;
     try { await ensureIndex(); item = INDEX.episodes.find((e) => e.run_id === id); } catch (e) {
@@ -210,7 +217,7 @@
       </div>
     </div></div>`;
 
-    wirePlayer(ep);
+    wirePlayer(ep, seekTo);
     collectFollowSegs();
     window.scrollTo(0, 0);
   }
@@ -229,7 +236,7 @@
         <div class="seg-btns">
           <button class="seg-btn" data-skip="-15">−15s</button>
           <button class="seg-btn" data-skip="15">+15s</button>
-          <button class="seg-btn" id="rate">1.0×</button>
+          <button class="seg-btn" id="rate">${fmtRate(loadRate())}</button>
         </div>
         <div class="spacer"></div>
         <a class="dl-btn" href="${esc(ep.audioUrl)}" download><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>下载 MP3</a>
@@ -435,7 +442,7 @@
   }
 
   // ---------------- player wiring ----------------
-  function wirePlayer(ep) {
+  function wirePlayer(ep, seekTo) {
     const dur0 = ep.media.duration_seconds || ep.item.duration_seconds || 0;
     const elPlay = document.getElementById('play');
     const elEq = document.getElementById('eq');
@@ -444,7 +451,7 @@
     const bars = elWave ? Array.from(elWave.children) : [];
 
     audio.src = ep.audioUrl;
-    audio.playbackRate = 1;
+    audio.playbackRate = loadRate();
 
     // Total-duration label stays the metadata value (matches the list/meta);
     // audio.duration only drives the progress ratio.
@@ -463,8 +470,13 @@
 
     audio.onloadedmetadata = () => {
       if (elWave) elWave.setAttribute('aria-valuemax', Math.round(durOf()));
-      const saved = loadPos(ep.run_id);
-      if (saved > 1 && saved < durOf() - 2) audio.currentTime = saved;
+      if (seekTo != null) {
+        audio.currentTime = Math.min(seekTo, durOf());
+        audio.play().catch(() => {});
+      } else {
+        const saved = loadPos(ep.run_id);
+        if (saved > 1 && saved < durOf() - 2) audio.currentTime = saved;
+      }
       paint();
     };
     audio.ontimeupdate = () => { paint(); savePos(ep.run_id, audio.currentTime); };
@@ -524,7 +536,7 @@
     if (e.target.id === 'rate') {
       const steps = [1, 1.25, 1.5, 2, 0.75];
       const next = steps[(steps.indexOf(audio.playbackRate) + 1) % steps.length] || 1;
-      audio.playbackRate = next; e.target.textContent = next.toFixed(2).replace(/0$/, '') + '×';
+      audio.playbackRate = next; e.target.textContent = fmtRate(next); saveRate(next);
       return;
     }
     const segEl = e.target.closest('[data-start]');
@@ -565,7 +577,7 @@
   }
   mobileMQ.addEventListener('change', () => { if (curEp) applyMobileCollapse(); });
   const _origRenderDetail = renderDetail;
-  renderDetail = async function (id) { await _origRenderDetail(id); applyMobileCollapse(); };
+  renderDetail = async function (id, seekTo) { await _origRenderDetail(id, seekTo); applyMobileCollapse(); };
 
   // ---------------- icons ----------------
   const ICON_PLAY = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
@@ -575,6 +587,20 @@
   const markManualScroll = () => { suppressFollowUntil = Date.now() + 3000; };
   window.addEventListener('wheel', markManualScroll, { passive: true });
   window.addEventListener('touchmove', markManualScroll, { passive: true });
+
+  // global player keys on the detail view; skip when a control/segment is focused
+  window.addEventListener('keydown', (e) => {
+    if (!curEp) return;
+    if (e.target.closest && e.target.closest('button, a, input, textarea, select, [role="slider"], [role="tab"]')) return;
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      audio.paused ? audio.play().catch(() => {}) : audio.pause();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault(); audio.currentTime = Math.max(0, audio.currentTime - 5);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault(); audio.currentTime = audio.currentTime + 5;
+    }
+  });
 
   window.addEventListener('hashchange', route);
   route();
