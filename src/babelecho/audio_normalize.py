@@ -26,6 +26,9 @@ HIGH_CONFIDENCE_BOUNDARY_CONTENT_PATTERNS = (
     re.compile(r"\bthis tv broadcast\b.*\bwebsite\b", re.IGNORECASE),
     re.compile(r"\bbbc\s+(?:nl|sounds|iplayer)\b.*\b(?:drama|series|comedy|watch|listen|download)\b", re.IGNORECASE),
     re.compile(r"\bbest of brits\b", re.IGNORECASE),
+    re.compile(r"\bsubscribe to (?:our|the) newsletter\b", re.IGNORECASE),
+    re.compile(r"\bnew podcasts and videos to improve your english\b", re.IGNORECASE),
+    re.compile(r"\bnever miss an update from bbc learning english\b", re.IGNORECASE),
 )
 POSSIBLE_BOUNDARY_CONTENT_PATTERNS = (
     re.compile(r"\bfor more information\b", re.IGNORECASE),
@@ -345,10 +348,9 @@ def _boundary_content_cleanup(
         if index > farewell_index
     ):
         dropped_indices.update(range(farewell_index + 1, len(segments)))
-    else:
-        for index in trailing_indices:
-            if _is_high_confidence_boundary_content(segments[index]):
-                dropped_indices.add(index)
+    for index in trailing_indices:
+        if _is_high_confidence_boundary_content(segments[index]):
+            dropped_indices.add(index)
 
     cleaned = [
         segment for index, segment in enumerate(segments) if index not in dropped_indices

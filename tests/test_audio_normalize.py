@@ -539,6 +539,63 @@ def test_audio_normalize_drops_high_confidence_boundary_ads(tmp_path: Path):
     assert quality["metrics"]["segment_count"] == 2
 
 
+def test_audio_normalize_drops_trailing_newsletter_promo(tmp_path: Path):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-newsletter-promo")
+    _write_audio_source(run_paths)
+    _write_asr(
+        run_paths,
+        [
+            {
+                "start_ms": 420000,
+                "end_ms": 426000,
+                "text": "The final vocabulary recap belongs to the episode.",
+            },
+            {
+                "start_ms": 533940,
+                "end_ms": 540300,
+                "text": "That's it for this episode. We'll be back next week.",
+            },
+            {
+                "start_ms": 540300,
+                "end_ms": 544780,
+                "text": "To keep up to date with our latest programmes, subscribe to our newsletter.",
+            },
+            {
+                "start_ms": 544780,
+                "end_ms": 561100,
+                "text": "There's a link in the notes below. Bye for now. Goodbye. Did you know we have new podcasts and videos to improve your English every weekday?",
+            },
+            {
+                "start_ms": 561100,
+                "end_ms": 568340,
+                "text": "Never miss an update from BBC Learning English.",
+            },
+        ],
+    )
+    _write_diarization(
+        run_paths,
+        [
+            {"start_ms": 420000, "end_ms": 426000, "speaker": "speaker_1"},
+            {"start_ms": 533940, "end_ms": 540300, "speaker": "speaker_2"},
+            {"start_ms": 540300, "end_ms": 544780, "speaker": "speaker_1"},
+            {"start_ms": 544780, "end_ms": 561100, "speaker": "speaker_2"},
+            {"start_ms": 561100, "end_ms": 568340, "speaker": "speaker_1"},
+        ],
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    normalized = read_json(run_paths.normalized_transcript_json)
+    assert [segment["text"] for segment in normalized["segments"]] == [
+        "The final vocabulary recap belongs to the episode.",
+        "That's it for this episode. We'll be back next week.",
+    ]
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert "dropped_boundary_content_segments" in quality["warnings"]
+    assert quality["metrics"]["dropped_boundary_content_segment_count"] == 3
+
+
 def test_audio_normalize_keeps_uncertain_boundary_promo_with_warning(
     tmp_path: Path,
 ):
