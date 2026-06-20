@@ -94,6 +94,7 @@
 - `--existing-map` preserves existing `alias_id -> voice_role` assignments so regenerating the map does not drift recurring speakers to a different Chinese voice role.
 - The output is still a passive contract: it is not consumed by TTS routing, is not published, does not read or output embeddings, and does not perform voice clone.
 - Local focused verification passed: `tests/test_speaker_aliases.py tests/test_speaker_similarity.py tests/test_voice_profile.py tests/test_speaker_voices.py`.
+- 5090D smoke passed using a simulated confirmed review derived from the five-episode Practical AI review file: `speaker_alias_001 -> female_a`, `speaker_alias_002` was skipped as `rejected`, and the output contained no `embedding_artifact` or `voice-profiles` strings. A second 5090D smoke with `--existing-map` preserved `speaker_alias_001 -> male_b`.
 - Remaining work: add an explicit opt-in application path that turns this private map into per-run `speaker_voices` only when the user chooses to apply it. Do not auto-apply this map to synthesize.
 
 ---
