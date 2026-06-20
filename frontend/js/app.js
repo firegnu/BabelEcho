@@ -22,7 +22,10 @@
   };
   const posKey = (id) => 'be:pos:' + id;
   const loadPos = (id) => { try { return parseFloat(localStorage.getItem(posKey(id))) || 0; } catch (e) { return 0; } };
-  const savePos = (id, p) => { try { localStorage.setItem(posKey(id), String(p)); } catch (e) {} };
+  const savePos = (id, p) => { try { localStorage.setItem(posKey(id), String(p)); if (p > 0) localStorage.setItem('be:last', id); } catch (e) {} };
+  const lastPlayedId = () => { try { return localStorage.getItem('be:last'); } catch (e) { return null; } };
+  // visible only mid-listen: started past the intro, not yet at the end
+  const midListen = (id, dur) => { const p = loadPos(id); return p >= 5 && (!dur || p < dur - 5) ? p : 0; };
 
   // ---------------- routing ----------------
   function parseHash() {
@@ -90,14 +93,30 @@
     const routeKinds = new Set(eps.map((e) => e.route)).size;
     const allSafe = eps.length > 0 && eps.every((e) => qrec(e) === 'safe_to_adapt');
 
+    const lastId = lastPlayedId();
+    const lastEp = lastId ? eps.find((e) => e.run_id === lastId) : null;
+    const lastPos = lastEp ? midListen(lastEp.run_id, lastEp.duration_seconds) : 0;
+    const resumeHtml = (lastEp && lastPos)
+      ? `<a class="resume-card" href="#/ep/${encodeURIComponent(lastEp.run_id)}">
+          <div class="resume-ic">▶</div>
+          <div class="resume-mid"><div class="resume-k">继续上次在听</div><div class="resume-title">${esc(lastEp.title)}</div></div>
+          <div class="resume-pos">${BE.fmt(lastPos)}</div>
+        </a>`
+      : '';
+
     const rowsHtml = shown.map((e) => {
       const rc = e.route === 'article_reading' ? 'var(--accent-2)' : 'var(--accent)';
       const q = BE.quality(qrec(e));
       const none = (e.speaker_count || 0) === 0;
+      const pos = midListen(e.run_id, e.duration_seconds);
+      const prog = pos && e.duration_seconds
+        ? `<div class="row-prog" title="已听 ${Math.round((pos / e.duration_seconds) * 100)}% · ${BE.fmt(pos)}"><span style="width:${Math.min(100, (pos / e.duration_seconds) * 100).toFixed(0)}%"></span></div>`
+        : '';
       return `<a class="row grid-cols" data-rid="${esc(e.run_id)}" style="--route:${rc}" href="#/ep/${encodeURIComponent(e.run_id)}">
         <div style="min-width:0">
           <div class="row-title">${esc(e.title)}</div>
           <div class="row-host">${esc(e.run_id)}</div>
+          ${prog}
         </div>
         <div class="badges"><span class="badge-route">${esc(e.route)}</span><span class="badge-source">${esc(e.source_type)}</span></div>
         <div class="row-dur">${BE.fmtDur(e.duration_seconds)}</div>
@@ -121,6 +140,7 @@
         <span class="chip"><span class="k">route</span><span class="v">${routeKinds}</span></span>
         ${allSafe ? '<span class="chip"><span class="dot"></span>全部 safe_to_adapt</span>' : ''}
       </div>
+      ${resumeHtml}
       <div class="grid-cols cols"><div>标题 / 来源</div><div>route · source</div><div>时长</div><div>角色</div><div>质量 · 发布</div></div>
       ${shown.length ? rowsHtml : emptyHtml}
     </section>`;
