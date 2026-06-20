@@ -2,7 +2,7 @@
 
 ## 0. 2026-06-20 最新接续状态
 
-新 session 优先读取 `resume-prompt.md`；本文件保留更长历史。当前功能基线已包含 `fd8d259 feat: ingest audio URLs in audio-first pipeline`，继续前仍按标准入口执行 `git status --short --branch` 和 `git log --oneline -3` 确认最新点。5090D 已 `git pull --ff-only` 到该功能提交；远端仍有既有 untracked 文件 `workspace/sources/practicalai-mcp-312-transcript.txt`，不要误删。
+新 session 优先读取 `resume-prompt.md`；本文件保留更长历史。当前功能基线已包含 audio-first URL ingest、边界内容自动清理，以及非 WAV diarization 输入规范化。继续前仍按标准入口执行 `git status --short --branch` 和 `git log --oneline -3` 确认最新点。远端仍有既有 untracked 文件 `workspace/sources/practicalai-mcp-312-transcript.txt`，不要误删。
 
 Phase 2 Route B audio-first 当前状态：
 
@@ -12,6 +12,7 @@ Phase 2 Route B audio-first 当前状态：
 - 5090D 短 URL full-chain `audio-url-fullchain-bbc-6min-screen-time-20260620` 已通过：BBC `6 Minute English - Limiting screen time for children` 直链约 8.5 分钟输入，经 `--audio-url -> ASR -> diarize -> normalize -> DeepSeek -> TTS -> publish` 生成中文 MP3，40 段，quality=`safe_to_adapt`，diarization 4 speakers，voice roles `female_a/male_a/female_b/male_b` 均有使用，输出 `22050 Hz` mono、约 `354.8s`、约 `5.7 MB`，已拷回本机 ignored `workspace/runs/audio-url-fullchain-bbc-6min-screen-time-20260620/output/audio.mp3`。
 - 该 BBC 样本暴露 audio-first 真实内容清理问题：动态广告/片尾推广进入 ASR 和中文稿，首尾 segment 包含广告/推广性内容。链路可用，但在正式自用前应补 audio-first 的广告/舞台/片尾清理或人工裁剪入口。
 - 已新增 audio-first 边界内容自动清理：只处理开头/结尾边界窗口，高置信广告/推广自动删除，低置信只写 warning，不要求人工确认。5090D 重跑同一 BBC run 的 `normalize -> publish` 后，normalized/script/manifest 为 36 段，自动删除 4 个边界内容段，quality 仍为 `safe_to_adapt`，MP3 更新为 `22050 Hz` mono、约 `339.4s`，首段从“大家好，这里是六分钟英语”开始，尾段到“再见”结束；更新后的 MP3 已拷回同一本机 ignored 路径。
+- 已新增 diarization 输入规范化：`local_cli` diarization 对非 WAV 输入会先用 ffmpeg 生成 run-local `audio/diarization-input.wav`（mono、16k、PCM），再把该 WAV 传给 pyannote wrapper；原始音频仍保留给 ASR/source artifact。根因验证样本是 Podnews `The risk takers in podcasting` MP3：原始 MP3 含封面图视频流、双声道和非零 start time，pyannote 原始读取会因 10 秒 chunk 样本数不匹配失败；同文件转成标准 WAV 后 wrapper 可正常输出 diarization。5090D 回归 `audio-url-regression-podnews-risk-takers-20260620` 已从 `diarize -> publish` 跑通：quality=`safe_to_adapt`，10 段、2 speakers，自动删除 3 个边界段，1 个 possible boundary warning 保留，最终 MP3 为 `22050 Hz` mono、约 `147.10s`、约 `2.35 MB`，ffmpeg 解码通过，产物已拷回本机 ignored `workspace/runs/audio-url-regression-podnews-risk-takers-20260620/output/audio.mp3`。
 - ASR provider 已有 `fixture` / `local_cli`；5090D 已验证本地 OpenAI Whisper `small.en`。
 - Diarization provider 已有 `none` / `fixture` / `local_cli`；5090D 已用 pyannote Community-1 在 Practical AI 8 分钟样本上分出 `speaker_1/speaker_2`。
 - `asr.replacements` 已实现：只做显式短语 `from -> to`，默认不开启；5090D smoke 修正 `Daniel White Knack`、`cloud code`、`cloud co-worker`，不宽泛替换普通 `cloud`。
@@ -35,7 +36,7 @@ Phase 2 Route B audio-first 当前状态：
 
 下一步计划：
 
-- `audio_url` 已完成 ingest、normalize、短音频 full-chain 和自动边界清理回归；下一步可继续扩充保守清理规则/可选裁剪 override，或进入 speaker consistency 的人工确认/审核步骤。不要直接把 alias map 接入 TTS。
+- `audio_url` 已完成 ingest、normalize、短音频 full-chain、自动边界清理和非 WAV diarization 输入规范化；Podnews 失败样本已越过 diarization 并生成最终中文 MP3。下一步优先校准 BBC 类样本的 diarization 质量门，不要直接把 alias map 接入 TTS。
 - 不进入“立即声音 clone”；embedding 仍只做诊断/跨集一致性，不喂给 TTS，不发布向量或声纹文件。
 - 本阶段仍要保持 Route B 隔离，不改 Route A 的 YouTube/RSS/iTunes/Article 已验证逻辑。
 

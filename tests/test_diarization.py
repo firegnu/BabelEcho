@@ -1,3 +1,4 @@
+import subprocess
 import sys
 from pathlib import Path
 
@@ -239,6 +240,96 @@ Path(args.output_json).write_text(json.dumps({
             "speaker_bounds": ["1", "3"],
         },
     }
+
+
+def test_local_cli_diarization_canonicalizes_compressed_audio_before_wrapper(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "local-cli-compressed-diarization")
+    audio_dir = run_paths.run_dir / "audio"
+    audio_dir.mkdir(parents=True)
+    audio_path = audio_dir / "input.mp3"
+    audio_path.write_bytes(b"fake mp3 bytes")
+    write_json(
+        run_paths.source_json,
+        {
+            "source_type": "audio_url",
+            "audio_input": "audio/input.mp3",
+        },
+    )
+
+    ffmpeg_commands = []
+    wrapper_audio_files = []
+
+    def fake_run(command, check, text, capture_output):
+        if command[0] == "ffmpeg":
+            ffmpeg_commands.append(command)
+            Path(command[-1]).write_bytes(b"canonical wav bytes")
+            return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+        audio = Path(command[command.index("--audio-file") + 1])
+        wrapper_audio_files.append(audio)
+        output_json = Path(command[command.index("--output-json") + 1])
+        output_json.parent.mkdir(parents=True, exist_ok=True)
+        output_json.write_text(
+            """
+{
+  "provider": "fake_diarization",
+  "model": "fake-model",
+  "speaker_count": 1,
+  "segments": [
+    {"start_ms": 0, "end_ms": 1500, "speaker": "speaker_1"}
+  ],
+  "metadata": {
+    "audio_name": "%s"
+  }
+}
+"""
+            % audio.name,
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr("babelecho.diarization.subprocess.run", fake_run)
+
+    diarization_path = run_diarization(
+        {
+            "provider": "local_cli",
+            "command": f"{sys.executable} fake_diarization_wrapper.py",
+            "model": "fake-model",
+        },
+        run_paths,
+        config_path=tmp_path / "local-audio.yaml",
+    )
+
+    canonical_audio = run_paths.run_dir / "audio" / "diarization-input.wav"
+    assert ffmpeg_commands == [
+        [
+            "ffmpeg",
+            "-y",
+            "-v",
+            "error",
+            "-i",
+            str(audio_path),
+            "-map",
+            "0:a:0",
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-c:a",
+            "pcm_s16le",
+            str(canonical_audio),
+        ]
+    ]
+    assert canonical_audio.exists()
+    assert wrapper_audio_files == [canonical_audio]
+    assert (
+        read_json(diarization_path)["metadata"]["audio_name"]
+        == "diarization-input.wav"
+    )
 
 
 @pytest.mark.parametrize("missing_key", ["start_ms", "end_ms", "speaker"])

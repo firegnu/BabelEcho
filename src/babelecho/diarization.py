@@ -6,6 +6,8 @@ from typing import Any
 from .jsonio import read_json, write_json
 from .paths import RunPaths
 
+CANONICAL_DIARIZATION_AUDIO_NAME = "diarization-input.wav"
+
 
 def _asr_dir(run_paths: RunPaths) -> Path:
     return run_paths.run_dir / "asr"
@@ -204,6 +206,51 @@ def _run_local_cli_command(command: list[str]) -> None:
         ) from error
 
 
+def _canonicalize_diarization_audio(audio_path: Path, run_paths: RunPaths) -> Path:
+    if audio_path.suffix.lower() == ".wav":
+        return audio_path
+
+    canonical_path = run_paths.run_dir / "audio" / CANONICAL_DIARIZATION_AUDIO_NAME
+    canonical_path.parent.mkdir(parents=True, exist_ok=True)
+    command = [
+        "ffmpeg",
+        "-y",
+        "-v",
+        "error",
+        "-i",
+        str(audio_path),
+        "-map",
+        "0:a:0",
+        "-vn",
+        "-ac",
+        "1",
+        "-ar",
+        "16000",
+        "-c:a",
+        "pcm_s16le",
+        str(canonical_path),
+    ]
+    try:
+        subprocess.run(command, check=True, text=True, capture_output=True)
+    except FileNotFoundError as error:
+        raise ValueError("ffmpeg is required for non-WAV diarization audio") from error
+    except subprocess.CalledProcessError as error:
+        stderr = (error.stderr or "").strip()
+        stdout = (error.stdout or "").strip()
+        detail = stderr or stdout or "no output"
+        raise RuntimeError(
+            "Diarization audio canonicalization failed with exit code "
+            f"{error.returncode}: {detail}"
+        ) from error
+    if not canonical_path.exists():
+        raise ValueError(
+            f"Diarization audio canonicalization did not write output: {canonical_path}"
+        )
+    if canonical_path.stat().st_size == 0:
+        raise ValueError(f"Diarization audio canonicalization wrote empty output: {canonical_path}")
+    return canonical_path
+
+
 def _run_local_cli_diarization(
     diarization_config: dict[str, Any],
     run_paths: RunPaths,
@@ -213,6 +260,7 @@ def _run_local_cli_diarization(
         raise ValueError("diarization.command is required for local_cli diarization")
 
     audio_path = _resolve_audio_input(run_paths)
+    audio_path = _canonicalize_diarization_audio(audio_path, run_paths)
     diarization_path = _asr_dir(run_paths) / "diarization.json"
     command = _command_parts(command_value)
     command.extend(["--audio-file", str(audio_path), "--output-json", str(diarization_path)])

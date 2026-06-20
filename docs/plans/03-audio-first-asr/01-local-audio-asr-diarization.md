@@ -987,7 +987,11 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 5090D 短 URL full-chain `audio-url-fullchain-bbc-6min-screen-time-20260620` 使用 BBC `6 Minute English - Limiting screen time for children` 直链跑通 `--audio-url -> ASR -> diarize -> normalize -> DeepSeek -> TTS -> publish`：输入约 `508.97s`、ASR 153 段、diarization 4 speakers/51 turns、normalized/script/manifest 均 40 段、quality=`safe_to_adapt`、voice roles `female_a/male_a/female_b/male_b` 均有使用，输出 MP3 为 `22050 Hz` mono、约 `354.8s`、约 `5.7 MB`，已拷回本机 ignored `workspace/runs/audio-url-fullchain-bbc-6min-screen-time-20260620/output/audio.mp3`。
   - 该 BBC 样本暴露真实 audio-first 清理问题：动态广告和片尾推广会进入 ASR/中文稿，首尾 segment 有广告/推广内容；这不是 URL 链路失败，但正式自用前需要广告/舞台/片尾清理或人工裁剪入口。
   - 已新增 audio-first 边界内容自动清理：只处理开头/结尾边界窗口，高置信广告/推广自动删除，低置信只写 warning，不要求人工确认。5090D 重跑同一 BBC run 的 `normalize -> publish` 后，normalized/script/manifest 为 36 段，自动删除 4 个边界内容段，quality=`safe_to_adapt`，更新后 MP3 为 `22050 Hz` mono、约 `339.4s`、约 `5.4 MB`。
+  - 已新增 `local_cli` diarization 输入规范化：非 WAV 输入会先转成 run-local `audio/diarization-input.wav`（mono、16k、PCM）再传给 wrapper，原始音频保留给 ASR/source artifact。根因验证样本为 Podnews `The risk takers in podcasting`：原始 MP3 含封面图视频流、双声道和非零 start time，pyannote 直接读取失败为 `requested chunk ... 439895 samples instead of ... 441000 samples`；同文件转成标准 WAV 后 wrapper 成功输出 2 speakers / 8 segments。5090D 回归 `audio-url-regression-podnews-risk-takers-20260620` 已从 `diarize -> publish` 跑通：quality=`safe_to_adapt`，normalized/script/manifest 均 10 段，voice roles 为 `female_a/male_a`，自动删除 3 个边界段，1 个 possible boundary warning 保留，最终 MP3 为 `22050 Hz` mono、约 `147.10s`、约 `2.35 MB`，ffmpeg 解码通过。
 - 本机验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py::test_local_cli_diarization_canonicalizes_compressed_audio_before_wrapper -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_supports_local_cli_provider tests/test_audio_pipeline.py::test_audio_convert_asr_stage_supports_local_cli_provider -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_voice_profile.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_applies_local_cli_voice_profile -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_publish.py::test_publish_episode_adds_audio_first_asr_summary -q`
@@ -1006,6 +1010,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - 或继续横评 `large-v3` / faster-whisper，但必须继续只在 audio-first 路线验证，不作为 Route A fallback。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
+- 校准 BBC 类短音频样本的 diarization 质量门：当前广告清理有效，但部分样本仍因 ambiguous speaker assignments / missing overlap 进入 `inspect_first`。
 - 同一节目跨 episode speaker profile 复用。
 - 人工 speaker 改名工具。
 - 长音频 chunking。
