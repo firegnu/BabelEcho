@@ -250,6 +250,30 @@ def _write_published_index(stable_publish_dir: Path, generated_at: str) -> None:
     )
 
 
+def _write_zh_transcript(run_paths: RunPaths, script: dict, target: Path) -> None:
+    timings: dict = {}
+    manifest_path = run_paths.segments_dir / "manifest.json"
+    if manifest_path.exists():
+        manifest = read_json(manifest_path)
+        for segment in manifest.get("segments", []):
+            if "start_ms" in segment:
+                timings[segment["id"]] = {
+                    "start_ms": segment["start_ms"],
+                    "end_ms": segment.get("end_ms"),
+                    "duration_ms": segment.get("duration_ms"),
+                }
+    enriched = dict(script)
+    enriched_segments = []
+    for segment in script.get("segments", []):
+        new_segment = dict(segment)
+        timing = timings.get(segment.get("id"))
+        if timing is not None:
+            new_segment.update(timing)
+        enriched_segments.append(new_segment)
+    enriched["segments"] = enriched_segments
+    write_json(target, enriched)
+
+
 def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
     base_url = publish_config["base_url"].rstrip("/")
     source = read_json(run_paths.source_json)
@@ -270,7 +294,7 @@ def publish_episode(run_paths: RunPaths, publish_config: dict) -> str:
     }
     write_json(episode_dir / "metadata.json", metadata)
     shutil.copy2(run_paths.normalized_transcript_json, episode_dir / "transcript.en.json")
-    shutil.copy2(run_paths.chinese_script_json, episode_dir / "transcript.zh.json")
+    _write_zh_transcript(run_paths, script, episode_dir / "transcript.zh.json")
     speaker_profiles_path = run_paths.run_dir / "asr" / "speaker-profiles.json"
     if speaker_profiles_path.exists():
         shutil.copy2(speaker_profiles_path, episode_dir / "speaker-profiles.json")
