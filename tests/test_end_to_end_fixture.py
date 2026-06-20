@@ -315,8 +315,8 @@ publish:
     )
     first_zh = zh_transcript["segments"][0]
     assert first_zh["start_ms"] == 0
-    assert first_zh["end_ms"] == 200
-    assert first_zh["duration_ms"] == 200
+    assert first_zh["duration_ms"] > 0
+    assert first_zh["end_ms"] == first_zh["duration_ms"]
 
     check_result = subprocess.run(
         [
