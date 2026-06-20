@@ -961,7 +961,8 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - `summary.json` 只把 safe metadata 合并回 `asr/speaker-profiles.json`：`sample_count`、`sample_duration_ms`、`profile_kind`、`embedding_status`、`embedding_artifact`；`embedding_status=computed` 已进入合法状态。
   - `tools/speaker_embedding_wrapper.py` 已从契约 stub 升级为 SpeechBrain ECAPA wrapper：按 speaker 选择最长 diarization windows，运行 `speechbrain/spkrec-ecapa-voxceleb`，写 run-local `asr/voice-profiles/<speaker>.json` 和 `summary.json`。
   - 5090D 独立 `babelecho-voice-profile` model probe 已选中 `speechbrain/spkrec-ecapa-voxceleb`：pyannote embedding 被 gated repo 403 阻断，SpeechBrain ECAPA 在 Practical AI 8 分钟样本上成功产出 192 维 embedding，speaker 内 cosine 均值约 `0.929/0.849`，speaker 间约 `0.457`，首次 probe 总耗时约 `36.9s`，峰值 RSS 约 `2.4 GB`。
-  - publish 仍只暴露摘要：`artifact.json.asr.speaker_profiles` 不包含 `embedding_artifact`，也不会把 `asr/voice-profiles/*.json` 复制到 `workspace/published/`。
+  - 5090D 真实 wrapper smoke `audio-voice-profile-speechbrain-smoke-20260620` 已通过：`voice_profile.provider=local_cli` 调用 SpeechBrain wrapper 后，`speaker_1/speaker_2` 均为 `embedding_status=computed`，写入 run-local 192 维 `asr/voice-profiles/speaker_*.json`，并合并摘要到 `asr/speaker-profiles.json`。
+  - 同一 run 已继续做 publish-stage privacy smoke：`artifact.json.asr.speaker_profiles` 不包含 `embedding_artifact`，也没有把 `asr/voice-profiles/*.json` 复制到 `workspace/published/`。
   - 这一步仍不是 voice clone，不做原主播声音复刻、不做真实身份识别，也不把 embedding 用于 TTS。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_voice_profile.py -q`

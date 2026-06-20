@@ -38,7 +38,9 @@
 - `tools/speaker_embedding_wrapper.py` now selects the longest diarization windows per speaker, runs `speechbrain/spkrec-ecapa-voxceleb`, averages per-speaker embeddings, writes private run-local speaker JSON artifacts, and writes `summary.json`.
 - Heavy dependencies remain outside BabelEcho core. The wrapper imports SpeechBrain, torch, and torchaudio only when executed.
 - Local wrapper unit tests cover sample-window selection and summary/artifact writing without requiring SpeechBrain in the local dev env.
-- Remaining work: 5090D real `voice_profile.provider=local_cli` smoke using the SpeechBrain wrapper.
+- 5090D real `voice_profile.provider=local_cli` smoke passed in run `audio-voice-profile-speechbrain-smoke-20260620`: both speakers became `embedding_status=computed`, private 192-dimensional artifacts were written under `asr/voice-profiles/`, and the merged summary stayed in `asr/speaker-profiles.json`.
+- Publish-stage privacy smoke passed on the same run: `artifact.json.asr.speaker_profiles` did not expose `embedding_artifact`, and `workspace/published/episodes/<run-id>/asr/voice-profiles/` was not created.
+- Remaining work: decide whether to use these speaker embeddings only for cross-episode speaker consistency or keep them as diagnostic metadata.
 
 ---
 
