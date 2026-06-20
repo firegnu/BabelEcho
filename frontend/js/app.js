@@ -228,18 +228,22 @@
   function scriptHtml(ep, isArt) {
     const segCount = metricVal(ep, 'segment_count') ?? ep.zh.length;
     if (isArt) {
-      const body = ep.zh.map((s) => BE.isHeading(s.text)
-        ? `<h3 class="reading-h">${esc(s.text)}</h3>`
-        : `<p class="reading-p">${esc(s.text)}</p>`).join('');
+      const body = ep.zh.map((s) => {
+        const ts = s.start_ms != null ? ` data-start="${s.start_ms}" data-end="${s.end_ms}"` : '';
+        return BE.isHeading(s.text)
+          ? `<h3 class="reading-h"${ts}>${esc(s.text)}</h3>`
+          : `<p class="reading-p"${ts}>${esc(s.text)}</p>`;
+      }).join('');
       return `<div class="reading">${body}
-        <div class="note">正文共 ${segCount} 段 · article_reading 路线为文章正文 + 小标题段，按阅读排版而非主持人转录行。中文无段级时间戳。</div></div>`;
+        <div class="note">正文共 ${segCount} 段 · article_reading 路线为文章正文 + 小标题段，按阅读排版而非主持人转录行。播放时高亮跟随，可点击段落跳转。</div></div>`;
     }
     const rows = ep.zh.map((s) => {
       const role = ep.roleOf(s.speaker);
       const spk = s.speaker
         ? `<div class="seg-spk"><span class="seg-badge" style="--role:${BE.roleColor(role)}">${esc(s.speaker)}</span>${role ? `<span class="seg-role">${esc(role)}</span>` : ''}</div>`
         : '';
-      return `<div class="seg">${spk}<div class="seg-body"><span class="seg-id">${esc(s.id || '')}</span><p class="seg-text">${esc(s.text)}</p></div></div>`;
+      const ts = s.start_ms != null ? ` data-start="${s.start_ms}" data-end="${s.end_ms}"` : '';
+      return `<div class="seg"${ts}>${spk}<div class="seg-body"><span class="seg-id">${esc(s.id || '')}</span><p class="seg-text">${esc(s.text)}</p></div></div>`;
     }).join('');
     return `${rows}<div class="note">脚本共 ${segCount} 段 · 含无 speaker 的过场段时不显标签 · 中文脚本无段级时间戳。</div>`;
   }
