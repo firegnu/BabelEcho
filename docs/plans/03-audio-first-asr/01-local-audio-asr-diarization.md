@@ -8,7 +8,7 @@
 
 ## 目标
 
-建立一条独立的 Route B：用户提供本地音频文件后，系统先做 ASR，再做 speaker diarization / 声纹聚类，生成现有后流程可消费的 `transcript/normalized.json`。
+建立一条独立的 Route B：用户提供本地音频文件或显式音频 URL 后，系统先做 ASR，再做 speaker diarization / 声纹聚类，生成现有后流程可消费的 `transcript/normalized.json`。
 
 第一轮目标不是追求最佳 ASR 或最佳声纹模型，而是先把 audio-first 的工程边界、CLI、artifact contract、质量门禁和回归测试做稳。真实 ASR/diarization 模型随后以 provider/adapter 形式接入，避免把重依赖和模型环境塞进现有 YouTube/RSS/iTunes/Article 路线。
 
@@ -29,7 +29,7 @@ single URL / source YAML / transcript file / article
 Route B 要新增：
 
 ```text
-local audio file
+local audio file / explicit audio URL
   -> audio ingest
   -> ASR
   -> speaker diarization / voice profile
@@ -43,8 +43,8 @@ local audio file
 
 ### In
 
-- 新增独立 CLI：`babelecho audio convert`，必填参数包含 `--audio-file`。
-- 第一版只接受本地音频文件，不下载 URL 音频。
+- 新增独立 CLI：`babelecho audio convert`，输入参数为 `--audio-file` / `--audio-url` 二选一。
+- 支持本地音频文件和显式公网音频 URL ingest；URL 入口只属于 Route B，不作为 Route A 的静默 ASR fallback。
 - 新增独立 audio-first pipeline stage。
 - 写入 audio-first 专属 artifacts：
   - `audio/input.*` 或 `audio/input.json`
@@ -57,7 +57,7 @@ local audio file
 - 支持 fixture ASR / fixture diarization provider，用于本机无重模型测试。
 - 支持从 `normalize` 之后继续复用 DeepSeek/TTS/publish。
 - 质量门禁至少覆盖空文本、时间戳异常、speaker 过碎、低置信度和音频 metadata 缺失。
-- 发布 artifact 中 `source.type=audio_file`、`route=audio_first`、`asr` 摘要可展示给只读前端；不含 embedding 的 speaker profile 统计文件可以同步到 published，真实 voiceprint embedding 不发布。
+- 发布 artifact 中 `source.type=audio_file` 或 `source.type=audio_url`、`route=audio_first`、`asr` 摘要可展示给只读前端；URL source 只暴露 `source_host` / `source_path`，不写 query/fragment；不含 embedding 的 speaker profile 统计文件可以同步到 published，真实 voiceprint embedding 不发布。
 
 ### Out
 
@@ -106,6 +106,17 @@ babelecho audio convert \
   --audio-file tests/fixtures/audio/sample.mp3 \
   --local-config workspace/config/local-audio.yaml \
   --to-stage normalize
+```
+
+URL 音频入口：
+
+```bash
+babelecho audio convert \
+  --workspace workspace \
+  --run-id audio-url-smoke-20260620 \
+  --audio-url "https://example.com/episode.mp3" \
+  --local-config workspace/config/local-audio.yaml \
+  --to-stage ingest_audio
 ```
 
 后续继续：
@@ -205,7 +216,8 @@ publish:
 约束：
 
 - 不写用户本机绝对路径。
-- 不写远端路径。
+- URL 输入时 `input_kind=audio_url`，允许写 `source_host` 和 `source_path`，但不写 query/fragment。
+- 不写远端本地路径。
 - 不写模型路径。
 - 如果 ffprobe 不可用，metadata 字段可为 `null`，但 quality gate 要记录 warning。
 
@@ -964,6 +976,13 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 5090D 真实 wrapper smoke `audio-voice-profile-speechbrain-smoke-20260620` 已通过：`voice_profile.provider=local_cli` 调用 SpeechBrain wrapper 后，`speaker_1/speaker_2` 均为 `embedding_status=computed`，写入 run-local 192 维 `asr/voice-profiles/speaker_*.json`，并合并摘要到 `asr/speaker-profiles.json`。
   - 同一 run 已继续做 publish-stage privacy smoke：`artifact.json.asr.speaker_profiles` 不包含 `embedding_artifact`，也没有把 `asr/voice-profiles/*.json` 复制到 `workspace/published/`。
   - 这一步仍不是 voice clone，不做原主播声音复刻、不做真实身份识别，也不把 embedding 用于 TTS。
+- URL 音频入口：
+  - 已新增 `babelecho audio convert --audio-url ...`，CLI 输入现在是 `--audio-file | --audio-url` 二选一。
+  - `audio_url` 入口写 `source_type=audio_url`、`provider=remote_url`、`audio/input.<ext>`、`audio/metadata.json`，并只保留 `source_host` / `source_path`，不把 URL query/fragment 写入 artifact。
+  - publish 已把 `audio_url` 归为 `route=audio_first`，并在公开 source 中只暴露 safe source 字段。
+  - 本机验证：`tests/test_audio_source.py tests/test_audio_pipeline.py tests/test_publish.py tests/test_cli_smoke.py -q` 为 24 passed；全量 `.conda/babelecho-dev/bin/python -m pytest -q` 为 244 passed。
+  - 5090D 已 `git pull --ff-only` 到 `fd8d259` 并通过 `tests/test_audio_source.py tests/test_audio_pipeline.py::test_audio_convert_cli_accepts_audio_url -q`：8 passed。
+  - 5090D 真实公网 smoke `audio-url-ingest-practicalai-ai-index-20260620` 使用 Practical AI MP3 跑到 `ingest_audio`：`source_type=audio_url`、`provider=remote_url`、`source_host=pscrb.fm`、`duration_seconds=2832.404898`、`sample_rate=44100`、mono、`file_size_bytes=45365394`、warnings 为空。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_voice_profile.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_applies_local_cli_voice_profile -q`
@@ -986,5 +1005,5 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - 同一节目跨 episode speaker profile 复用。
 - 人工 speaker 改名工具。
 - 长音频 chunking。
-- URL 音频下载 adapter。
+- 受控 `--audio-url -> asr -> diarize -> normalize` 真实回归。
 - ASR 结果人工校对入口。
