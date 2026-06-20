@@ -18,7 +18,7 @@ from .itunes import (
     fetch_itunes_podcast_lookup,
     fetch_itunes_podcast_search,
 )
-from .jsonio import read_json
+from .jsonio import read_json, write_json
 from .overrides import apply_script_overrides
 from .paths import create_run
 from .podcast import build_podcast_rss_episode_source_config, fetch_podcast_episodes
@@ -29,6 +29,12 @@ from .podcast_index_api import (
 )
 from .publish import publish_episode
 from .script import preview_chinese_script
+from .speaker_similarity import (
+    DEFAULT_POSSIBLE_THRESHOLD,
+    DEFAULT_SAME_THRESHOLD,
+    compare_speaker_profiles,
+    format_speaker_similarity_summary,
+)
 from .speaker_voices import infer_speaker_voices, infer_speaker_voices_if_enabled
 from .status import (
     init_run_status,
@@ -107,6 +113,36 @@ def build_parser() -> argparse.ArgumentParser:
     speaker_voices.add_argument("--workspace", required=True)
     speaker_voices.add_argument("--run-id", required=True)
     speaker_voices.add_argument("--local-config", required=True)
+
+    speaker_profiles = subparsers.add_parser(
+        "speaker-profiles",
+        help="Inspect speaker profile artifacts.",
+    )
+    speaker_profiles_subparsers = speaker_profiles.add_subparsers(
+        dest="speaker_profiles_command",
+        required=True,
+    )
+    speaker_profiles_compare = speaker_profiles_subparsers.add_parser(
+        "compare",
+        help="Compare run-local speaker embeddings.",
+    )
+    speaker_profiles_compare.add_argument(
+        "--run-dir",
+        action="append",
+        required=True,
+        help="Run directory containing asr/speaker-profiles.json. Repeat for multiple runs.",
+    )
+    speaker_profiles_compare.add_argument("--output-json")
+    speaker_profiles_compare.add_argument(
+        "--same-threshold",
+        type=float,
+        default=DEFAULT_SAME_THRESHOLD,
+    )
+    speaker_profiles_compare.add_argument(
+        "--possible-threshold",
+        type=float,
+        default=DEFAULT_POSSIBLE_THRESHOLD,
+    )
 
     podcast_index = subparsers.add_parser(
         "podcast-index",
@@ -810,6 +846,23 @@ def main(argv: list[str] | None = None) -> int:
         result = infer_speaker_voices(run_paths, config["llm"], config.get("speaker_voices"))
         print(_format_speaker_voice_result(result))
         return 0
+
+    if args.command == "speaker-profiles":
+        try:
+            if args.speaker_profiles_command == "compare":
+                report = compare_speaker_profiles(
+                    [Path(value) for value in args.run_dir],
+                    same_threshold=args.same_threshold,
+                    possible_threshold=args.possible_threshold,
+                )
+                if args.output_json:
+                    write_json(args.output_json, report)
+                    print(f"speaker similarity report: {args.output_json}")
+                print(format_speaker_similarity_summary(report))
+                return 0
+        except Exception as error:
+            print(str(error), file=sys.stderr)
+            return 1
 
     if args.command == "podcast-index":
         try:
