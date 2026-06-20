@@ -294,6 +294,73 @@ publish:
     assert status["outputs"]["speaker_profiles"] == "asr/speaker-profiles.json"
 
 
+def test_audio_convert_diarize_stage_applies_fixture_voice_profile(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    audio = tmp_path / "sample.mp3"
+    audio.write_bytes(b"fixture audio bytes")
+    asr_fixture = Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-asr.json"
+    diarization_fixture = (
+        Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-diarization.json"
+    )
+    voice_profile_fixture = (
+        Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-voice-profile.json"
+    )
+    local_config = tmp_path / "local-audio.yaml"
+    local_config.write_text(
+        f"""
+asr:
+  provider: fixture
+  fixture_path: "{asr_fixture}"
+diarization:
+  provider: fixture
+  fixture_path: "{diarization_fixture}"
+voice_profile:
+  provider: fixture
+  fixture_path: "{voice_profile_fixture}"
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "audio",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "audio-voice-profile-cli",
+            "--audio-file",
+            str(audio),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "diarize",
+        ],
+        text=True,
+        capture_output=True,
+        env=worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "diarize:" in result.stdout
+    run_dir = workspace / "runs" / "audio-voice-profile-cli"
+    profiles = read_json(run_dir / "asr" / "speaker-profiles.json")
+    status = read_json(run_dir / "run.json")
+    assert profiles["speakers"][0]["embedding_status"] == "fixture"
+    assert profiles["speakers"][0]["sample_count"] == 2
+    assert profiles["speakers"][0]["sample_duration_ms"] == 12000
+    assert profiles["speakers"][0]["embedding_artifact"] == (
+        "asr/voice-profiles/speaker_1.json"
+    )
+    assert status["outputs"]["speaker_profiles"] == "asr/speaker-profiles.json"
+
+
 def test_audio_convert_diarize_stage_supports_local_cli_provider(tmp_path: Path):
     workspace = tmp_path / "workspace"
     audio = tmp_path / "sample.wav"

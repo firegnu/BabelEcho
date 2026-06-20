@@ -101,8 +101,11 @@ def _speaker_profiles(diarization: dict[str, Any]) -> dict[str, Any]:
                 "total_ms": 0,
                 "first_start_ms": None,
                 "last_end_ms": None,
+                "sample_count": 0,
+                "sample_duration_ms": 0,
                 "profile_kind": "diarization_stats",
                 "embedding_status": "not_computed",
+                "embedding_artifact": None,
             }
         profile = speakers[speaker]
         start_ms = int(turn["start_ms"])
@@ -126,8 +129,11 @@ def _speaker_profiles(diarization: dict[str, Any]) -> dict[str, Any]:
                 "total_ms": 0,
                 "first_start_ms": None,
                 "last_end_ms": None,
+                "sample_count": 0,
+                "sample_duration_ms": 0,
                 "profile_kind": "diarization_stats",
                 "embedding_status": "not_computed",
+                "embedding_artifact": None,
             }
 
     profiles = []

@@ -1,0 +1,13 @@
+{
+  "provider": "fixture",
+  "speakers": [
+    {
+      "id": "speaker_1",
+      "sample_count": 2,
+      "sample_duration_ms": 12000,
+      "embedding_status": "fixture",
+      "profile_kind": "voice_profile_fixture",
+      "embedding_artifact": "asr/voice-profiles/speaker_1.json"
+    }
+  ]
+}

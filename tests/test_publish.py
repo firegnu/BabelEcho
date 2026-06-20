@@ -246,6 +246,51 @@ def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
         },
     )
     write_json(
+        run_paths.run_dir / "asr" / "voice-profiles" / "speaker_1.json",
+        {"vector": [0.1]},
+    )
+    write_json(
+        run_paths.run_dir / "asr" / "speaker-profiles.json",
+        {
+            "schema_version": "1.0",
+            "provider": "diarization_stats",
+            "source": "diarization",
+            "diarization_provider": "fixture",
+            "diarization_model": "fixture",
+            "speaker_count": 2,
+            "speakers": [
+                {
+                    "id": "speaker_1",
+                    "label": "speaker_1",
+                    "turn_count": 1,
+                    "total_ms": 4200,
+                    "first_start_ms": 0,
+                    "last_end_ms": 4200,
+                    "avg_turn_ms": 4200.0,
+                    "sample_count": 2,
+                    "sample_duration_ms": 12000,
+                    "profile_kind": "voice_profile_fixture",
+                    "embedding_status": "fixture",
+                    "embedding_artifact": "asr/voice-profiles/speaker_1.json",
+                },
+                {
+                    "id": "speaker_2",
+                    "label": "speaker_2",
+                    "turn_count": 1,
+                    "total_ms": 4900,
+                    "first_start_ms": 4300,
+                    "last_end_ms": 9200,
+                    "avg_turn_ms": 4900.0,
+                    "sample_count": 0,
+                    "sample_duration_ms": 0,
+                    "profile_kind": "diarization_stats",
+                    "embedding_status": "not_computed",
+                    "embedding_artifact": None,
+                },
+            ],
+        },
+    )
+    write_json(
         run_paths.normalized_transcript_json,
         {
             "episode_id": "audio-publish-run",
@@ -305,4 +350,21 @@ def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
             "warnings": [],
             "reasons": [],
         },
+        "speaker_profiles": {
+            "provider": "diarization_stats",
+            "speaker_count": 2,
+            "profile_kind": "voice_profile_fixture",
+            "embedding_status": "fixture",
+        },
     }
+    assert "embedding_artifact" not in artifact["asr"]["speaker_profiles"]
+    assert artifact["artifacts"]["speaker_profiles"] == "speaker-profiles.json"
+    assert not (
+        run_paths.workspace
+        / "published"
+        / "episodes"
+        / "audio-publish-run"
+        / "asr"
+        / "voice-profiles"
+        / "speaker_1.json"
+    ).exists()

@@ -19,6 +19,7 @@ from .status import (
     mark_stage_succeeded,
 )
 from .synthesize import synthesize_segments
+from .voice_profile import apply_voice_profile_config
 
 
 AUDIO_PIPELINE_STAGES = (
@@ -110,15 +111,24 @@ def run_audio_pipeline(
         outputs.append(f"asr: {asr_path}")
 
     if stage_index <= AUDIO_PIPELINE_STAGES.index("diarize") <= stop_index:
+        def diarize_stage() -> str:
+            diarization_path = run_diarization(
+                local_config.get("diarization") or {"provider": "none"},
+                run_paths,
+                config_path=Path(local_config_path),
+            )
+            apply_voice_profile_config(
+                local_config.get("voice_profile"),
+                run_paths,
+                config_path=Path(local_config_path),
+            )
+            return diarization_path
+
         diarization_path = _run_stage(
             status,
             run_paths,
             "diarize",
-            lambda: run_diarization(
-                local_config.get("diarization") or {"provider": "none"},
-                run_paths,
-                config_path=Path(local_config_path),
-            ),
+            diarize_stage,
         )
         outputs.append(f"diarize: {diarization_path}")
 

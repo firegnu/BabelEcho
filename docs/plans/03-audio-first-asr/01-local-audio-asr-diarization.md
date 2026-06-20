@@ -285,8 +285,11 @@ publish:
       "first_start_ms": 0,
       "last_end_ms": 601200,
       "avg_turn_ms": 26708.3,
+      "sample_count": 0,
+      "sample_duration_ms": 0,
       "profile_kind": "diarization_stats",
-      "embedding_status": "not_computed"
+      "embedding_status": "not_computed",
+      "embedding_artifact": null
     }
   ]
 }
@@ -297,6 +300,15 @@ publish:
 - 文件会写在 ignored run 目录 `asr/speaker-profiles.json`。
 - publish 阶段可以把无 embedding 的统计 profile 同步为 `workspace/published/episodes/<run-id>/speaker-profiles.json`，并在 `artifact.json.artifacts.speaker_profiles` 中给出相对路径。
 - 如果以后保存真实 embedding，只能保存 run-local 相对路径；published artifact 只能展示统计摘要和 `embedding_status`，不能发布 embedding 文件。
+- audio-first runtime config 已支持 `voice_profile.provider=none/fixture`。`none` 保留统计 profile；`fixture` 只用于测试和契约验证，可合并 `sample_count`、`sample_duration_ms`、`profile_kind`、`embedding_status` 和 run-local 相对 `embedding_artifact`。真实 embedding provider 后移。
+
+示例 fixture config：
+
+```yaml
+voice_profile:
+  provider: fixture
+  fixture_path: tests/fixtures/asr/two-speaker-voice-profile.json
+```
 
 ### `transcript/normalized.json`
 
@@ -938,7 +950,8 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 5090D 最新 `main` 已跑 `audio-diarization-practicalai-replacements-normalize-20260620`：`small.en` + pyannote 到 `normalize` 仍为 `safe_to_adapt`，ASR 123 段、normalized 32 段、3 条规则命中 4 次；继续 `adapt` 后 DeepSeek 生成 32 段中文脚本，script QA 通过，首段脚本保留 `Daniel Whitenack`。
 - Speaker profile contract 第一版：
   - `diarize` 阶段会从 canonical diarization turns 生成 `asr/speaker-profiles.json`。
-  - 当前 profile 只含 turn 数、总时长、首尾时间和 `embedding_status=not_computed`，不做身份识别，不写 voiceprint embedding。
+  - 当前 profile 含 turn 数、总时长、首尾时间、`sample_count`、`sample_duration_ms`、`profile_kind`、`embedding_status` 和保留的 run-local `embedding_artifact` 字段；默认 `embedding_status=not_computed`，不做身份识别，不写 voiceprint embedding。
+  - 已支持 audio-first-only `voice_profile.provider=none/fixture`。`fixture` 只合并 deterministic 测试元数据，不加载真实模型、不创建 embedding 文件。
   - publish 阶段如果发现该文件，会复制到 episode published 目录，并在 `artifact.json.artifacts.speaker_profiles` 与 `artifact.json.asr.speaker_profiles` 中暴露摘要。
   - 5090D 临时 worktree 已用 Practical AI 8 分钟样本跑到 `diarize`：`speaker_count=2`，speaker ids 为 `speaker_1/speaker_2`，所有 profile `embedding_status=not_computed`，`run.json.outputs.speaker_profiles=asr/speaker-profiles.json`。
   - 5090D 最新 `main` full publish smoke `audio-speaker-profiles-practicalai-publish-20260620` 已通过：ASR 123 段、normalized/script/manifest 均 32 段，quality=`safe_to_adapt`，最终 MP3 为 `22050 Hz` mono、约 `361.48s`；published artifact 中 `speaker-profiles.json` 存在，`artifact.json.artifacts.speaker_profiles="speaker-profiles.json"`，`artifact.json.asr.speaker_profiles.embedding_status="not_computed"`。

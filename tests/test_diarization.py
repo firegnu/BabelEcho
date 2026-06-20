@@ -45,8 +45,11 @@ def test_fixture_diarization_writes_canonical_json(tmp_path: Path):
                 "first_start_ms": 0,
                 "last_end_ms": 4200,
                 "avg_turn_ms": 4200.0,
+                "sample_count": 0,
+                "sample_duration_ms": 0,
                 "profile_kind": "diarization_stats",
                 "embedding_status": "not_computed",
+                "embedding_artifact": None,
             },
             {
                 "id": "speaker_2",
@@ -56,8 +59,11 @@ def test_fixture_diarization_writes_canonical_json(tmp_path: Path):
                 "first_start_ms": 4300,
                 "last_end_ms": 9200,
                 "avg_turn_ms": 4900.0,
+                "sample_count": 0,
+                "sample_duration_ms": 0,
                 "profile_kind": "diarization_stats",
                 "embedding_status": "not_computed",
+                "embedding_artifact": None,
             },
         ],
     }
@@ -97,8 +103,11 @@ def test_disabled_diarization_writes_empty_single_speaker_artifact(tmp_path: Pat
                 "first_start_ms": None,
                 "last_end_ms": None,
                 "avg_turn_ms": None,
+                "sample_count": 0,
+                "sample_duration_ms": 0,
                 "profile_kind": "diarization_stats",
                 "embedding_status": "not_computed",
+                "embedding_artifact": None,
             }
         ],
     }
@@ -143,8 +152,11 @@ def test_fixture_diarization_profiles_preserve_custom_speaker_labels(tmp_path: P
             "first_start_ms": 1000,
             "last_end_ms": 2500,
             "avg_turn_ms": 1500.0,
+            "sample_count": 0,
+            "sample_duration_ms": 0,
             "profile_kind": "diarization_stats",
             "embedding_status": "not_computed",
+            "embedding_artifact": None,
         }
     ]
 

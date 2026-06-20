@@ -340,7 +340,7 @@ workspace/published/episodes/<run-id>/artifact.json
 - 当前实现生成 `segment_count`；speaker 级 `duration_seconds` 暂不生成，前端如遇到该字段可展示，缺失时应忽略。
 - 文章朗读路线不识别 speaker，不生成角色列表，`speakers=[]`。
 - 不暴露声纹 embedding。
-- 不暴露原始 speaker profile 文件。
+- 不暴露 run-local 原始 speaker profile 或 embedding 文件；如果 `artifacts.speaker_profiles` 存在，前端只读取 published 目录下的安全摘要文件。
 - 不暗示真实身份识别。
 
 ## ASR / Diarization Contract
@@ -376,7 +376,8 @@ audio-first 路线以后可以填充 `asr`：
 - 这个字段只做展示和人工判断。
 - 前端不依赖具体 ASR 模型名做分支逻辑。
 - 前端不展示或保存 voiceprint embedding。
-- 如果 `artifacts.speaker_profiles` 存在，它指向无 embedding 的 speaker 统计 profile，例如 turn 数、总时长和首尾时间；前端可用于详情页展示 speaker 分布。
+- 如果 `artifacts.speaker_profiles` 存在，它指向 published episode 目录下的 speaker profile 摘要，例如 turn 数、总时长、首尾时间、`sample_count`、`sample_duration_ms`、`profile_kind` 和 `embedding_status`；前端可用于详情页展示 speaker 分布。
+- `artifact.json.asr.speaker_profiles` 不包含 `embedding_artifact`。即使 published `speaker-profiles.json` 里出现 run-local 相对 `embedding_artifact` 元数据，前端也不能把它当作公开下载、播放或请求目标。
 - `confidence` 第一版可以是粗粒度字符串：`high`、`medium`、`low`、`unknown`。
 
 ## Transcript / Script Contract
