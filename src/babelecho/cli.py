@@ -29,6 +29,13 @@ from .podcast_index_api import (
 )
 from .publish import publish_episode
 from .script import preview_chinese_script
+from .speaker_aliases import (
+    DEFAULT_ALIAS_SAME_THRESHOLD,
+    DEFAULT_MIN_ALIAS_MEMBERS,
+    DEFAULT_MIN_SAMPLE_DURATION_MS,
+    build_speaker_aliases,
+    format_speaker_alias_summary,
+)
 from .speaker_similarity import (
     DEFAULT_POSSIBLE_THRESHOLD,
     DEFAULT_SAME_THRESHOLD,
@@ -142,6 +149,27 @@ def build_parser() -> argparse.ArgumentParser:
         "--possible-threshold",
         type=float,
         default=DEFAULT_POSSIBLE_THRESHOLD,
+    )
+    speaker_profiles_alias = speaker_profiles_subparsers.add_parser(
+        "alias",
+        help="Build private speaker alias candidates from a similarity report.",
+    )
+    speaker_profiles_alias.add_argument("--similarity-report", required=True)
+    speaker_profiles_alias.add_argument("--output-json", required=True)
+    speaker_profiles_alias.add_argument(
+        "--same-threshold",
+        type=float,
+        default=DEFAULT_ALIAS_SAME_THRESHOLD,
+    )
+    speaker_profiles_alias.add_argument(
+        "--min-sample-duration-ms",
+        type=int,
+        default=DEFAULT_MIN_SAMPLE_DURATION_MS,
+    )
+    speaker_profiles_alias.add_argument(
+        "--min-members",
+        type=int,
+        default=DEFAULT_MIN_ALIAS_MEMBERS,
     )
 
     podcast_index = subparsers.add_parser(
@@ -859,6 +887,17 @@ def main(argv: list[str] | None = None) -> int:
                     write_json(args.output_json, report)
                     print(f"speaker similarity report: {args.output_json}")
                 print(format_speaker_similarity_summary(report))
+                return 0
+            if args.speaker_profiles_command == "alias":
+                alias_map = build_speaker_aliases(
+                    read_json(args.similarity_report),
+                    same_threshold=args.same_threshold,
+                    min_sample_duration_ms=args.min_sample_duration_ms,
+                    min_members=args.min_members,
+                )
+                write_json(args.output_json, alias_map)
+                print(f"speaker aliases: {args.output_json}")
+                print(format_speaker_alias_summary(alias_map))
                 return 0
         except Exception as error:
             print(str(error), file=sys.stderr)
