@@ -117,8 +117,9 @@
 - When enabled, BabelEcho reads the private voice-role map, writes the current run's `script/speaker-voices.json`, and then lets the existing TTS role loader consume that file.
 - Existing `speaker-voices.json` is reused by default; `speaker_voices.overwrite: true` is required to replace it.
 - Default behavior is unchanged: no config means no alias map is read and no cross-episode map affects TTS.
-- Local verification passed for transcript-first and audio-first fixture synthesize paths. Full verification should be run before merge.
-- Remaining work: run a 5090D smoke using the config flag with the existing Practical AI simulated confirmed map.
+- Local verification passed for transcript-first and audio-first fixture synthesize paths, speaker-focused tests, and full `pytest -q`.
+- 5090D focused verification passed: `tests/test_speaker_voices.py`, the transcript-first and audio-first config switch synthesize tests, `tests/test_synthesize.py`, `tests/test_speaker_aliases.py`, `tests/test_speaker_similarity.py`, and `tests/test_voice_profile.py`.
+- 5090D config-switch smoke passed using `speaker_voices.mode=apply_voice_role_map` and the existing Practical AI simulated confirmed map. It applied `speaker_alias_001 -> female_a` to `audio-voice-profile-real-practicalai-ai-index-8min-20260620`, wrote `speaker_2 -> female_a`, contained no `embedding_artifact` or `voice-profiles` strings, and a second run without `overwrite` returned `reused`.
 
 ---
 
