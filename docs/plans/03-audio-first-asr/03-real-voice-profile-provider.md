@@ -2,13 +2,26 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**状态:** `ready`
+**状态:** `in_progress`
 
 **Goal:** Add a real Route B speaker embedding provider contract without starting voice clone or exposing private embeddings.
 
 **Architecture:** Keep all real voice profile work behind audio-first `voice_profile.provider=local_cli`. BabelEcho core calls a wrapper, validates canonical JSON, and merges safe metadata into `asr/speaker-profiles.json`; model loading, GPU dependencies, and embedding extraction stay outside the package in ignored 5090D runtime environments. Published artifacts remain summary-only and must not copy embedding files or vectors.
 
 **Tech Stack:** Python 3.12, pytest, YAML runtime config, existing `babelecho audio convert` pipeline, local CLI wrappers under `tools/`, 5090D ignored conda environments.
+
+---
+
+## Progress
+
+### 2026-06-20：local_cli contract implemented locally
+
+- Added audio-first-only `voice_profile.provider=local_cli`.
+- BabelEcho core now invokes a local wrapper with audio, diarization, speaker profile input paths, output dir, output summary path, optional model/device/sample settings, and `extra_args`.
+- Wrapper `summary.json` is validated and merged into `asr/speaker-profiles.json`; `embedding_status=computed` is now allowed.
+- Added `tools/speaker_embedding_wrapper.py` as a contract stub only. It documents the stable CLI shape but intentionally does not load a model.
+- Publish remains summary-only: `artifact.json.asr.speaker_profiles` does not expose `embedding_artifact`, and `asr/voice-profiles/*.json` is not copied to `workspace/published/`.
+- Remaining work: run the 5090D model probe in an ignored `babelecho-voice-profile` environment and select a real backend before replacing the stub with a model-specific wrapper.
 
 ---
 

@@ -269,8 +269,8 @@ def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
                     "avg_turn_ms": 4200.0,
                     "sample_count": 2,
                     "sample_duration_ms": 12000,
-                    "profile_kind": "voice_profile_fixture",
-                    "embedding_status": "fixture",
+                    "profile_kind": "speaker_embedding",
+                    "embedding_status": "computed",
                     "embedding_artifact": "asr/voice-profiles/speaker_1.json",
                 },
                 {
@@ -353,8 +353,8 @@ def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
         "speaker_profiles": {
             "provider": "diarization_stats",
             "speaker_count": 2,
-            "profile_kind": "voice_profile_fixture",
-            "embedding_status": "fixture",
+            "profile_kind": "speaker_embedding",
+            "embedding_status": "computed",
         },
     }
     assert "embedding_artifact" not in artifact["asr"]["speaker_profiles"]

@@ -1,11 +1,13 @@
 from pathlib import Path
+import shlex
+import subprocess
 from typing import Any
 
 from .jsonio import read_json, write_json
 from .paths import RunPaths
 
 
-ALLOWED_EMBEDDING_STATUS = {"not_computed", "fixture", "unavailable"}
+ALLOWED_EMBEDDING_STATUS = {"not_computed", "fixture", "unavailable", "computed"}
 
 
 def _require_mapping(value: Any, context: str) -> dict[str, Any]:
@@ -19,6 +21,35 @@ def _resolve_fixture_path(fixture_path: str, config_path: Path) -> Path:
     if source.is_absolute():
         return source
     return config_path.parent / source
+
+
+def _command_parts(command: Any) -> list[str]:
+    if isinstance(command, str):
+        parts = shlex.split(command)
+    elif isinstance(command, list) and all(isinstance(item, str) for item in command):
+        parts = list(command)
+    else:
+        raise ValueError("voice_profile.command must be a string or list of strings")
+    if not parts:
+        raise ValueError("voice_profile.command must not be empty")
+    return parts
+
+
+def _extra_args(config: dict[str, Any]) -> list[str]:
+    extra_args = config.get("extra_args") or []
+    if not isinstance(extra_args, list) or not all(
+        isinstance(item, str) for item in extra_args
+    ):
+        raise ValueError("voice_profile.extra_args must be a list of strings")
+    return extra_args
+
+
+def _optional_string(config: dict[str, Any], key: str) -> str | None:
+    value = config.get(key)
+    if value is None:
+        return None
+    value = str(value)
+    return value if value else None
 
 
 def _load_fixture_config(
@@ -36,6 +67,25 @@ def _load_fixture_config(
     if not isinstance(speakers, list):
         raise ValueError("voice profile fixture speakers must be a list")
     return fixture
+
+
+def _load_summary_config(path: Path) -> dict[str, Any]:
+    summary = _require_mapping(read_json(path), "voice profile summary")
+    speakers = summary.get("speakers")
+    if not isinstance(speakers, list):
+        raise ValueError("voice profile summary speakers must be a list")
+    return summary
+
+
+def _resolve_audio_input(run_paths: RunPaths) -> Path:
+    source = _require_mapping(read_json(run_paths.source_json), "audio source")
+    audio_input = source.get("audio_input")
+    if not isinstance(audio_input, str) or not audio_input.strip():
+        raise ValueError("source.audio_input is required before voice profile extraction")
+    audio_path = run_paths.run_dir / audio_input
+    if not audio_path.exists():
+        raise ValueError(f"Voice profile audio input does not exist: {audio_path}")
+    return audio_path
 
 
 def _validate_embedding_artifact(value: Any, run_paths: RunPaths) -> str | None:
@@ -119,6 +169,82 @@ def _merge_fixture_profiles(
     return profiles
 
 
+def _run_local_cli_command(command: list[str]) -> None:
+    try:
+        subprocess.run(command, check=True, text=True, capture_output=True)
+    except FileNotFoundError as error:
+        raise ValueError(f"Voice profile local_cli command not found: {command[0]}") from error
+    except subprocess.CalledProcessError as error:
+        stderr = (error.stderr or "").strip()
+        stdout = (error.stdout or "").strip()
+        detail = stderr or stdout or "no output"
+        raise RuntimeError(
+            "Voice profile local_cli command failed with exit code "
+            f"{error.returncode}: {detail}"
+        ) from error
+
+
+def run_local_cli_voice_profile(
+    voice_profile_config: dict[str, Any],
+    run_paths: RunPaths,
+    *,
+    config_path: Path,
+) -> Path:
+    del config_path
+    command_value = voice_profile_config.get("command")
+    if not command_value:
+        raise ValueError("voice_profile.command is required for local_cli voice profile")
+    command = _command_parts(command_value)
+    extra_args = _extra_args(voice_profile_config)
+    audio_path = _resolve_audio_input(run_paths)
+    diarization_path = run_paths.run_dir / "asr" / "diarization.json"
+    profiles_path = run_paths.run_dir / "asr" / "speaker-profiles.json"
+    if not diarization_path.exists():
+        raise ValueError("asr/diarization.json is required before voice profile extraction")
+    if not profiles_path.exists():
+        raise ValueError("asr/speaker-profiles.json is required before voice profile extraction")
+
+    output_dir = run_paths.run_dir / "asr" / "voice-profiles"
+    summary_path = output_dir / "summary.json"
+    command.extend(
+        [
+            "--audio-file",
+            str(audio_path),
+            "--diarization-json",
+            str(diarization_path),
+            "--speaker-profiles-json",
+            str(profiles_path),
+            "--output-dir",
+            str(output_dir),
+            "--output-json",
+            str(summary_path),
+        ]
+    )
+    for key, argument in [
+        ("model", "--model"),
+        ("device", "--device"),
+        ("min_sample_ms", "--min-sample-ms"),
+        ("max_samples_per_speaker", "--max-samples-per-speaker"),
+    ]:
+        value = _optional_string(voice_profile_config, key)
+        if value:
+            command.extend([argument, value])
+    command.extend(extra_args)
+
+    _run_local_cli_command(command)
+    if not summary_path.exists():
+        raise ValueError(f"Voice profile local_cli command did not write output: {summary_path}")
+
+    profiles = _require_mapping(read_json(profiles_path), "speaker profiles")
+    merged = _merge_fixture_profiles(
+        profiles,
+        _load_summary_config(summary_path),
+        run_paths,
+    )
+    write_json(profiles_path, merged)
+    return profiles_path
+
+
 def apply_voice_profile_config(
     voice_profile_config: dict[str, Any] | None,
     run_paths: RunPaths,
@@ -134,8 +260,10 @@ def apply_voice_profile_config(
     provider = config.get("provider") or "none"
     if provider == "none":
         return profiles_path
+    if provider == "local_cli":
+        return run_local_cli_voice_profile(config, run_paths, config_path=config_path)
     if provider != "fixture":
-        raise ValueError("voice_profile.provider must be none or fixture")
+        raise ValueError("voice_profile.provider must be none, fixture, or local_cli")
 
     fixture = _load_fixture_config(config, config_path)
     profiles = _require_mapping(read_json(profiles_path), "speaker profiles")

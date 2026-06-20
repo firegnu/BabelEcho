@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import pytest
@@ -116,6 +117,109 @@ def test_voice_profile_rejects_unknown_provider(tmp_path: Path):
         )
 
 
+def test_local_cli_voice_profile_requires_command(tmp_path: Path):
+    run_paths = create_run(tmp_path / "workspace", "voice-profile-local-cli-no-command")
+    _write_profiles(run_paths)
+
+    with pytest.raises(ValueError, match="voice_profile.command is required"):
+        apply_voice_profile_config(
+            {"provider": "local_cli"},
+            run_paths,
+            config_path=tmp_path / "local-audio.yaml",
+        )
+
+
+def test_voice_profile_rejects_invalid_extra_args(tmp_path: Path):
+    run_paths = create_run(tmp_path / "workspace", "voice-profile-extra-args")
+    _write_profiles(run_paths)
+
+    with pytest.raises(
+        ValueError,
+        match="voice_profile.extra_args must be a list of strings",
+    ):
+        apply_voice_profile_config(
+            {
+                "provider": "local_cli",
+                "command": "python tools/speaker_embedding_wrapper.py",
+                "extra_args": ["--ok", 1],
+            },
+            run_paths,
+            config_path=tmp_path / "local-audio.yaml",
+        )
+
+
+def test_local_cli_voice_profile_merges_wrapper_summary(tmp_path: Path):
+    wrapper = tmp_path / "fake_voice_profile_wrapper.py"
+    wrapper.write_text(
+        """
+import argparse
+import json
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--audio-file", required=True)
+parser.add_argument("--diarization-json", required=True)
+parser.add_argument("--speaker-profiles-json", required=True)
+parser.add_argument("--output-dir", required=True)
+parser.add_argument("--output-json", required=True)
+parser.add_argument("--model")
+parser.add_argument("--device")
+parser.add_argument("--min-sample-ms")
+parser.add_argument("--max-samples-per-speaker")
+args = parser.parse_args()
+
+output_dir = Path(args.output_dir)
+output_dir.mkdir(parents=True, exist_ok=True)
+(output_dir / "speaker_1.json").write_text(
+    json.dumps({"speaker_id": "speaker_1", "embedding": [0.1, 0.2]}),
+    encoding="utf-8",
+)
+Path(args.output_json).write_text(json.dumps({
+    "provider": "fake_embedding",
+    "model": args.model,
+    "speakers": [
+        {
+            "id": "speaker_1",
+            "sample_count": 1,
+            "sample_duration_ms": 4200,
+            "profile_kind": "speaker_embedding",
+            "embedding_status": "computed",
+            "embedding_artifact": "asr/voice-profiles/speaker_1.json"
+        }
+    ]
+}), encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    run_paths = create_run(tmp_path / "workspace", "voice-profile-local-cli")
+    _write_profiles(run_paths)
+    audio_dir = run_paths.run_dir / "audio"
+    audio_dir.mkdir(parents=True)
+    (audio_dir / "input.wav").write_bytes(b"fake audio")
+    write_json(run_paths.source_json, {"audio_input": "audio/input.wav"})
+    write_json(run_paths.run_dir / "asr" / "diarization.json", {"segments": []})
+
+    apply_voice_profile_config(
+        {
+            "provider": "local_cli",
+            "command": f"{sys.executable} {wrapper}",
+            "model": "fake-model",
+            "device": "cpu",
+            "min_sample_ms": 1500,
+            "max_samples_per_speaker": 5,
+        },
+        run_paths,
+        config_path=tmp_path / "local-audio.yaml",
+    )
+
+    profiles = read_json(run_paths.run_dir / "asr" / "speaker-profiles.json")
+    assert profiles["speakers"][0]["embedding_status"] == "computed"
+    assert profiles["speakers"][0]["embedding_artifact"] == (
+        "asr/voice-profiles/speaker_1.json"
+    )
+    assert (run_paths.run_dir / "asr" / "voice-profiles" / "speaker_1.json").exists()
+
+
 def test_voice_profile_rejects_non_mapping_config(tmp_path: Path):
     run_paths = create_run(tmp_path / "workspace", "voice-profile-non-mapping")
     _write_profiles(run_paths)
@@ -165,6 +269,37 @@ def test_fixture_voice_profile_allows_not_computed_status(tmp_path: Path):
 
     profiles = read_json(run_paths.run_dir / "asr" / "speaker-profiles.json")
     assert profiles["speakers"][0]["embedding_status"] == "not_computed"
+
+
+def test_fixture_voice_profile_allows_computed_status(tmp_path: Path):
+    run_paths = create_run(tmp_path / "workspace", "voice-profile-computed")
+    _write_profiles(run_paths)
+    fixture = tmp_path / "voice-profile-fixture.json"
+    write_json(
+        fixture,
+        {
+            "provider": "fixture",
+            "speakers": [
+                {
+                    "id": "speaker_1",
+                    "sample_count": 1,
+                    "sample_duration_ms": 4200,
+                    "embedding_status": "computed",
+                    "profile_kind": "speaker_embedding",
+                    "embedding_artifact": "asr/voice-profiles/speaker_1.json",
+                }
+            ],
+        },
+    )
+
+    apply_voice_profile_config(
+        {"provider": "fixture", "fixture_path": str(fixture)},
+        run_paths,
+        config_path=tmp_path / "local-audio.yaml",
+    )
+
+    profiles = read_json(run_paths.run_dir / "asr" / "speaker-profiles.json")
+    assert profiles["speakers"][0]["embedding_status"] == "computed"
 
 
 def test_fixture_voice_profile_rejects_unknown_speaker(tmp_path: Path):

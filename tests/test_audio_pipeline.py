@@ -361,6 +361,116 @@ publish:
     assert status["outputs"]["speaker_profiles"] == "asr/speaker-profiles.json"
 
 
+def test_audio_convert_diarize_stage_applies_local_cli_voice_profile(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    audio = tmp_path / "sample.mp3"
+    audio.write_bytes(b"fixture audio bytes")
+    asr_fixture = Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-asr.json"
+    diarization_fixture = (
+        Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-diarization.json"
+    )
+    wrapper = tmp_path / "fake_voice_profile_wrapper.py"
+    wrapper.write_text(
+        """
+import argparse
+import json
+from pathlib import Path
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--audio-file", required=True)
+parser.add_argument("--diarization-json", required=True)
+parser.add_argument("--speaker-profiles-json", required=True)
+parser.add_argument("--output-dir", required=True)
+parser.add_argument("--output-json", required=True)
+parser.add_argument("--model")
+parser.add_argument("--device")
+parser.add_argument("--min-sample-ms")
+parser.add_argument("--max-samples-per-speaker")
+args = parser.parse_args()
+
+output_dir = Path(args.output_dir)
+output_dir.mkdir(parents=True, exist_ok=True)
+(output_dir / "speaker_1.json").write_text(
+    json.dumps({"speaker_id": "speaker_1", "embedding": [0.1, 0.2]}),
+    encoding="utf-8",
+)
+Path(args.output_json).write_text(json.dumps({
+    "provider": "fake_embedding",
+    "model": args.model,
+    "speakers": [
+        {
+            "id": "speaker_1",
+            "sample_count": 1,
+            "sample_duration_ms": 4200,
+            "profile_kind": "speaker_embedding",
+            "embedding_status": "computed",
+            "embedding_artifact": "asr/voice-profiles/speaker_1.json"
+        }
+    ]
+}), encoding="utf-8")
+""",
+        encoding="utf-8",
+    )
+    local_config = tmp_path / "local-audio.yaml"
+    local_config.write_text(
+        f"""
+asr:
+  provider: fixture
+  fixture_path: "{asr_fixture}"
+diarization:
+  provider: fixture
+  fixture_path: "{diarization_fixture}"
+voice_profile:
+  provider: local_cli
+  command: "{sys.executable} {wrapper}"
+  model: fake-model
+  device: cpu
+  min_sample_ms: 1500
+  max_samples_per_speaker: 5
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "audio",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "audio-local-cli-voice-profile",
+            "--audio-file",
+            str(audio),
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "diarize",
+        ],
+        text=True,
+        capture_output=True,
+        env=worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "diarize:" in result.stdout
+    run_dir = workspace / "runs" / "audio-local-cli-voice-profile"
+    profiles = read_json(run_dir / "asr" / "speaker-profiles.json")
+    status = read_json(run_dir / "run.json")
+    assert profiles["speakers"][0]["profile_kind"] == "speaker_embedding"
+    assert profiles["speakers"][0]["embedding_status"] == "computed"
+    assert profiles["speakers"][0]["embedding_artifact"] == (
+        "asr/voice-profiles/speaker_1.json"
+    )
+    assert (run_dir / "asr" / "voice-profiles" / "speaker_1.json").exists()
+    assert status["outputs"]["speaker_profiles"] == "asr/speaker-profiles.json"
+
+
 def test_audio_convert_diarize_stage_supports_local_cli_provider(tmp_path: Path):
     workspace = tmp_path / "workspace"
     audio = tmp_path / "sample.wav"

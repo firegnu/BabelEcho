@@ -377,6 +377,7 @@ audio-first 路线以后可以填充 `asr`：
 - 前端不依赖具体 ASR 模型名做分支逻辑。
 - 前端不展示或保存 voiceprint embedding。
 - 如果 `artifacts.speaker_profiles` 存在，它指向 published episode 目录下的 speaker profile 摘要，例如 turn 数、总时长、首尾时间、`sample_count`、`sample_duration_ms`、`profile_kind` 和 `embedding_status`；前端可用于详情页展示 speaker 分布。
+- `embedding_status` 可能是 `not_computed`、`fixture`、`unavailable` 或 `computed`。`computed` 只表示后端 run-local 已生成 embedding artifact，不表示前端可以读取向量或发起 voice clone。
 - `artifact.json.asr.speaker_profiles` 不包含 `embedding_artifact`。即使 published `speaker-profiles.json` 里出现 run-local 相对 `embedding_artifact` 元数据，前端也不能把它当作公开下载、播放或请求目标。
 - `confidence` 第一版可以是粗粒度字符串：`high`、`medium`、`low`、`unknown`。
 

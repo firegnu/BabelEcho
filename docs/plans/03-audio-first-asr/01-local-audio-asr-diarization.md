@@ -955,7 +955,18 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - publish 阶段如果发现该文件，会复制到 episode published 目录，并在 `artifact.json.artifacts.speaker_profiles` 与 `artifact.json.asr.speaker_profiles` 中暴露摘要。
   - 5090D 临时 worktree 已用 Practical AI 8 分钟样本跑到 `diarize`：`speaker_count=2`，speaker ids 为 `speaker_1/speaker_2`，所有 profile `embedding_status=not_computed`，`run.json.outputs.speaker_profiles=asr/speaker-profiles.json`。
   - 5090D 最新 `main` full publish smoke `audio-speaker-profiles-practicalai-publish-20260620` 已通过：ASR 123 段、normalized/script/manifest 均 32 段，quality=`safe_to_adapt`，最终 MP3 为 `22050 Hz` mono、约 `361.48s`；published artifact 中 `speaker-profiles.json` 存在，`artifact.json.artifacts.speaker_profiles="speaker-profiles.json"`，`artifact.json.asr.speaker_profiles.embedding_status="not_computed"`。
+- Voice profile local_cli contract 起步：
+  - 已支持 audio-first-only `voice_profile.provider=local_cli`，核心只调用本地 wrapper，不直接依赖 pyannote embedding、SpeechBrain、NeMo 等重模型包。
+  - wrapper 输入为 run-local audio、`asr/diarization.json`、`asr/speaker-profiles.json`，输出为 ignored run-local `asr/voice-profiles/summary.json` 和可选 `asr/voice-profiles/*.json`。
+  - `summary.json` 只把 safe metadata 合并回 `asr/speaker-profiles.json`：`sample_count`、`sample_duration_ms`、`profile_kind`、`embedding_status`、`embedding_artifact`；`embedding_status=computed` 已进入合法状态。
+  - 新增 `tools/speaker_embedding_wrapper.py`，目前只是契约 stub，用于固定 CLI shape；真实模型 wrapper 需等 5090D 独立 `babelecho-voice-profile` 环境完成 model probe 后再落地。
+  - publish 仍只暴露摘要：`artifact.json.asr.speaker_profiles` 不包含 `embedding_artifact`，也不会把 `asr/voice-profiles/*.json` 复制到 `workspace/published/`。
+  - 这一步仍不是 voice clone，不做原主播声音复刻、不做真实身份识别，也不把 embedding 用于 TTS。
 - 本机验证通过：
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_voice_profile.py -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_applies_local_cli_voice_profile -q`
+  - `.conda/babelecho-dev/bin/python -m pytest tests/test_publish.py::test_publish_episode_adds_audio_first_asr_summary -q`
+  - `.conda/babelecho-dev/bin/python tools/speaker_embedding_wrapper.py --help`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_asr.py tests/test_audio_pipeline.py tests/test_audio_normalize.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_diarization.py tests/test_audio_pipeline.py tests/test_publish.py -q`
