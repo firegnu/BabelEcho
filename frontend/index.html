@@ -22,6 +22,21 @@
   <!-- real audio element, controlled by the player UI -->
   <audio id="player" preload="metadata"></audio>
 
+  <!-- persistent mini player: shown on the library view while audio is loaded -->
+  <div class="mini" id="mini" hidden>
+    <div class="mini-inner">
+      <button class="mini-play" id="mini-play" aria-label="播放/暂停"></button>
+      <div class="mini-mid">
+        <div class="mini-title" id="mini-title" role="link" tabindex="0"></div>
+        <div class="mini-sub">
+          <span class="mini-time" id="mini-time">0:00</span>
+          <div class="mini-bar" id="mini-bar"><span></span></div>
+        </div>
+      </div>
+      <button class="mini-close" id="mini-close" aria-label="停止并关闭">✕</button>
+    </div>
+  </div>
+
   <script defer src="./js/format.js"></script>
   <script defer src="./js/data.js"></script>
   <script defer src="./js/app.js"></script>

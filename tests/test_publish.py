@@ -390,3 +390,94 @@ def test_publish_episode_adds_audio_first_asr_summary(
         / "voice-profiles"
         / "speaker_1.json"
     ).exists()
+
+
+def test_publish_merges_segment_timings_into_zh_transcript(tmp_path: Path):
+    run_paths = create_run(tmp_path, "timing-publish-run")
+    run_paths.output_audio.write_bytes(b"fake mp3")
+    write_json(
+        run_paths.source_json,
+        {"run_id": "timing-publish-run", "source_type": "podcast_rss", "title": "T"},
+    )
+    write_json(
+        run_paths.normalized_transcript_json,
+        {"episode_id": "timing-publish-run", "segments": [{"id": "1", "text": "Hello."}]},
+    )
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "timing-publish-run",
+            "segments": [{"id": "1", "speaker": None, "text": "你好。"}],
+        },
+    )
+    write_json(
+        run_paths.transcript_quality_json,
+        {"recommendation": "safe_to_adapt", "metrics": {}, "warnings": [], "reasons": []},
+    )
+    write_json(
+        run_paths.segments_dir / "manifest.json",
+        {
+            "episode_id": "timing-publish-run",
+            "segments": [
+                {
+                    "id": "1",
+                    "audio_path": "segments/1.wav",
+                    "text": "你好。",
+                    "start_ms": 0,
+                    "end_ms": 640,
+                    "duration_ms": 640,
+                }
+            ],
+        },
+    )
+
+    publish_episode(run_paths, {"base_url": "https://example.com/babelecho"})
+
+    zh = read_json(
+        run_paths.workspace
+        / "published"
+        / "episodes"
+        / "timing-publish-run"
+        / "transcript.zh.json"
+    )
+    assert zh["segments"][0]["start_ms"] == 0
+    assert zh["segments"][0]["end_ms"] == 640
+    assert zh["segments"][0]["duration_ms"] == 640
+    script = read_json(run_paths.chinese_script_json)
+    assert "start_ms" not in script["segments"][0]
+
+
+def test_publish_zh_transcript_has_no_timings_without_manifest(tmp_path: Path):
+    run_paths = create_run(tmp_path, "no-manifest-run")
+    run_paths.output_audio.write_bytes(b"fake mp3")
+    write_json(
+        run_paths.source_json,
+        {"run_id": "no-manifest-run", "source_type": "podcast_rss", "title": "T"},
+    )
+    write_json(
+        run_paths.normalized_transcript_json,
+        {"episode_id": "no-manifest-run", "segments": [{"id": "1", "text": "Hello."}]},
+    )
+    write_json(
+        run_paths.chinese_script_json,
+        {
+            "episode_id": "no-manifest-run",
+            "segments": [{"id": "1", "speaker": None, "text": "你好。"}],
+        },
+    )
+    write_json(
+        run_paths.transcript_quality_json,
+        {"recommendation": "safe_to_adapt", "metrics": {}, "warnings": [], "reasons": []},
+    )
+
+    publish_episode(run_paths, {"base_url": "https://example.com/babelecho"})
+
+    zh = read_json(
+        run_paths.workspace
+        / "published"
+        / "episodes"
+        / "no-manifest-run"
+        / "transcript.zh.json"
+    )
+    assert zh["segments"][0]["text"] == "你好。"
+    assert "start_ms" not in zh["segments"][0]

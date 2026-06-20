@@ -11,6 +11,10 @@
   const filters = { route: 'all', source: 'all', quality: 'all', speaker: 'all' };
   let curTab = 'script';
   let curEp = null;            // currently rendered detail episode
+  let playingEp = null;        // episode loaded in <audio>, persists across views
+  let followSegs = [];          // [{el, start, end}] for the current tab panel
+  let followIdx = -1;           // index of currently highlighted segment
+  let suppressFollowUntil = 0;  // pause auto-scroll until this ms timestamp (manual scroll)
 
   const uniq = (base, extra) => {
     const out = base.slice();
@@ -19,26 +23,37 @@
   };
   const posKey = (id) => 'be:pos:' + id;
   const loadPos = (id) => { try { return parseFloat(localStorage.getItem(posKey(id))) || 0; } catch (e) { return 0; } };
-  const savePos = (id, p) => { try { localStorage.setItem(posKey(id), String(p)); } catch (e) {} };
+  const savePos = (id, p) => { try { localStorage.setItem(posKey(id), String(p)); if (p > 0) localStorage.setItem('be:last', id); } catch (e) {} };
+  const lastPlayedId = () => { try { return localStorage.getItem('be:last'); } catch (e) { return null; } };
+  // visible only mid-listen: started past the intro, not yet at the end
+  const midListen = (id, dur) => { const p = loadPos(id); return p >= 5 && (!dur || p < dur - 5) ? p : 0; };
+  const loadRate = () => { try { return parseFloat(localStorage.getItem('be:rate')) || 1; } catch (e) { return 1; } };
+  const saveRate = (r) => { try { localStorage.setItem('be:rate', String(r)); } catch (e) {} };
+  const fmtRate = (r) => r.toFixed(2).replace(/0$/, '') + '×';
 
   // ---------------- routing ----------------
   function parseHash() {
     const h = location.hash.replace(/^#\/?/, '');
-    if (h.indexOf('ep/') === 0) return { view: 'detail', id: decodeURIComponent(h.slice(3)) };
+    if (h.indexOf('ep/') === 0) {
+      const [path, query] = h.slice(3).split('?');
+      const m = query && query.match(/(?:^|&)t=(\d+)/);
+      return { view: 'detail', id: decodeURIComponent(path), t: m ? Number(m[1]) : null };
+    }
     return { view: 'library' };
   }
   async function route() {
-    stopAudio();
     const r = parseHash();
-    if (r.view === 'detail') await renderDetail(r.id);
+    if (r.view === 'detail') await renderDetail(r.id, r.t);
     else await renderLibrary();
+    updateMini();
   }
-  function stopAudio() { try { audio.pause(); } catch (e) {} audio.removeAttribute('src'); audio.load(); curEp = null; }
+  function stopAudio() { try { audio.pause(); } catch (e) {} audio.removeAttribute('src'); audio.load(); playingEp = null; updateMini(); }
 
   async function ensureIndex() { if (!INDEX) INDEX = await BE.loadIndex(); return INDEX; }
 
   // ---------------- Library ----------------
   async function renderLibrary() {
+    curEp = null;
     app.innerHTML = '<div class="loading">读取 index.json…</div>';
     try { await ensureIndex(); } catch (e) {
       app.innerHTML = `<div class="errbox">无法读取 index.json：${esc(e.message)}<br>请确认已从仓库根目录启动静态服务，且 workspace/published/ 可访问。</div>`;
@@ -87,14 +102,30 @@
     const routeKinds = new Set(eps.map((e) => e.route)).size;
     const allSafe = eps.length > 0 && eps.every((e) => qrec(e) === 'safe_to_adapt');
 
+    const lastId = lastPlayedId();
+    const lastEp = lastId ? eps.find((e) => e.run_id === lastId) : null;
+    const lastPos = lastEp ? midListen(lastEp.run_id, lastEp.duration_seconds) : 0;
+    const resumeHtml = (lastEp && lastPos)
+      ? `<a class="resume-card" href="#/ep/${encodeURIComponent(lastEp.run_id)}">
+          <div class="resume-ic">▶</div>
+          <div class="resume-mid"><div class="resume-k">继续上次在听</div><div class="resume-title">${esc(lastEp.title)}</div></div>
+          <div class="resume-pos">${BE.fmt(lastPos)}</div>
+        </a>`
+      : '';
+
     const rowsHtml = shown.map((e) => {
       const rc = e.route === 'article_reading' ? 'var(--accent-2)' : 'var(--accent)';
       const q = BE.quality(qrec(e));
       const none = (e.speaker_count || 0) === 0;
+      const pos = midListen(e.run_id, e.duration_seconds);
+      const prog = pos && e.duration_seconds
+        ? `<div class="row-prog" title="已听 ${Math.round((pos / e.duration_seconds) * 100)}% · ${BE.fmt(pos)}"><span style="width:${Math.min(100, (pos / e.duration_seconds) * 100).toFixed(0)}%"></span></div>`
+        : '';
       return `<a class="row grid-cols" data-rid="${esc(e.run_id)}" style="--route:${rc}" href="#/ep/${encodeURIComponent(e.run_id)}">
         <div style="min-width:0">
           <div class="row-title">${esc(e.title)}</div>
           <div class="row-host">${esc(e.run_id)}</div>
+          ${prog}
         </div>
         <div class="badges"><span class="badge-route">${esc(e.route)}</span><span class="badge-source">${esc(e.source_type)}</span></div>
         <div class="row-dur">${BE.fmtDur(e.duration_seconds)}</div>
@@ -118,6 +149,7 @@
         <span class="chip"><span class="k">route</span><span class="v">${routeKinds}</span></span>
         ${allSafe ? '<span class="chip"><span class="dot"></span>全部 safe_to_adapt</span>' : ''}
       </div>
+      ${resumeHtml}
       <div class="grid-cols cols"><div>标题 / 来源</div><div>route · source</div><div>时长</div><div>角色</div><div>质量 · 发布</div></div>
       ${shown.length ? rowsHtml : emptyHtml}
     </section>`;
@@ -148,7 +180,7 @@
   }
 
   // ---------------- Detail ----------------
-  async function renderDetail(id) {
+  async function renderDetail(id, seekTo) {
     app.innerHTML = '<div class="loading">读取 artifact.json…</div>';
     let item;
     try { await ensureIndex(); item = INDEX.episodes.find((e) => e.run_id === id); } catch (e) {
@@ -187,7 +219,8 @@
       </div>
     </div></div>`;
 
-    wirePlayer(ep);
+    wirePlayer(ep, seekTo);
+    collectFollowSegs();
     window.scrollTo(0, 0);
   }
 
@@ -205,7 +238,7 @@
         <div class="seg-btns">
           <button class="seg-btn" data-skip="-15">−15s</button>
           <button class="seg-btn" data-skip="15">+15s</button>
-          <button class="seg-btn" id="rate">1.0×</button>
+          <button class="seg-btn" id="rate">${fmtRate(loadRate())}</button>
         </div>
         <div class="spacer"></div>
         <a class="dl-btn" href="${esc(ep.audioUrl)}" download><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v12M7 11l5 5 5-5M5 21h14"/></svg>下载 MP3</a>
@@ -228,20 +261,24 @@
   function scriptHtml(ep, isArt) {
     const segCount = metricVal(ep, 'segment_count') ?? ep.zh.length;
     if (isArt) {
-      const body = ep.zh.map((s) => BE.isHeading(s.text)
-        ? `<h3 class="reading-h">${esc(s.text)}</h3>`
-        : `<p class="reading-p">${esc(s.text)}</p>`).join('');
+      const body = ep.zh.map((s) => {
+        const ts = s.start_ms != null ? ` data-start="${s.start_ms}" data-end="${s.end_ms}"` : '';
+        return BE.isHeading(s.text)
+          ? `<h3 class="reading-h"${ts}>${esc(s.text)}</h3>`
+          : `<p class="reading-p"${ts}>${esc(s.text)}</p>`;
+      }).join('');
       return `<div class="reading">${body}
-        <div class="note">正文共 ${segCount} 段 · article_reading 路线为文章正文 + 小标题段，按阅读排版而非主持人转录行。中文无段级时间戳。</div></div>`;
+        <div class="note">正文共 ${segCount} 段 · article_reading 路线为文章正文 + 小标题段，按阅读排版而非主持人转录行。播放时高亮跟随，可点击段落跳转。</div></div>`;
     }
     const rows = ep.zh.map((s) => {
       const role = ep.roleOf(s.speaker);
       const spk = s.speaker
         ? `<div class="seg-spk"><span class="seg-badge" style="--role:${BE.roleColor(role)}">${esc(s.speaker)}</span>${role ? `<span class="seg-role">${esc(role)}</span>` : ''}</div>`
         : '';
-      return `<div class="seg">${spk}<div class="seg-body"><span class="seg-id">${esc(s.id || '')}</span><p class="seg-text">${esc(s.text)}</p></div></div>`;
+      const ts = s.start_ms != null ? ` data-start="${s.start_ms}" data-end="${s.end_ms}"` : '';
+      return `<div class="seg"${ts}>${spk}<div class="seg-body"><span class="seg-id">${esc(s.id || '')}</span><p class="seg-text">${esc(s.text)}</p></div></div>`;
     }).join('');
-    return `${rows}<div class="note">脚本共 ${segCount} 段 · 含无 speaker 的过场段时不显标签 · 中文脚本无段级时间戳。</div>`;
+    return `${rows}<div class="note">脚本共 ${segCount} 段 · 含无 speaker 的过场段时不显标签 · 播放时高亮跟随，可点击段落跳转。</div>`;
   }
 
   function originalHtml(ep, isArt) {
@@ -378,8 +415,36 @@
     return m && m[key] != null ? m[key] : undefined;
   };
 
+  // ---------------- follow-along ----------------
+  function collectFollowSegs() {
+    followSegs = [];
+    followIdx = -1;
+    const panel = document.getElementById('tabpanel');
+    if (!panel) return;
+    panel.querySelectorAll('[data-start]').forEach((el) => {
+      followSegs.push({ el, start: Number(el.dataset.start), end: Number(el.dataset.end) });
+    });
+  }
+
+  function followToTime(seconds) {
+    if (!followSegs.length) return;
+    const ms = seconds * 1000;
+    let idx = -1;
+    for (let i = 0; i < followSegs.length; i++) {
+      if (followSegs[i].start <= ms) idx = i; else break;
+    }
+    if (idx === followIdx) return;
+    if (followIdx >= 0 && followSegs[followIdx]) followSegs[followIdx].el.classList.remove('active');
+    followIdx = idx;
+    if (idx >= 0) {
+      const el = followSegs[idx].el;
+      el.classList.add('active');
+      if (Date.now() > suppressFollowUntil) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
   // ---------------- player wiring ----------------
-  function wirePlayer(ep) {
+  function wirePlayer(ep, seekTo) {
     const dur0 = ep.media.duration_seconds || ep.item.duration_seconds || 0;
     const elPlay = document.getElementById('play');
     const elEq = document.getElementById('eq');
@@ -387,8 +452,11 @@
     const elWave = document.getElementById('wave');
     const bars = elWave ? Array.from(elWave.children) : [];
 
-    audio.src = ep.audioUrl;
-    audio.playbackRate = 1;
+    if (!playingEp || playingEp.run_id !== ep.run_id) {
+      audio.src = ep.audioUrl;
+      audio.playbackRate = loadRate();
+    }
+    playingEp = ep;
 
     // Total-duration label stays the metadata value (matches the list/meta);
     // audio.duration only drives the progress ratio.
@@ -402,12 +470,18 @@
         elWave.setAttribute('aria-valuenow', Math.round(audio.currentTime));
         elWave.setAttribute('aria-valuetext', BE.fmt(audio.currentTime));
       }
+      followToTime(audio.currentTime);
     };
 
     audio.onloadedmetadata = () => {
       if (elWave) elWave.setAttribute('aria-valuemax', Math.round(durOf()));
-      const saved = loadPos(ep.run_id);
-      if (saved > 1 && saved < durOf() - 2) audio.currentTime = saved;
+      if (seekTo != null) {
+        audio.currentTime = Math.min(seekTo, durOf());
+        audio.play().catch(() => {});
+      } else {
+        const saved = loadPos(ep.run_id);
+        if (saved > 1 && saved < durOf() - 2) audio.currentTime = saved;
+      }
       paint();
     };
     audio.ontimeupdate = () => { paint(); savePos(ep.run_id, audio.currentTime); };
@@ -438,6 +512,57 @@
     paint();
   }
 
+  // ---------------- mini player ----------------
+  // Shown on the library view while audio is loaded; controls the same <audio>.
+  function miniDur() {
+    if (isFinite(audio.duration) && audio.duration > 0) return audio.duration;
+    return (playingEp && playingEp.media && playingEp.media.duration_seconds) || 0;
+  }
+
+  function miniTick() {
+    const mini = document.getElementById('mini');
+    if (!mini || mini.hidden) return;
+    const pb = document.getElementById('mini-play');
+    if (pb) pb.innerHTML = audio.paused ? ICON_PLAY : ICON_PAUSE;
+    const tm = document.getElementById('mini-time');
+    if (tm) tm.textContent = BE.fmt(audio.currentTime);
+    const bar = document.getElementById('mini-bar');
+    const d = miniDur();
+    if (bar && bar.firstElementChild) {
+      bar.firstElementChild.style.width = (d > 0 ? Math.min(100, (audio.currentTime / d) * 100) : 0).toFixed(1) + '%';
+    }
+  }
+
+  function renderMini() {
+    const t = document.getElementById('mini-title');
+    if (t && playingEp) {
+      t.textContent = playingEp.title;
+      const open = () => { location.hash = '#/ep/' + encodeURIComponent(playingEp.run_id); };
+      t.onclick = open;
+      t.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+    }
+    const pb = document.getElementById('mini-play');
+    if (pb) pb.onclick = () => { audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
+    const cl = document.getElementById('mini-close');
+    if (cl) cl.onclick = stopAudio;
+    const bar = document.getElementById('mini-bar');
+    if (bar) bar.onclick = (e) => {
+      const r = bar.getBoundingClientRect();
+      const d = miniDur();
+      if (d > 0) audio.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * d;
+    };
+    miniTick();
+  }
+
+  function updateMini() {
+    const mini = document.getElementById('mini');
+    if (!mini) return;
+    const show = !!(playingEp && !curEp && audio.src);
+    mini.hidden = !show;
+    document.body.classList.toggle('has-mini', show);
+    if (show) renderMini();
+  }
+
   // ---------------- global events ----------------
   app.addEventListener('click', (e) => {
     const filtBtn = e.target.closest('[data-group]');
@@ -458,6 +583,8 @@
       document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === curTab)));
       const panel = document.getElementById('tabpanel');
       if (panel) panel.innerHTML = tabPanelHtml(curEp, curTab, curEp.route === 'article_reading');
+      collectFollowSegs();
+      followToTime(audio.currentTime);
       return;
     }
     const skip = e.target.closest('[data-skip]');
@@ -465,7 +592,13 @@
     if (e.target.id === 'rate') {
       const steps = [1, 1.25, 1.5, 2, 0.75];
       const next = steps[(steps.indexOf(audio.playbackRate) + 1) % steps.length] || 1;
-      audio.playbackRate = next; e.target.textContent = next.toFixed(2).replace(/0$/, '') + '×';
+      audio.playbackRate = next; e.target.textContent = fmtRate(next); saveRate(next);
+      return;
+    }
+    const segEl = e.target.closest('[data-start]');
+    if (segEl && curEp) {
+      audio.currentTime = Number(segEl.dataset.start) / 1000;
+      if (audio.paused) audio.play().catch(() => {});
       return;
     }
     // mobile collapsible cards (also keyboard-activatable via the toggle button)
@@ -500,12 +633,32 @@
   }
   mobileMQ.addEventListener('change', () => { if (curEp) applyMobileCollapse(); });
   const _origRenderDetail = renderDetail;
-  renderDetail = async function (id) { await _origRenderDetail(id); applyMobileCollapse(); };
+  renderDetail = async function (id, seekTo) { await _origRenderDetail(id, seekTo); applyMobileCollapse(); };
 
   // ---------------- icons ----------------
   const ICON_PLAY = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
   const ICON_PAUSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
   const ICON_EXT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>';
+
+  const markManualScroll = () => { suppressFollowUntil = Date.now() + 3000; };
+  window.addEventListener('wheel', markManualScroll, { passive: true });
+  window.addEventListener('touchmove', markManualScroll, { passive: true });
+
+  // global player keys on the detail view; skip when a control/segment is focused
+  window.addEventListener('keydown', (e) => {
+    if (!curEp) return;
+    if (e.target.closest && e.target.closest('button, a, input, textarea, select, [role="slider"], [role="tab"]')) return;
+    if (e.code === 'Space' || e.key === ' ') {
+      e.preventDefault();
+      audio.paused ? audio.play().catch(() => {}) : audio.pause();
+    } else if (e.key === 'ArrowLeft') {
+      e.preventDefault(); audio.currentTime = Math.max(0, audio.currentTime - 5);
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault(); audio.currentTime = audio.currentTime + 5;
+    }
+  });
+
+  ['timeupdate', 'play', 'pause', 'ended'].forEach((ev) => audio.addEventListener(ev, miniTick));
 
   window.addEventListener('hashchange', route);
   route();

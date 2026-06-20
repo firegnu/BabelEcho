@@ -1,7 +1,8 @@
 import subprocess
+import wave
 from pathlib import Path
 
-from .jsonio import read_json
+from .jsonio import read_json, write_json
 from .paths import RunPaths
 
 
@@ -10,8 +11,30 @@ def _ffmpeg_concat_line(path: Path) -> str:
     return f"file '{escaped}'"
 
 
+def _wav_duration_ms(path: Path) -> int:
+    with wave.open(str(path), "rb") as handle:
+        frames = handle.getnframes()
+        rate = handle.getframerate()
+    if rate <= 0:
+        return 0
+    return round(frames / rate * 1000)
+
+
+def _annotate_segment_timings(run_paths: RunPaths, manifest: dict) -> None:
+    cursor_ms = 0
+    for segment in manifest["segments"]:
+        audio_path = (run_paths.run_dir / segment["audio_path"]).resolve()
+        duration_ms = _wav_duration_ms(audio_path)
+        segment["start_ms"] = cursor_ms
+        segment["end_ms"] = cursor_ms + duration_ms
+        segment["duration_ms"] = duration_ms
+        cursor_ms += duration_ms
+    write_json(run_paths.segments_dir / "manifest.json", manifest)
+
+
 def assemble_audio(run_paths: RunPaths, audio_config: dict | None = None) -> str:
     manifest = read_json(run_paths.segments_dir / "manifest.json")
+    _annotate_segment_timings(run_paths, manifest)
     concat_path = run_paths.output_dir / "concat.txt"
     lines = []
     for segment in manifest["segments"]:
