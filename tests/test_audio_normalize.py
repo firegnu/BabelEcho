@@ -239,6 +239,92 @@ def test_audio_normalize_keeps_low_risk_cross_speaker_segments_safe(
     assert quality["metrics"]["min_primary_speaker_overlap_ratio"] == 0.92
 
 
+def test_audio_normalize_aggregates_same_speaker_split_turns(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-split-turns")
+    _write_asr(
+        run_paths,
+        [
+            {
+                "start_ms": 0,
+                "end_ms": 5200,
+                "text": "A single speaker sentence spans two diarization turns.",
+            },
+        ],
+    )
+    _write_diarization(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 2200, "speaker": "speaker_1"},
+            {"start_ms": 2200, "end_ms": 5200, "speaker": "speaker_1"},
+        ],
+        speaker_count=1,
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert "asr_segment_crosses_speaker_turns" not in quality["warnings"]
+    assert quality["metrics"]["cross_speaker_segment_count"] == 0
+    assert quality["metrics"]["ambiguous_speaker_segment_count"] == 0
+    assert quality["metrics"]["min_primary_speaker_overlap_ratio"] is None
+
+
+def test_audio_normalize_keeps_sparse_ambiguous_segments_safe(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-sparse-ambiguous")
+    asr_segments = []
+    diarization_segments = []
+    for index in range(100):
+        start_ms = index * 2_000
+        end_ms = start_ms + 1_000
+        asr_segments.append(
+            {
+                "start_ms": start_ms,
+                "end_ms": end_ms,
+                "text": f"ASR sentence {index}.",
+            }
+        )
+        if index < 4:
+            diarization_segments.extend(
+                [
+                    {
+                        "start_ms": start_ms,
+                        "end_ms": start_ms + 450,
+                        "speaker": "speaker_1",
+                    },
+                    {
+                        "start_ms": start_ms + 450,
+                        "end_ms": end_ms,
+                        "speaker": "speaker_2",
+                    },
+                ]
+            )
+        else:
+            diarization_segments.append(
+                {
+                    "start_ms": start_ms,
+                    "end_ms": end_ms,
+                    "speaker": "speaker_1",
+                }
+            )
+    _write_asr(run_paths, asr_segments)
+    _write_diarization(run_paths, diarization_segments)
+
+    normalize_audio_transcript(run_paths)
+
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert "asr_segment_crosses_speaker_turns" in quality["warnings"]
+    assert "ambiguous_speaker_assignments" not in quality["warnings"]
+    assert quality["metrics"]["cross_speaker_segment_count"] == 4
+    assert quality["metrics"]["ambiguous_speaker_segment_count"] == 4
+    assert quality["metrics"]["ambiguous_speaker_segment_ratio"] == 0.04
+
+
 def test_audio_normalize_marks_ambiguous_cross_speaker_segments_for_inspection(
     tmp_path: Path,
 ):

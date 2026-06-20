@@ -83,33 +83,33 @@ def _speaker_for_segment(
     if diarization.get("provider") == "none" or not turns:
         return "speaker_1"
 
-    overlaps = [
-        (
-            _overlap_ms(
-                segment["start_ms"],
-                segment["end_ms"],
-                turn["start_ms"],
-                turn["end_ms"],
-            ),
-            turn.get("speaker"),
+    speaker_overlaps: dict[str, int] = {}
+    for turn in turns:
+        overlap = _overlap_ms(
+            segment["start_ms"],
+            segment["end_ms"],
+            turn["start_ms"],
+            turn["end_ms"],
         )
-        for turn in turns
-    ]
-    matches = [(overlap, speaker) for overlap, speaker in overlaps if overlap > 0]
-    if not matches:
+        if overlap <= 0:
+            continue
+        speaker = str(turn.get("speaker"))
+        speaker_overlaps[speaker] = speaker_overlaps.get(speaker, 0) + overlap
+
+    if not speaker_overlaps:
         _add_warning(warnings, "missing_diarization_overlap")
         return None
-    if len(matches) > 1:
+    if len(speaker_overlaps) > 1:
         _add_warning(warnings, "asr_segment_crosses_speaker_turns")
-        primary_overlap = max(overlap for overlap, _speaker in matches)
-        total_overlap = sum(overlap for overlap, _speaker in matches)
+        primary_overlap = max(speaker_overlaps.values())
+        total_overlap = sum(speaker_overlaps.values())
         if total_overlap > 0:
             primary_overlap_ratio = primary_overlap / total_overlap
             cross_speaker_stats["primary_overlap_ratios"].append(primary_overlap_ratio)
             if primary_overlap_ratio < AMBIGUOUS_PRIMARY_OVERLAP_RATIO:
                 cross_speaker_stats["ambiguous_count"] += 1
         cross_speaker_stats["count"] += 1
-    return max(matches, key=lambda item: item[0])[1]
+    return max(speaker_overlaps.items(), key=lambda item: item[1])[0]
 
 
 def _add_warning(warnings: list[str], warning: str) -> None:
@@ -407,9 +407,9 @@ def _quality_report(
         _add_warning(warnings, "too_many_short_speaker_turns")
     ambiguous_count = int(segment_metrics.get("ambiguous_speaker_segment_count") or 0)
     ambiguous_ratio = float(segment_metrics.get("ambiguous_speaker_segment_ratio") or 0)
-    if ambiguous_count and (
+    if (
         ambiguous_count >= AMBIGUOUS_SEGMENT_COUNT_INSPECT_THRESHOLD
-        or ambiguous_ratio >= AMBIGUOUS_SEGMENT_RATIO_INSPECT_THRESHOLD
+        and ambiguous_ratio >= AMBIGUOUS_SEGMENT_RATIO_INSPECT_THRESHOLD
     ):
         _add_warning(warnings, "ambiguous_speaker_assignments")
 
