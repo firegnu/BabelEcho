@@ -1021,6 +1021,6 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - 同一节目跨 episode speaker profile 复用。
 - 人工 speaker 改名工具。
 - 长音频 chunking。
-- Private speaker alias 人工确认/审核 contract 和 confirmed alias 到稳定中文 voice role 的私有映射 contract 已完成；后续进入显式 opt-in 应用到单次 run 的 speaker_voices。
+- Private speaker alias 人工确认/审核 contract、confirmed alias 到稳定中文 voice role 的私有映射 contract、显式 opt-in 应用到单次 run 的 speaker_voices 已完成；后续补 5090D 应用 smoke。
 - 扩充保守 audio-first 广告/片尾清理规则，或增加可选裁剪 override。
 - ASR 结果人工校对入口。

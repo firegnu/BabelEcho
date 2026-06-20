@@ -12,6 +12,24 @@ MALE_VOICE_ROLES = ("male_a", "male_b")
 VALID_GENDERS = {"male", "female", "unknown"}
 
 
+def _require_mapping(value: Any, context: str) -> dict[str, Any]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{context} must be a JSON object")
+    return value
+
+
+def _require_list(value: Any, context: str) -> list[Any]:
+    if not isinstance(value, list):
+        raise ValueError(f"{context} must be a list")
+    return value
+
+
+def _require_string(value: Any, context: str) -> str:
+    if not isinstance(value, str) or not value:
+        raise ValueError(f"{context} is required")
+    return value
+
+
 def speaker_voice_path(run_paths: RunPaths, config: dict[str, Any] | None = None) -> Path:
     configured_path = (config or {}).get("path")
     if configured_path:
@@ -154,6 +172,94 @@ def infer_speaker_voices_if_enabled(
             "path": str(speaker_voice_path(run_paths, config)),
             "error": str(error),
         }
+
+
+def _speaker_voices_from_role_map(
+    role_map: dict[str, Any],
+    run_id: str,
+) -> tuple[dict[str, str], list[dict[str, Any]], set[str]]:
+    data = _require_mapping(role_map, "speaker voice role map")
+    speaker_voices: dict[str, str] = {}
+    inferences = []
+    matched_aliases: set[str] = set()
+
+    for item in _require_list(data.get("aliases"), "speaker voice role map aliases"):
+        alias = _require_mapping(item, "speaker voice role map alias")
+        alias_id = _require_string(alias.get("alias_id"), "speaker voice role alias_id")
+        voice_role = _require_string(alias.get("voice_role"), "speaker voice role")
+        if voice_role not in VOICE_ROLES:
+            raise ValueError("speaker voice role must be one of: " + ", ".join(VOICE_ROLES))
+        if alias.get("review_status") != "confirmed":
+            continue
+        for member_item in _require_list(alias.get("members"), "speaker voice role members"):
+            member = _require_mapping(member_item, "speaker voice role member")
+            if member.get("run_id") != run_id:
+                continue
+            speaker_id = _require_string(
+                member.get("speaker_id"), "speaker voice role member speaker_id"
+            )
+            previous = speaker_voices.get(speaker_id)
+            if previous is not None and previous != voice_role:
+                raise ValueError(
+                    f"speaker {speaker_id} maps to multiple voice roles: "
+                    f"{previous}, {voice_role}"
+                )
+            if previous == voice_role:
+                continue
+            matched_aliases.add(alias_id)
+            speaker_voices[speaker_id] = voice_role
+            inferences.append(
+                {
+                    "speaker": speaker_id,
+                    "gender": "unknown",
+                    "confidence": 1.0,
+                    "reason": f"confirmed speaker alias {alias_id}",
+                    "voice_role": voice_role,
+                    "alias_id": alias_id,
+                }
+            )
+    return speaker_voices, inferences, matched_aliases
+
+
+def apply_speaker_voice_role_map(
+    run_paths: RunPaths,
+    role_map: dict[str, Any],
+    *,
+    overwrite: bool = False,
+) -> dict[str, Any]:
+    output_path = speaker_voice_path(run_paths)
+    if output_path.exists() and not overwrite:
+        return {"status": "reused", "path": str(output_path)}
+
+    speaker_voices, inferences, matched_aliases = _speaker_voices_from_role_map(
+        role_map,
+        run_paths.run_id,
+    )
+    if not speaker_voices:
+        return {
+            "status": "skipped",
+            "path": str(output_path),
+            "reason": "no matching speakers",
+            "speaker_count": 0,
+            "alias_count": 0,
+        }
+
+    write_json(
+        output_path,
+        {
+            "version": 1,
+            "mode": "speaker_voice_role_map",
+            "source": "speaker_voice_role_map",
+            "speaker_voices": speaker_voices,
+            "inferences": inferences,
+        },
+    )
+    return {
+        "status": "created",
+        "path": str(output_path),
+        "speaker_count": len(speaker_voices),
+        "alias_count": len(matched_aliases),
+    }
 
 
 def load_speaker_voice_roles(

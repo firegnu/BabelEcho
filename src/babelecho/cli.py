@@ -50,7 +50,11 @@ from .speaker_voice_role_map import (
     build_speaker_voice_role_map,
     format_speaker_voice_role_map_summary,
 )
-from .speaker_voices import infer_speaker_voices, infer_speaker_voices_if_enabled
+from .speaker_voices import (
+    apply_speaker_voice_role_map,
+    infer_speaker_voices,
+    infer_speaker_voices_if_enabled,
+)
 from .status import (
     init_run_status,
     mark_run_succeeded,
@@ -199,6 +203,14 @@ def build_parser() -> argparse.ArgumentParser:
         "--existing-map",
         help="Existing voice-role map whose roles should be preserved by alias_id.",
     )
+    speaker_profiles_apply_voice_roles = speaker_profiles_subparsers.add_parser(
+        "apply-voice-roles",
+        help="Apply a private voice-role map to one run's speaker-voices.json.",
+    )
+    speaker_profiles_apply_voice_roles.add_argument("--workspace", required=True)
+    speaker_profiles_apply_voice_roles.add_argument("--run-id", required=True)
+    speaker_profiles_apply_voice_roles.add_argument("--voice-role-map", required=True)
+    speaker_profiles_apply_voice_roles.add_argument("--overwrite", action="store_true")
 
     podcast_index = subparsers.add_parser(
         "podcast-index",
@@ -956,6 +968,19 @@ def main(argv: list[str] | None = None) -> int:
                 write_json(args.output_json, role_map)
                 print(f"speaker voice role map: {args.output_json}")
                 print(format_speaker_voice_role_map_summary(role_map))
+                return 0
+            if args.speaker_profiles_command == "apply-voice-roles":
+                result = apply_speaker_voice_role_map(
+                    create_run(args.workspace, args.run_id),
+                    read_json(args.voice_role_map),
+                    overwrite=args.overwrite,
+                )
+                print(
+                    f"speaker voice role map applied: {result['status']} "
+                    f"{result['path']}"
+                )
+                if result.get("reason"):
+                    print(f"reason: {result['reason']}")
                 return 0
         except Exception as error:
             print(str(error), file=sys.stderr)

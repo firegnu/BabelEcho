@@ -95,7 +95,18 @@
 - The output is still a passive contract: it is not consumed by TTS routing, is not published, does not read or output embeddings, and does not perform voice clone.
 - Local focused verification passed: `tests/test_speaker_aliases.py tests/test_speaker_similarity.py tests/test_voice_profile.py tests/test_speaker_voices.py`.
 - 5090D smoke passed using a simulated confirmed review derived from the five-episode Practical AI review file: `speaker_alias_001 -> female_a`, `speaker_alias_002` was skipped as `rejected`, and the output contained no `embedding_artifact` or `voice-profiles` strings. A second 5090D smoke with `--existing-map` preserved `speaker_alias_001 -> male_b`.
-- Remaining work: add an explicit opt-in application path that turns this private map into per-run `speaker_voices` only when the user chooses to apply it. Do not auto-apply this map to synthesize.
+- The explicit opt-in application path is implemented in the next section; the map is still not auto-applied to synthesize.
+
+### 2026-06-20：private voice-role map opt-in application implemented
+
+- Added `babelecho speaker-profiles apply-voice-roles --workspace ... --run-id ... --voice-role-map ... [--overwrite]`.
+- The command explicitly applies one private voice-role map to one run by writing `workspace/runs/<run-id>/script/speaker-voices.json`.
+- It only writes speakers whose role-map alias members match the target `run_id`; other runs in the same alias are ignored for this per-run output.
+- The written file uses the existing `speaker-voices.json` shape consumed by TTS: `speaker_voices` plus `inferences`, with `mode=speaker_voice_role_map`.
+- Existing `speaker-voices.json` is reused by default and only replaced with `--overwrite`, so the opt-in command does not silently overwrite prior manual or LLM-inferred roles.
+- The default pipeline still does not call this command. Applying the map remains an explicit separate step.
+- Local focused verification passed: `tests/test_speaker_voices.py tests/test_speaker_aliases.py tests/test_speaker_similarity.py tests/test_voice_profile.py tests/test_synthesize.py`.
+- Remaining work: run a 5090D smoke that applies the Practical AI simulated confirmed map to an existing run and then verify the manifest uses the mapped role.
 
 ---
 
@@ -115,7 +126,7 @@
 - Keep `embedding_artifact` as a run-local relative path only.
 - Add a deterministic fake local CLI wrapper test before touching real model wrappers.
 - Add a 5090D model-probe task that compares candidate embedding backends before choosing a default.
-- Build private speaker alias candidates, a private review file, and a private confirmed-alias voice-role map from similarity reports after enough same-show samples are available.
+- Build private speaker alias candidates, a private review file, a private confirmed-alias voice-role map, and an explicit opt-in per-run application command from similarity reports after enough same-show samples are available.
 
 ### Out
 
