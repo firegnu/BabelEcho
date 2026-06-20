@@ -1,6 +1,8 @@
 from pathlib import Path
 from xml.etree import ElementTree
 
+import pytest
+
 from babelecho.jsonio import read_json, write_json
 from babelecho.paths import create_run
 from babelecho.publish import publish_episode
@@ -206,18 +208,38 @@ def test_publish_episode_maps_article_route_and_public_source_metadata(tmp_path:
     assert index["episodes"][0]["speaker_count"] == 0
 
 
-def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
+@pytest.mark.parametrize(
+    ("source_type", "provider", "extra_source"),
+    [
+        ("audio_file", "local_file", {}),
+        (
+            "audio_url",
+            "remote_url",
+            {
+                "source_host": "media.example.com",
+                "source_path": "/episode.mp3",
+            },
+        ),
+    ],
+)
+def test_publish_episode_adds_audio_first_asr_summary(
+    tmp_path: Path,
+    source_type: str,
+    provider: str,
+    extra_source: dict,
+):
     run_paths = create_run(tmp_path, "audio-publish-run")
     run_paths.output_audio.write_bytes(b"fake mp3")
     write_json(
         run_paths.source_json,
         {
             "run_id": "audio-publish-run",
-            "source_type": "audio_file",
-            "provider": "local_file",
+            "source_type": source_type,
+            "provider": provider,
             "title": "Audio Source",
             "audio_input": "audio/input.mp3",
             "audio_metadata": "audio/metadata.json",
+            **extra_source,
         },
     )
     write_json(
@@ -318,7 +340,7 @@ def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
                 "segment_count": 2,
                 "speaker_count": 2,
                 "avg_confidence": None,
-                "source_type": "audio_file",
+                "source_type": source_type,
                 "extractor": "asr",
             },
             "warnings": [],
@@ -336,7 +358,7 @@ def test_publish_episode_adds_audio_first_asr_summary(tmp_path: Path):
         / "artifact.json"
     )
     assert artifact["route"] == "audio_first"
-    assert artifact["source"]["type"] == "audio_file"
+    assert artifact["source"]["type"] == source_type
     assert artifact["asr"] == {
         "provider": "fixture",
         "model": "fixture",

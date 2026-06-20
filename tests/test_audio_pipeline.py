@@ -1,7 +1,10 @@
 import os
 import subprocess
 import sys
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
+from threading import Thread
+from urllib.parse import urlparse
 
 from babelecho.jsonio import read_json
 
@@ -14,7 +17,32 @@ def worktree_python_env() -> dict[str, str]:
         if not env.get("PYTHONPATH")
         else f"{src_path}{os.pathsep}{env['PYTHONPATH']}"
     )
+    env["NO_PROXY"] = "127.0.0.1,localhost"
+    env["no_proxy"] = "127.0.0.1,localhost"
     return env
+
+
+def run_audio_route_server(routes: dict[str, bytes]):
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            response_body = routes.get(urlparse(self.path).path)
+            if response_body is None:
+                self.send_response(404)
+                self.end_headers()
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", "audio/wav")
+            self.send_header("Content-Length", str(len(response_body)))
+            self.end_headers()
+            self.wfile.write(response_body)
+
+        def log_message(self, format, *args):
+            return
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    return server
 
 
 def test_audio_convert_ingest_audio_stage_creates_isolated_run_artifacts(
@@ -74,6 +102,113 @@ publish:
     assert status["outputs"]["source"] == "source.json"
     assert status["outputs"]["audio_metadata"] == "audio/metadata.json"
     assert str(audio) not in (run_dir / "source.json").read_text(encoding="utf-8")
+
+
+def test_audio_convert_ingest_audio_stage_accepts_audio_url(
+    monkeypatch,
+    tmp_path: Path,
+):
+    class FakeResponse:
+        def __init__(self):
+            self._sent = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self, size=-1):
+            if self._sent:
+                return b""
+            self._sent = True
+            return b"remote audio bytes"
+
+    def fake_urlopen(request, timeout):
+        return FakeResponse()
+
+    monkeypatch.setattr("babelecho.audio_source.urlopen", fake_urlopen)
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local-audio.yaml"
+    local_config.write_text(
+        """
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    from babelecho.audio_pipeline import run_audio_pipeline
+
+    output = run_audio_pipeline(
+        workspace=str(workspace),
+        run_id="audio-url-cli",
+        audio_url="https://media.example.com/show/episode.wav?token=secret",
+        local_config_path=str(local_config),
+        title="Audio URL CLI",
+        to_stage="ingest_audio",
+    )
+
+    assert "ingest_audio:" in output
+    run_dir = workspace / "runs" / "audio-url-cli"
+    source = read_json(run_dir / "source.json")
+    metadata = read_json(run_dir / "audio" / "metadata.json")
+    assert source["source_type"] == "audio_url"
+    assert source["source_host"] == "media.example.com"
+    assert source["source_path"] == "/show/episode.wav"
+    assert source["audio_input"] == "audio/input.wav"
+    assert metadata["input_kind"] == "audio_url"
+    assert "token=secret" not in (run_dir / "source.json").read_text(encoding="utf-8")
+
+
+def test_audio_convert_cli_accepts_audio_url(tmp_path: Path):
+    server = run_audio_route_server({"/episode.wav": b"remote audio bytes"})
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local-audio.yaml"
+    local_config.write_text(
+        """
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+    audio_url = f"http://127.0.0.1:{server.server_port}/episode.wav?token=secret"
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "audio",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "audio-url-cli-subprocess",
+            "--audio-url",
+            audio_url,
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "ingest_audio",
+        ],
+        text=True,
+        capture_output=True,
+        env=worktree_python_env(),
+        check=False,
+    )
+
+    server.shutdown()
+    assert result.returncode == 0, result.stderr
+    assert "ingest_audio:" in result.stdout
+    run_dir = workspace / "runs" / "audio-url-cli-subprocess"
+    source = read_json(run_dir / "source.json")
+    metadata = read_json(run_dir / "audio" / "metadata.json")
+    assert source["source_type"] == "audio_url"
+    assert source["source_host"].startswith("127.0.0.1:")
+    assert source["source_path"] == "/episode.wav"
+    assert metadata["input_kind"] == "audio_url"
+    assert "token=secret" not in (run_dir / "source.json").read_text(encoding="utf-8")
 
 
 def test_audio_convert_asr_stage_writes_fixture_asr_artifact(tmp_path: Path):

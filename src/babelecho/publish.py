@@ -8,6 +8,8 @@ from xml.etree import ElementTree
 from .jsonio import read_json, write_json
 from .paths import RunPaths
 
+AUDIO_FIRST_SOURCE_TYPES = {"audio_file", "audio_url"}
+
 
 def _text(parent: ElementTree.Element, tag: str, value: str) -> ElementTree.Element:
     child = ElementTree.SubElement(parent, tag)
@@ -44,6 +46,7 @@ def _source_provider(source: dict) -> str:
         "podcast_rss": "rss",
         "transcript_file": "local_file",
         "audio_file": "local_file",
+        "audio_url": "remote_url",
         "article_file": "local_file",
         "web_article": "trafilatura",
         "x_post": "x_api",
@@ -54,7 +57,7 @@ def _source_provider(source: dict) -> str:
 
 def _route_for_source(source: dict) -> str:
     source_type = _source_type(source)
-    if source_type == "audio_file":
+    if source_type in AUDIO_FIRST_SOURCE_TYPES:
         return "audio_first"
     if source_type in {"article_file", "web_article", "x_post", "x_thread"}:
         return "article_reading"
@@ -76,6 +79,9 @@ def _public_source(source: dict) -> dict:
         "feed_url": source.get("feed_url"),
     }
     for key in ["site_name", "author", "published_time", "excerpt"]:
+        if source.get(key) is not None:
+            public_source[key] = source[key]
+    for key in ["source_host", "source_path"]:
         if source.get(key) is not None:
             public_source[key] = source[key]
     return public_source
@@ -172,7 +178,7 @@ def _speaker_summaries(script: dict, speaker_voices: dict | None) -> list[dict]:
 
 
 def _asr_summary(run_paths: RunPaths, source: dict) -> dict | None:
-    if _source_type(source) != "audio_file":
+    if _source_type(source) not in AUDIO_FIRST_SOURCE_TYPES:
         return None
     raw_asr = _read_optional_json(run_paths.run_dir / "asr" / "raw.json") or {}
     if not raw_asr:

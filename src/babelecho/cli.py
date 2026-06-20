@@ -313,7 +313,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     audio = subparsers.add_parser(
         "audio",
-        help="Convert one local audio file.",
+        help="Convert one audio input.",
     )
     audio_subparsers = audio.add_subparsers(
         dest="audio_command",
@@ -321,11 +321,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     audio_convert = audio_subparsers.add_parser(
         "convert",
-        help="Convert one local audio file through the audio-first pipeline.",
+        help="Convert one audio input through the audio-first pipeline.",
     )
     audio_convert.add_argument("--workspace", required=True)
     audio_convert.add_argument("--run-id", required=True)
-    audio_convert.add_argument("--audio-file", required=True)
+    audio_input = audio_convert.add_mutually_exclusive_group(required=True)
+    audio_input.add_argument("--audio-file")
+    audio_input.add_argument("--audio-url")
     audio_convert.add_argument("--local-config", required=True)
     audio_convert.add_argument("--title")
     audio_convert.add_argument(
@@ -1048,6 +1050,7 @@ def main(argv: list[str] | None = None) -> int:
                     workspace=args.workspace,
                     run_id=args.run_id,
                     audio_file=args.audio_file,
+                    audio_url=args.audio_url,
                     local_config_path=args.local_config,
                     from_stage=args.from_stage,
                     to_stage=args.to_stage,

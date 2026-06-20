@@ -49,12 +49,15 @@ def run_audio_pipeline(
     *,
     workspace: str,
     run_id: str,
-    audio_file: str,
     local_config_path: str,
+    audio_file: str | None = None,
+    audio_url: str | None = None,
     from_stage: str = "ingest_audio",
     to_stage: str = "ingest_audio",
     title: str | None = None,
 ) -> str:
+    if bool(audio_file) == bool(audio_url):
+        raise ValueError("audio convert requires exactly one of --audio-file or --audio-url")
     stage_index = AUDIO_PIPELINE_STAGES.index(from_stage)
     stop_index = AUDIO_PIPELINE_STAGES.index(to_stage)
     if stop_index < stage_index:
@@ -68,6 +71,7 @@ def run_audio_pipeline(
         to_stage=to_stage,
         input_info={
             "audio_file": audio_file,
+            "audio_url": audio_url,
             "local_config": local_config_path,
             "title": title,
         },
@@ -82,8 +86,9 @@ def run_audio_pipeline(
             "ingest_audio",
             lambda: ingest_audio_source(
                 {
-                    "type": "audio_file",
+                    "type": "audio_file" if audio_file else "audio_url",
                     "audio_file": audio_file,
+                    "audio_url": audio_url,
                     "title": title,
                 },
                 run_paths,
