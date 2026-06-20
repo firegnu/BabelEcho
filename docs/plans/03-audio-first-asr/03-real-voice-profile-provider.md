@@ -106,7 +106,9 @@
 - Existing `speaker-voices.json` is reused by default and only replaced with `--overwrite`, so the opt-in command does not silently overwrite prior manual or LLM-inferred roles.
 - The default pipeline still does not call this command. Applying the map remains an explicit separate step.
 - Local focused verification passed: `tests/test_speaker_voices.py tests/test_speaker_aliases.py tests/test_speaker_similarity.py tests/test_voice_profile.py tests/test_synthesize.py`.
-- Remaining work: run a 5090D smoke that applies the Practical AI simulated confirmed map to an existing run and then verify the manifest uses the mapped role.
+- Local full verification passed: `pytest -q`.
+- 5090D smoke passed using `speaker-voice-role-map-practicalai-real-five-episodes-confirmed-smoke-20260620.json` applied to `audio-voice-profile-real-practicalai-zero-trust-8min-20260620`: it wrote `script/speaker-voices.json` with `speaker_1 -> female_a`, contained no `embedding_artifact` or `voice-profiles` strings, `load_speaker_voice_roles()` returned `{"speaker_1": "female_a"}`, and a second run without `--overwrite` returned `reused`.
+- Remaining work: decide whether a future config flag should call this explicit application step before synthesize; do not enable it by default.
 
 ---
 
