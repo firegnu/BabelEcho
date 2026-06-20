@@ -15,6 +15,8 @@ MERGE_MAX_DURATION_MS = 45_000
 AMBIGUOUS_PRIMARY_OVERLAP_RATIO = 0.60
 AMBIGUOUS_SEGMENT_COUNT_INSPECT_THRESHOLD = 3
 AMBIGUOUS_SEGMENT_RATIO_INSPECT_THRESHOLD = 0.05
+MISSING_DIARIZATION_BOUNDARY_SEGMENT_INSPECT_THRESHOLD = 2
+MISSING_DIARIZATION_BOUNDARY_DURATION_INSPECT_MS = 5_000
 BOUNDARY_CONTENT_WINDOW_MS = 120_000
 BOUNDARY_CONTENT_MAX_SEGMENTS = 8
 
@@ -388,6 +390,65 @@ def _speaker_turn_metrics(diarization: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _edge_missing_diarization_indices(segments: list[dict[str, Any]]) -> set[int]:
+    indices: set[int] = set()
+    for index, segment in enumerate(segments):
+        if segment.get("speaker") is not None:
+            break
+        indices.add(index)
+    for index in range(len(segments) - 1, -1, -1):
+        if segments[index].get("speaker") is not None:
+            break
+        indices.add(index)
+    return indices
+
+
+def _missing_diarization_overlap_metrics(
+    segments: list[dict[str, Any]],
+) -> dict[str, Any]:
+    missing_indices = [
+        index for index, segment in enumerate(segments) if segment.get("speaker") is None
+    ]
+    edge_indices = _edge_missing_diarization_indices(segments)
+    total_duration_ms = sum(
+        int(segments[index]["end_ms"]) - int(segments[index]["start_ms"])
+        for index in missing_indices
+    )
+    edge_duration_ms = sum(
+        int(segments[index]["end_ms"]) - int(segments[index]["start_ms"])
+        for index in missing_indices
+        if index in edge_indices
+    )
+    return {
+        "missing_diarization_overlap_segment_count": len(missing_indices),
+        "missing_diarization_overlap_segment_ratio": (
+            round(len(missing_indices) / len(segments), 3) if segments else 0
+        ),
+        "missing_diarization_overlap_total_duration_ms": total_duration_ms,
+        "missing_diarization_overlap_boundary_segment_count": sum(
+            1 for index in missing_indices if index in edge_indices
+        ),
+        "missing_diarization_overlap_boundary_duration_ms": edge_duration_ms,
+    }
+
+
+def _missing_diarization_overlap_needs_inspection(
+    metrics: dict[str, Any],
+) -> bool:
+    missing_count = int(metrics["missing_diarization_overlap_segment_count"])
+    boundary_count = int(metrics["missing_diarization_overlap_boundary_segment_count"])
+    if missing_count == 0:
+        return False
+    if missing_count != boundary_count:
+        return True
+    if missing_count > MISSING_DIARIZATION_BOUNDARY_SEGMENT_INSPECT_THRESHOLD:
+        return True
+    return (
+        int(metrics["missing_diarization_overlap_total_duration_ms"])
+        > MISSING_DIARIZATION_BOUNDARY_DURATION_INSPECT_MS
+    )
+
+
 def _quality_report(
     *,
     run_paths: RunPaths,
@@ -405,6 +466,16 @@ def _quality_report(
         speaker_turn_metrics["short_speaker_turn_count"] >= MANY_SHORT_SPEAKER_TURNS
     ):
         _add_warning(warnings, "too_many_short_speaker_turns")
+    missing_diarization_metrics = _missing_diarization_overlap_metrics(segments)
+    if missing_diarization_metrics["missing_diarization_overlap_segment_count"]:
+        _add_warning(warnings, "missing_diarization_overlap")
+    else:
+        warnings = [
+            warning for warning in warnings if warning != "missing_diarization_overlap"
+        ]
+    missing_diarization_needs_inspection = (
+        _missing_diarization_overlap_needs_inspection(missing_diarization_metrics)
+    )
     ambiguous_count = int(segment_metrics.get("ambiguous_speaker_segment_count") or 0)
     ambiguous_ratio = float(segment_metrics.get("ambiguous_speaker_segment_ratio") or 0)
     if (
@@ -425,14 +496,15 @@ def _quality_report(
 
     inspect_warnings = {
         "low_confidence_segments",
-        "missing_diarization_overlap",
         "ambiguous_speaker_assignments",
         "timestamp_errors",
         "too_many_short_speaker_turns",
     }
     if reasons:
         recommendation = "reject"
-    elif any(warning in inspect_warnings for warning in warnings):
+    elif missing_diarization_needs_inspection or any(
+        warning in inspect_warnings for warning in warnings
+    ):
         recommendation = "inspect_first"
     else:
         recommendation = "safe_to_adapt"
@@ -444,6 +516,7 @@ def _quality_report(
             "speaker_count": len(speakers),
             "total_chars": sum(len(text) for text in texts),
             **segment_metrics,
+            **missing_diarization_metrics,
             **speaker_turn_metrics,
             "source_type": _source_type(run_paths),
             "extractor": "asr",

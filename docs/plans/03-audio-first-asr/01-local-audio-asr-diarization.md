@@ -988,7 +988,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 该 BBC 样本暴露真实 audio-first 清理问题：动态广告和片尾推广会进入 ASR/中文稿，首尾 segment 有广告/推广内容；这不是 URL 链路失败，但正式自用前需要广告/舞台/片尾清理或人工裁剪入口。
   - 已新增 audio-first 边界内容自动清理：只处理开头/结尾边界窗口，高置信广告/推广自动删除，低置信只写 warning，不要求人工确认。5090D 重跑同一 BBC run 的 `normalize -> publish` 后，normalized/script/manifest 为 36 段，自动删除 4 个边界内容段，quality=`safe_to_adapt`，更新后 MP3 为 `22050 Hz` mono、约 `339.4s`、约 `5.4 MB`。
   - 已新增 `local_cli` diarization 输入规范化：非 WAV 输入会先转成 run-local `audio/diarization-input.wav`（mono、16k、PCM）再传给 wrapper，原始音频保留给 ASR/source artifact。根因验证样本为 Podnews `The risk takers in podcasting`：原始 MP3 含封面图视频流、双声道和非零 start time，pyannote 直接读取失败为 `requested chunk ... 439895 samples instead of ... 441000 samples`；同文件转成标准 WAV 后 wrapper 成功输出 2 speakers / 8 segments。5090D 回归 `audio-url-regression-podnews-risk-takers-20260620` 已从 `diarize -> publish` 跑通：quality=`safe_to_adapt`，normalized/script/manifest 均 10 段，voice roles 为 `female_a/male_a`，自动删除 3 个边界段，1 个 possible boundary warning 保留，最终 MP3 为 `22050 Hz` mono、约 `147.10s`、约 `2.35 MB`，ffmpeg 解码通过。
-  - 已校准 audio-first diarization 质量门：ASR/diarization overlap 先按 speaker 聚合，避免同一 speaker 被拆成多个 turns 后误算为 cross/ambiguous；`ambiguous_speaker_assignments` 现在要求 ambiguous 数量和比例同时达到阈值，少量低占比 ambiguous 只保留 advisory。5090D 回归：BBC Advertisers 从 `inspect_first` 变为 `safe_to_adapt`，35 段、3 speakers，自动删除 8 个边界段，并已跑通 `adapt -> publish`，最终 MP3 为 `22050 Hz` mono、约 `343.01s`、约 `5.49 MB`，ffmpeg 解码通过；BBC Hantavirus 因 `missing_diarization_overlap` 仍保持 `inspect_first`；BBC Screen Time 和 Podnews 仍为 `safe_to_adapt`。
+  - 已校准 audio-first diarization 质量门：ASR/diarization overlap 先按 speaker 聚合，避免同一 speaker 被拆成多个 turns 后误算为 cross/ambiguous；`ambiguous_speaker_assignments` 现在要求 ambiguous 数量和比例同时达到阈值，少量低占比 ambiguous 只保留 advisory；`missing_diarization_overlap` 现在写 count/ratio/duration/boundary metrics，只有正文缺失、缺失过多或边界缺失过长才 `inspect_first`，尾部短 farewell 缺口只保留 advisory。5090D 回归：BBC Advertisers 从 `inspect_first` 变为 `safe_to_adapt`，35 段、3 speakers，自动删除 8 个边界段，并已跑通 `adapt -> publish`，最终 MP3 为 `22050 Hz` mono、约 `343.01s`、约 `5.49 MB`，ffmpeg 解码通过；BBC Hantavirus 从 `inspect_first` 变为 `safe_to_adapt`，49 段、3 speakers、`missing_diarization_overlap_segment_count=1`、尾部缺失 1000ms，并已跑通 `normalize -> publish`，最终 MP3 为 `22050 Hz` mono、约 `365.27s`、约 `5.84 MB`，ffmpeg 解码通过；BBC Screen Time 和 Podnews 仍为 `safe_to_adapt`。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_normalize.py::test_audio_normalize_aggregates_same_speaker_split_turns tests/test_audio_normalize.py::test_audio_normalize_keeps_sparse_ambiguous_segments_safe -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_normalize.py -q`
@@ -1014,7 +1014,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - 或继续横评 `large-v3` / faster-whisper，但必须继续只在 audio-first 路线验证，不作为 Route A fallback。
 - 真实 ASR 模型横评和默认模型选择。
 - 真实 diarization 模型横评和默认模型选择。
-- 处理仍为 `inspect_first` 的 missing diarization overlap / speaker-turn 高交叉样本，例如 BBC Hantavirus。
+- 继续补更多 audio-url 短样本回归，重点观察 missing diarization overlap 是否只发生在首尾短 farewell/广告残留，以及 high cross 是否仍由高 primary-overlap 的 speaker-turn 细切分导致。
 - 同一节目跨 episode speaker profile 复用。
 - 人工 speaker 改名工具。
 - 长音频 chunking。

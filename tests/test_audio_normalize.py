@@ -361,6 +361,65 @@ def test_audio_normalize_marks_ambiguous_cross_speaker_segments_for_inspection(
     assert quality["metrics"]["min_primary_speaker_overlap_ratio"] == 0.5
 
 
+def test_audio_normalize_keeps_short_boundary_missing_overlap_safe(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-tail-missing")
+    _write_asr(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 2_000, "text": "Main episode sentence."},
+            {"start_ms": 2_200, "end_ms": 3_200, "text": "Bye."},
+        ],
+    )
+    _write_diarization(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 2_000, "speaker": "speaker_1"},
+        ],
+        speaker_count=1,
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert "missing_diarization_overlap" in quality["warnings"]
+    assert quality["metrics"]["missing_diarization_overlap_segment_count"] == 1
+    assert quality["metrics"]["missing_diarization_overlap_boundary_segment_count"] == 1
+    assert quality["metrics"]["missing_diarization_overlap_total_duration_ms"] == 1000
+
+
+def test_audio_normalize_marks_interior_missing_overlap_for_inspection(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-mid-missing")
+    _write_asr(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 2_000, "text": "Opening sentence."},
+            {"start_ms": 3_000, "end_ms": 5_000, "text": "Uncovered middle sentence."},
+            {"start_ms": 6_000, "end_ms": 8_000, "text": "Closing sentence."},
+        ],
+    )
+    _write_diarization(
+        run_paths,
+        [
+            {"start_ms": 0, "end_ms": 2_000, "speaker": "speaker_1"},
+            {"start_ms": 6_000, "end_ms": 8_000, "speaker": "speaker_1"},
+        ],
+        speaker_count=1,
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "inspect_first"
+    assert "missing_diarization_overlap" in quality["warnings"]
+    assert quality["metrics"]["missing_diarization_overlap_segment_count"] == 1
+    assert quality["metrics"]["missing_diarization_overlap_boundary_segment_count"] == 0
+
+
 def test_audio_normalize_rejects_empty_asr_text(tmp_path: Path):
     run_paths = create_run(tmp_path / "workspace", "audio-normalize-empty")
     _write_asr(
