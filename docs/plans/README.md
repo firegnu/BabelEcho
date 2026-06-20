@@ -91,4 +91,5 @@ docs/plans/
 ### Phase 2 Audio-first ASR
 
 - [03.01 Audio-first 本地音频 ASR 与说话人分离计划](./03-audio-first-asr/01-local-audio-asr-diarization.md) - `ready`
-- [03.02 Voice Profile Provider Contract](./03-audio-first-asr/02-voice-profile-provider-contract.md) - `ready`
+- [03.02 Voice Profile Provider Contract](./03-audio-first-asr/02-voice-profile-provider-contract.md) - `done`
+- [03.03 Real Voice Profile Provider](./03-audio-first-asr/03-real-voice-profile-provider.md) - `ready`
