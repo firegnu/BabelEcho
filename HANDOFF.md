@@ -2,7 +2,7 @@
 
 ## 0. 2026-06-20 最新接续状态
 
-新 session 优先读取 `resume-prompt.md`；本文件保留更长历史。当前功能基线已包含 audio-first URL ingest、边界内容自动清理、非 WAV diarization 输入规范化、BBC 类短音频 diarization 质量门校准，以及 newsletter/podcast promo 片尾清理回归。继续前仍按标准入口执行 `git status --short --branch` 和 `git log --oneline -3` 确认最新点。远端仍有既有 untracked 文件 `workspace/sources/practicalai-mcp-312-transcript.txt`，不要误删。
+新 session 优先读取 `resume-prompt.md`；本文件保留更长历史。当前功能基线已包含 audio-first URL ingest、边界内容自动清理、非 WAV diarization 输入规范化、BBC 类短音频 diarization 质量门校准、newsletter/podcast promo 片尾清理回归，以及 NPR 非 BBC direct-audio 短样本全链路回归。继续前仍按标准入口执行 `git status --short --branch` 和 `git log --oneline -3` 确认最新点。远端仍有既有 untracked 文件 `workspace/sources/practicalai-mcp-312-transcript.txt`，不要误删。
 
 Phase 2 Route B audio-first 当前状态：
 
@@ -13,6 +13,7 @@ Phase 2 Route B audio-first 当前状态：
 - 该 BBC 样本暴露 audio-first 真实内容清理问题：动态广告/片尾推广进入 ASR 和中文稿，首尾 segment 包含广告/推广性内容。链路可用，但在正式自用前应补 audio-first 的广告/舞台/片尾清理或人工裁剪入口。
 - 已新增 audio-first 边界内容自动清理：只处理开头/结尾边界窗口，高置信广告/推广自动删除，低置信只写 warning，不要求人工确认。5090D 重跑同一 BBC run 的 `normalize -> publish` 后，normalized/script/manifest 为 36 段，自动删除 4 个边界内容段，quality 仍为 `safe_to_adapt`，MP3 更新为 `22050 Hz` mono、约 `339.4s`，首段从“大家好，这里是六分钟英语”开始，尾段到“再见”结束；更新后的 MP3 已拷回同一本机 ignored 路径。
 - 已补 BBC newsletter/podcast promo 片尾清理回归：`audio-url-regression-bbc-6min-poetry-20260620` 在 `normalize` 阶段保持 `inspect_first`，原因是开头 ASR/动态内容噪声和 `ambiguous_speaker_assignments`，未强行进入 DeepSeek/TTS；`audio-url-regression-bbc-news-us-iran-20260620` 初始为 `safe_to_adapt` 但残留 newsletter/podcast promo 尾巴，已扩展高置信片尾规则并在 5090D 重跑为 `safe_to_adapt`，normalized/script/manifest 均 50 段，自动删除 6 个边界内容段，`possible_boundary_content_segment_count=0`，voice roles 为 `female_a/male_a`，最终 MP3 为 `22050 Hz` mono、约 `396.51s`、约 `6.05 MB`，已拷回本机 ignored `workspace/runs/audio-url-regression-bbc-news-us-iran-20260620/output/audio.mp3`。
+- 已补非 BBC direct-audio 短样本回归：`audio-url-regression-npr-newsnow-20260620` 使用 NPR News Now `NPR News: 06-20-2026 4AM EDT` RSS enclosure，输入 MP3 约 `280.06s`、`44100 Hz` stereo，URL artifact 只保留 `source_host=prfx.byspotify.com` 和 `source_path`，未泄漏 query。5090D 跑通 `--audio-url -> ASR -> diarize -> normalize -> DeepSeek -> TTS -> publish`：quality=`safe_to_adapt`，24 段、4 speakers，warnings 只有 `asr_segment_crosses_speaker_turns`，无 dropped/possible boundary content，manifest 使用 `female_a/female_b/male_a/male_b` 四个 voice role；最终 MP3 为 `22050 Hz` mono、约 `283.95s`、约 `4.54 MB`，ffmpeg 解码通过，published `transcript.zh.json` 已带中文 MP3 时间轴字段，产物已拷回本机 ignored `workspace/runs/audio-url-regression-npr-newsnow-20260620/output/audio.mp3`。
 - 已新增 diarization 输入规范化：`local_cli` diarization 对非 WAV 输入会先用 ffmpeg 生成 run-local `audio/diarization-input.wav`（mono、16k、PCM），再把该 WAV 传给 pyannote wrapper；原始音频仍保留给 ASR/source artifact。根因验证样本是 Podnews `The risk takers in podcasting` MP3：原始 MP3 含封面图视频流、双声道和非零 start time，pyannote 原始读取会因 10 秒 chunk 样本数不匹配失败；同文件转成标准 WAV 后 wrapper 可正常输出 diarization。5090D 回归 `audio-url-regression-podnews-risk-takers-20260620` 已从 `diarize -> publish` 跑通：quality=`safe_to_adapt`，10 段、2 speakers，自动删除 3 个边界段，1 个 possible boundary warning 保留，最终 MP3 为 `22050 Hz` mono、约 `147.10s`、约 `2.35 MB`，ffmpeg 解码通过，产物已拷回本机 ignored `workspace/runs/audio-url-regression-podnews-risk-takers-20260620/output/audio.mp3`。
 - 已校准 audio-first diarization 质量门：ASR segment 与 diarization turn 对齐时先按 speaker 聚合 overlap，避免同一 speaker 被拆成多个 turn 后误算为 cross/ambiguous；`ambiguous_speaker_assignments` 现在要求 ambiguous 数量和比例同时达标，少量低占比 ambiguous 仅保留 advisory warning；`missing_diarization_overlap` 现在会写 count/ratio/duration/boundary metrics，只有正文缺失、缺失过多或边界缺失过长才 `inspect_first`，尾部短 farewell 缺口只保留 advisory。5090D 回归结果：BBC Advertisers 从 `inspect_first` 变为 `safe_to_adapt` 并已跑通 `adapt -> publish`，最终 MP3 `22050 Hz` mono、约 `343.01s`；BBC Hantavirus 从 `inspect_first` 变为 `safe_to_adapt`，49 段、3 speakers、`missing_diarization_overlap_segment_count=1`、尾部缺失 1000ms，并已跑通 `normalize -> publish`，最终 MP3 `22050 Hz` mono、约 `365.27s`、约 `5.84 MB`，ffmpeg 解码通过；BBC Screen Time 和 Podnews 仍为 `safe_to_adapt`。
 - ASR provider 已有 `fixture` / `local_cli`；5090D 已验证本地 OpenAI Whisper `small.en`。
@@ -38,7 +39,7 @@ Phase 2 Route B audio-first 当前状态：
 
 下一步计划：
 
-- `audio_url` 已完成 ingest、normalize、短音频 full-chain、自动边界清理、非 WAV diarization 输入规范化、Hantavirus 类质量门校准和 newsletter/podcast promo 片尾清理。下一步优先补 1 条非 BBC direct-audio 短样本回归；若仍稳定，再转回 private speaker alias 人工确认 contract。不要直接把 alias map 接入 TTS。
+- `audio_url` 已完成 ingest、normalize、短音频 full-chain、自动边界清理、非 WAV diarization 输入规范化、Hantavirus 类质量门校准、newsletter/podcast promo 片尾清理和 NPR 非 BBC direct-audio 全链路回归。下一步转回 private speaker alias 人工确认 contract；不要直接把 alias map 接入 TTS。
 - 不进入“立即声音 clone”；embedding 仍只做诊断/跨集一致性，不喂给 TTS，不发布向量或声纹文件。
 - 本阶段仍要保持 Route B 隔离，不改 Route A 的 YouTube/RSS/iTunes/Article 已验证逻辑。
 
