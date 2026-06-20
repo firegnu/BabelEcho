@@ -7,6 +7,7 @@ import pytest
 
 from babelecho.jsonio import read_json, write_json
 from babelecho.speaker_alias_review import build_speaker_alias_review
+from babelecho.speaker_voice_role_map import build_speaker_voice_role_map
 from babelecho.speaker_aliases import build_speaker_aliases
 
 
@@ -434,3 +435,153 @@ def test_speaker_profiles_review_cli_preserves_existing_review_contract(tmp_path
     assert review["review_status_counts"] == {"confirmed": 1}
     assert review["aliases"][0]["review_status"] == "confirmed"
     assert review["aliases"][0]["review_note"] == "same host"
+
+
+def test_build_speaker_voice_role_map_uses_only_confirmed_aliases():
+    review = {
+        "schema_version": "1.0",
+        "source": "speaker_alias_review",
+        "aliases": [
+            {
+                "alias_id": "speaker_alias_001",
+                "review_status": "confirmed",
+                "members": [
+                    _speaker(0, "episode-a", "speaker_1", 120000),
+                    _speaker(1, "episode-b", "speaker_2", 110000),
+                ],
+            },
+            {
+                "alias_id": "speaker_alias_002",
+                "review_status": "candidate",
+                "members": [
+                    _speaker(0, "episode-a", "speaker_3", 100000),
+                    _speaker(1, "episode-b", "speaker_4", 100000),
+                ],
+            },
+        ],
+    }
+
+    role_map = build_speaker_voice_role_map(review)
+
+    assert role_map["schema_version"] == "1.0"
+    assert role_map["source"] == "speaker_voice_role_map"
+    assert role_map["assignment_mode"] == "confirmed_aliases_only"
+    assert role_map["voice_roles"] == ["female_a", "male_a", "female_b", "male_b"]
+    assert role_map["alias_count"] == 1
+    assert role_map["voice_role_map"] == {"speaker_alias_001": "female_a"}
+    assert role_map["aliases"] == [
+        {
+            "alias_id": "speaker_alias_001",
+            "voice_role": "female_a",
+            "review_status": "confirmed",
+            "members": [
+                {
+                    "run_index": 0,
+                    "run_id": "episode-a",
+                    "speaker_id": "speaker_1",
+                    "sample_count": 4,
+                    "sample_duration_ms": 120000,
+                },
+                {
+                    "run_index": 1,
+                    "run_id": "episode-b",
+                    "speaker_id": "speaker_2",
+                    "sample_count": 4,
+                    "sample_duration_ms": 110000,
+                },
+            ],
+        }
+    ]
+    assert role_map["skipped_aliases"] == [
+        {
+            "alias_id": "speaker_alias_002",
+            "review_status": "candidate",
+            "reason": "not_confirmed",
+        }
+    ]
+
+
+def test_build_speaker_voice_role_map_preserves_existing_roles():
+    review = {
+        "schema_version": "1.0",
+        "source": "speaker_alias_review",
+        "aliases": [
+            {
+                "alias_id": "speaker_alias_001",
+                "review_status": "confirmed",
+                "members": [_speaker(0, "episode-a", "speaker_1", 120000)],
+            },
+            {
+                "alias_id": "speaker_alias_002",
+                "review_status": "confirmed",
+                "members": [_speaker(1, "episode-b", "speaker_2", 110000)],
+            },
+        ],
+    }
+    existing_map = {
+        "schema_version": "1.0",
+        "source": "speaker_voice_role_map",
+        "voice_role_map": {"speaker_alias_002": "male_b"},
+    }
+
+    role_map = build_speaker_voice_role_map(review, existing_map=existing_map)
+
+    assert role_map["voice_role_map"] == {
+        "speaker_alias_001": "female_a",
+        "speaker_alias_002": "male_b",
+    }
+    assert role_map["aliases"][1]["voice_role"] == "male_b"
+
+
+def test_speaker_profiles_voice_roles_cli_writes_private_map(tmp_path: Path):
+    review_path = tmp_path / "speaker-alias-review.json"
+    output_json = tmp_path / "speaker-voice-role-map.json"
+    write_json(
+        review_path,
+        {
+            "schema_version": "1.0",
+            "source": "speaker_alias_review",
+            "aliases": [
+                {
+                    "alias_id": "speaker_alias_001",
+                    "review_status": "confirmed",
+                    "members": [_speaker(0, "episode-a", "speaker_1", 120000)],
+                },
+                {
+                    "alias_id": "speaker_alias_002",
+                    "review_status": "rejected",
+                    "members": [_speaker(1, "episode-b", "speaker_2", 110000)],
+                },
+            ],
+        },
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "speaker-profiles",
+            "voice-roles",
+            "--review",
+            str(review_path),
+            "--output-json",
+            str(output_json),
+        ],
+        text=True,
+        capture_output=True,
+        env=_worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "speaker voice roles: 1 aliases" in result.stdout
+    role_map = read_json(output_json)
+    assert role_map["voice_role_map"] == {"speaker_alias_001": "female_a"}
+    assert role_map["skipped_aliases"] == [
+        {
+            "alias_id": "speaker_alias_002",
+            "review_status": "rejected",
+            "reason": "not_confirmed",
+        }
+    ]

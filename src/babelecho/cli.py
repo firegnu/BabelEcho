@@ -46,6 +46,10 @@ from .speaker_similarity import (
     compare_speaker_profiles,
     format_speaker_similarity_summary,
 )
+from .speaker_voice_role_map import (
+    build_speaker_voice_role_map,
+    format_speaker_voice_role_map_summary,
+)
 from .speaker_voices import infer_speaker_voices, infer_speaker_voices_if_enabled
 from .status import (
     init_run_status,
@@ -184,6 +188,16 @@ def build_parser() -> argparse.ArgumentParser:
     speaker_profiles_review.add_argument(
         "--existing-review",
         help="Existing review JSON whose decisions should be preserved by alias_id.",
+    )
+    speaker_profiles_voice_roles = speaker_profiles_subparsers.add_parser(
+        "voice-roles",
+        help="Build a private voice-role map from confirmed speaker aliases.",
+    )
+    speaker_profiles_voice_roles.add_argument("--review", required=True)
+    speaker_profiles_voice_roles.add_argument("--output-json", required=True)
+    speaker_profiles_voice_roles.add_argument(
+        "--existing-map",
+        help="Existing voice-role map whose roles should be preserved by alias_id.",
     )
 
     podcast_index = subparsers.add_parser(
@@ -928,6 +942,20 @@ def main(argv: list[str] | None = None) -> int:
                 write_json(args.output_json, review)
                 print(f"speaker alias review: {args.output_json}")
                 print(format_speaker_alias_review_summary(review))
+                return 0
+            if args.speaker_profiles_command == "voice-roles":
+                existing_map = (
+                    read_json(args.existing_map)
+                    if args.existing_map
+                    else None
+                )
+                role_map = build_speaker_voice_role_map(
+                    read_json(args.review),
+                    existing_map=existing_map,
+                )
+                write_json(args.output_json, role_map)
+                print(f"speaker voice role map: {args.output_json}")
+                print(format_speaker_voice_role_map_summary(role_map))
                 return 0
         except Exception as error:
             print(str(error), file=sys.stderr)

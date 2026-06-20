@@ -83,7 +83,18 @@
 - The review contract contains only safe metadata: alias id, candidate stats, member run ids/speaker ids, sample counts/durations, reviewer/review time/note fields. It does not identify real people.
 - Local verification passed: `tests/test_speaker_aliases.py` covers candidate defaults, safe-field stripping, decision preservation, and the CLI; full `pytest -q` also passed.
 - 5090D real smoke passed on the five-episode Practical AI alias map: `workspace/runs/speaker-alias-review-practicalai-real-five-episodes-20260620.json` contains 2 aliases, `review_status_counts={"candidate": 2}`, and no `embedding_artifact` or `voice-profiles` strings.
-- Remaining work: decide how `confirmed` aliases map to stable cross-episode Chinese voice roles. Do not auto-apply unconfirmed aliases, do not use embeddings for TTS, and do not do voice clone.
+- Remaining work after this step: decide how `confirmed` aliases map to stable cross-episode Chinese voice roles. Do not auto-apply unconfirmed aliases, do not use embeddings for TTS, and do not do voice clone.
+
+### 2026-06-20：private confirmed-alias voice-role map contract implemented
+
+- Added `src/babelecho/speaker_voice_role_map.py` and CLI entrypoint `babelecho speaker-profiles voice-roles`.
+- The command consumes a private speaker alias review JSON and writes a private voice-role map JSON.
+- Only aliases with `review_status=confirmed` are assigned fixed Chinese voice roles. `candidate`, `rejected`, `split`, and `ignored` aliases are listed under `skipped_aliases` with `reason=not_confirmed`.
+- Default role assignment uses the existing fixed role sequence `female_a`, `male_a`, `female_b`, `male_b`.
+- `--existing-map` preserves existing `alias_id -> voice_role` assignments so regenerating the map does not drift recurring speakers to a different Chinese voice role.
+- The output is still a passive contract: it is not consumed by TTS routing, is not published, does not read or output embeddings, and does not perform voice clone.
+- Local focused verification passed: `tests/test_speaker_aliases.py tests/test_speaker_similarity.py tests/test_voice_profile.py tests/test_speaker_voices.py`.
+- Remaining work: add an explicit opt-in application path that turns this private map into per-run `speaker_voices` only when the user chooses to apply it. Do not auto-apply this map to synthesize.
 
 ---
 
@@ -103,13 +114,13 @@
 - Keep `embedding_artifact` as a run-local relative path only.
 - Add a deterministic fake local CLI wrapper test before touching real model wrappers.
 - Add a 5090D model-probe task that compares candidate embedding backends before choosing a default.
-- Build private speaker alias candidates and a private review file from similarity reports after enough same-show samples are available.
+- Build private speaker alias candidates, a private review file, and a private confirmed-alias voice-role map from similarity reports after enough same-show samples are available.
 
 ### Out
 
 - Do not clone original host voices.
 - Do not synthesize Chinese audio using extracted embeddings.
-- Do not automatically apply unconfirmed alias candidates or review files to TTS voice roles.
+- Do not automatically apply unconfirmed alias candidates, review files, or voice-role maps to TTS voice roles.
 - Do not identify real people.
 - Do not publish vectors or embedding files under `workspace/published/`.
 - Do not change Route A transcript-first, YouTube, RSS, iTunes, PodcastIndex, episode page, article, or frontend-only flows.
