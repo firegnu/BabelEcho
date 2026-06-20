@@ -507,6 +507,12 @@
       audio.playbackRate = next; e.target.textContent = next.toFixed(2).replace(/0$/, '') + '×';
       return;
     }
+    const segEl = e.target.closest('[data-start]');
+    if (segEl && curEp) {
+      audio.currentTime = Number(segEl.dataset.start) / 1000;
+      if (audio.paused) audio.play().catch(() => {});
+      return;
+    }
     // mobile collapsible cards (also keyboard-activatable via the toggle button)
     const head = e.target.closest('.collapsible .card-head');
     if (head && mobileMQ.matches) {
