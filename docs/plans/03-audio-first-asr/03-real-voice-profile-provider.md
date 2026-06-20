@@ -23,6 +23,16 @@
 - Publish remains summary-only: `artifact.json.asr.speaker_profiles` does not expose `embedding_artifact`, and `asr/voice-profiles/*.json` is not copied to `workspace/published/`.
 - Remaining work: run the 5090D model probe in an ignored `babelecho-voice-profile` environment and select a real backend before replacing the stub with a model-specific wrapper.
 
+### 2026-06-20：5090D model probe selected SpeechBrain ECAPA
+
+- Created `/home/th5090d/miniforge3/envs/babelecho-voice-profile` as an isolated environment. It was cloned from `babelecho-diarization`, then `speechbrain 1.1.0` and `sentencepiece 0.2.1` were installed only in this voice-profile env.
+- `pyannote/embedding` was blocked by Hugging Face gated repo 403 with the current `HF_TOKEN`, so pyannote embedding is not the first implementation backend.
+- `speechbrain/spkrec-ecapa-voxceleb` ran successfully on `workspace/sources/asr-practicalai-zero-trust-8min.wav` with the existing Practical AI diarization artifact.
+- Probe stats: CUDA device, 192-dimensional embeddings, selected 5 samples for `speaker_1` and 4 for `speaker_2`, total probe time about `36.9s`, outer wall time about `38.1s`, peak RSS about `2.4 GB`.
+- Separation signal: within-speaker cosine means were about `0.929` and `0.849`; between-speaker cosine was about `0.457`.
+- NeMo was not tested because SpeechBrain ECAPA is a viable candidate.
+- Remaining work: replace `tools/speaker_embedding_wrapper.py` contract stub with a SpeechBrain-specific wrapper that writes run-local `asr/voice-profiles/*.json` and summary-only metadata.
+
 ---
 
 ## Scope
@@ -673,7 +683,7 @@ Document:
 voice_profile:
   provider: local_cli
   command: "/home/th5090d/miniforge3/envs/babelecho-voice-profile/bin/python tools/speaker_embedding_wrapper.py"
-  model: pyannote/embedding
+  model: speechbrain/spkrec-ecapa-voxceleb
   device: cuda
 ```
 
