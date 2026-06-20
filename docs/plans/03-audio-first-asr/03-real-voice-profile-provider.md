@@ -56,6 +56,24 @@
 - Negative smoke: JFK audio did not provide usable embedding windows; speakers were marked `unavailable`, so it is not useful for cross-episode consistency.
 - Remaining work: calibrate thresholds on more true same-show episodes before producing any private speaker alias map. Do not use embeddings for voice clone, identity recognition, or TTS conditioning.
 
+### 2026-06-20：private speaker alias candidates implemented
+
+- Added `src/babelecho/speaker_aliases.py` and CLI entrypoint `babelecho speaker-profiles alias`.
+- The alias command consumes an existing similarity report and writes a private candidate map. It does not read embedding vectors and does not output `embedding_artifact` paths.
+- Conservative defaults: `same_threshold=0.85`, `min_sample_duration_ms=60000`, `min_members=2`.
+- Safety behavior:
+  - speakers below the minimum sample duration are skipped, which filters repeated short intro/narration-like speakers;
+  - any connected component with multiple speakers from the same run is skipped instead of forcing a merge.
+- Local verification passed: `tests/test_speaker_aliases.py`, speaker-focused tests, and full `pytest -q` (`238 passed`). 5090D verification passed: `tests/test_speaker_aliases.py`.
+- 5090D added three more Practical AI public RSS 8-minute samples: `mcp-kubernetes`, `hermes-agent`, and `model-wars`.
+- Five-episode report `workspace/runs/speaker-similarity-practicalai-real-five-episodes-20260620.json`: 14 computed speakers, 78 cross-run pairs, `likely_same=19`, `possible_same=0`, `different=59`.
+- Alias map `workspace/runs/speaker-aliases-practicalai-real-five-episodes-20260620.json`:
+  - `speaker_alias_001`: 5 members, pair_count 9, min/avg/max cosine `0.850890/0.909038/0.959153`;
+  - `speaker_alias_002`: 3 members, pair_count 3, min/avg/max cosine `0.881848/0.898437/0.919010`;
+  - skipped 4 short speakers around 32 seconds each;
+  - verified no `embedding`, `embedding_artifact`, `voice-profiles`, or artifact path references are present in the alias map.
+- Remaining work: add an explicit human-confirmation contract before any alias candidate influences cross-episode Chinese TTS voice-role assignment.
+
 ---
 
 ## Scope
@@ -74,11 +92,13 @@
 - Keep `embedding_artifact` as a run-local relative path only.
 - Add a deterministic fake local CLI wrapper test before touching real model wrappers.
 - Add a 5090D model-probe task that compares candidate embedding backends before choosing a default.
+- Build private speaker alias candidates from similarity reports after enough same-show samples are available.
 
 ### Out
 
 - Do not clone original host voices.
 - Do not synthesize Chinese audio using extracted embeddings.
+- Do not automatically apply unconfirmed alias candidates to TTS voice roles.
 - Do not identify real people.
 - Do not publish vectors or embedding files under `workspace/published/`.
 - Do not change Route A transcript-first, YouTube, RSS, iTunes, PodcastIndex, episode page, article, or frontend-only flows.
