@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +15,31 @@ MERGE_MAX_DURATION_MS = 45_000
 AMBIGUOUS_PRIMARY_OVERLAP_RATIO = 0.60
 AMBIGUOUS_SEGMENT_COUNT_INSPECT_THRESHOLD = 3
 AMBIGUOUS_SEGMENT_RATIO_INSPECT_THRESHOLD = 0.05
+BOUNDARY_CONTENT_WINDOW_MS = 120_000
+BOUNDARY_CONTENT_MAX_SEGMENTS = 8
+
+HIGH_CONFIDENCE_BOUNDARY_CONTENT_PATTERNS = (
+    re.compile(r"\bsupported by (?:ads|advertising)\b", re.IGNORECASE),
+    re.compile(r"\b(?:advertisement|advertising|sponsored by|brought to you by)\b", re.IGNORECASE),
+    re.compile(r"\bthis tv broadcast\b.*\bwebsite\b", re.IGNORECASE),
+    re.compile(r"\bbbc\s+(?:nl|sounds|iplayer)\b.*\b(?:drama|series|comedy|watch|listen|download)\b", re.IGNORECASE),
+    re.compile(r"\bbest of brits\b", re.IGNORECASE),
+)
+POSSIBLE_BOUNDARY_CONTENT_PATTERNS = (
+    re.compile(r"\bfor more information\b", re.IGNORECASE),
+    re.compile(r"\bvisit (?:our|the) website\b", re.IGNORECASE),
+    re.compile(r"\bdownload (?:the )?(?:bbc )?(?:sounds )?app\b", re.IGNORECASE),
+    re.compile(r"\bsubscribe\b|\bfollow us\b|\brate and review\b", re.IGNORECASE),
+)
+MAIN_INTRO_PATTERNS = (
+    re.compile(r"^(?:hello|hi|welcome)\b.*\b(?:this is|to)\b", re.IGNORECASE),
+    re.compile(r"\bthis is\b.{0,80}\b(?:podcast|show|episode|programme|program|english)\b", re.IGNORECASE),
+    re.compile(r"\bin this (?:episode|programme|program)\b", re.IGNORECASE),
+)
+FAREWELL_PATTERNS = (
+    re.compile(r"\bgoodbye\b|\bbye for now\b|\bsee you again soon\b", re.IGNORECASE),
+    re.compile(r"\bour .* time .* up\b|\bonce again,? our .* minutes are up\b", re.IGNORECASE),
+)
 
 
 def _asr_raw_path(run_paths: RunPaths) -> Path:
@@ -223,6 +249,126 @@ def _merge_adjacent_same_speaker_segments(
     ]
 
 
+def _matches_any(patterns: tuple[re.Pattern[str], ...], text: str) -> bool:
+    return any(pattern.search(text) for pattern in patterns)
+
+
+def _is_high_confidence_boundary_content(segment: dict[str, Any]) -> bool:
+    text = str(segment.get("text") or "")
+    return _matches_any(HIGH_CONFIDENCE_BOUNDARY_CONTENT_PATTERNS, text)
+
+
+def _is_possible_boundary_content(segment: dict[str, Any]) -> bool:
+    text = str(segment.get("text") or "")
+    return _matches_any(POSSIBLE_BOUNDARY_CONTENT_PATTERNS, text)
+
+
+def _is_main_intro(segment: dict[str, Any]) -> bool:
+    text = str(segment.get("text") or "")
+    return _matches_any(MAIN_INTRO_PATTERNS, text)
+
+
+def _is_farewell(segment: dict[str, Any]) -> bool:
+    text = str(segment.get("text") or "")
+    return _matches_any(FAREWELL_PATTERNS, text)
+
+
+def _leading_boundary_indices(segments: list[dict[str, Any]]) -> list[int]:
+    if not segments:
+        return []
+    first_start = int(segments[0]["start_ms"])
+    indices = []
+    for index, segment in enumerate(segments[:BOUNDARY_CONTENT_MAX_SEGMENTS]):
+        if int(segment["start_ms"]) - first_start > BOUNDARY_CONTENT_WINDOW_MS:
+            break
+        indices.append(index)
+    return indices
+
+
+def _trailing_boundary_indices(segments: list[dict[str, Any]]) -> list[int]:
+    if not segments:
+        return []
+    last_end = int(segments[-1]["end_ms"])
+    start_index = max(0, len(segments) - BOUNDARY_CONTENT_MAX_SEGMENTS)
+    indices = []
+    for index in range(start_index, len(segments)):
+        if last_end - int(segments[index]["end_ms"]) <= BOUNDARY_CONTENT_WINDOW_MS:
+            indices.append(index)
+    return indices
+
+
+def _renumber_segments(segments: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        {
+            **segment,
+            "id": f"{index:04d}",
+        }
+        for index, segment in enumerate(segments, start=1)
+    ]
+
+
+def _boundary_content_cleanup(
+    segments: list[dict[str, Any]],
+    warnings: list[str],
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+    dropped_indices: set[int] = set()
+    leading_indices = _leading_boundary_indices(segments)
+    intro_index = next(
+        (index for index in leading_indices if _is_main_intro(segments[index])),
+        None,
+    )
+    if intro_index is not None and any(
+        _is_high_confidence_boundary_content(segments[index])
+        for index in leading_indices
+        if index < intro_index
+    ):
+        dropped_indices.update(range(0, intro_index))
+    else:
+        for index in leading_indices:
+            if _is_high_confidence_boundary_content(segments[index]):
+                dropped_indices.add(index)
+
+    trailing_indices = _trailing_boundary_indices(segments)
+    farewell_index = next(
+        (
+            index
+            for index in reversed(trailing_indices)
+            if _is_farewell(segments[index])
+        ),
+        None,
+    )
+    if farewell_index is not None and any(
+        _is_high_confidence_boundary_content(segments[index])
+        for index in trailing_indices
+        if index > farewell_index
+    ):
+        dropped_indices.update(range(farewell_index + 1, len(segments)))
+    else:
+        for index in trailing_indices:
+            if _is_high_confidence_boundary_content(segments[index]):
+                dropped_indices.add(index)
+
+    cleaned = [
+        segment for index, segment in enumerate(segments) if index not in dropped_indices
+    ]
+    possible_count = sum(
+        1
+        for index in set(_leading_boundary_indices(cleaned) + _trailing_boundary_indices(cleaned))
+        if _is_possible_boundary_content(cleaned[index])
+        and not _is_high_confidence_boundary_content(cleaned[index])
+    )
+
+    if dropped_indices:
+        _add_warning(warnings, "dropped_boundary_content_segments")
+    if possible_count:
+        _add_warning(warnings, "possible_boundary_content_segments")
+
+    return _renumber_segments(cleaned), {
+        "dropped_boundary_content_segment_count": len(dropped_indices),
+        "possible_boundary_content_segment_count": possible_count,
+    }
+
+
 def _speaker_turn_metrics(diarization: dict[str, Any]) -> dict[str, Any]:
     turns = diarization.get("segments") or []
     durations = [
@@ -327,6 +473,8 @@ def normalize_audio_transcript(run_paths: RunPaths) -> Path:
         diarization,
         warnings,
     )
+    segments, cleanup_metrics = _boundary_content_cleanup(segments, warnings)
+    segment_metrics.update(cleanup_metrics)
     normalized = {
         "episode_id": run_paths.run_id,
         "language": raw_asr.get("language") or "en",

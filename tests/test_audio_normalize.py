@@ -328,3 +328,104 @@ def test_audio_normalize_merges_adjacent_same_speaker_short_segments(
             "source": "asr",
         }
     ]
+
+
+def test_audio_normalize_drops_high_confidence_boundary_ads(tmp_path: Path):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-boundary-ads")
+    _write_audio_source(run_paths)
+    _write_asr(
+        run_paths,
+        [
+            {
+                "start_ms": 0,
+                "end_ms": 3500,
+                "text": "This BBC podcast is supported by ads outside the UK.",
+            },
+            {
+                "start_ms": 30000,
+                "end_ms": 40180,
+                "text": "This TV broadcast will be waiting only one year for more information on our website.",
+            },
+            {
+                "start_ms": 60000,
+                "end_ms": 64340,
+                "text": "One point five. Do you want to work, astronaut?",
+            },
+            {
+                "start_ms": 90000,
+                "end_ms": 100800,
+                "text": "Hello. This is 6 Minute English from BBC Learning English.",
+            },
+            {
+                "start_ms": 100800,
+                "end_ms": 110000,
+                "text": "Today we are talking about screen time for children.",
+            },
+            {
+                "start_ms": 450000,
+                "end_ms": 462000,
+                "text": "Once again, our six minutes are up.",
+            },
+            {"start_ms": 462000, "end_ms": 466000, "text": "Goodbye."},
+            {
+                "start_ms": 476000,
+                "end_ms": 492000,
+                "text": "BBC NL is the best of Brits drama and comedy series.",
+            },
+        ],
+    )
+    write_json(
+        run_paths.run_dir / "asr" / "diarization.json",
+        {"provider": "none", "model": None, "speaker_count": 1, "segments": []},
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    normalized = read_json(run_paths.normalized_transcript_json)
+    assert [segment["text"] for segment in normalized["segments"]] == [
+        "Hello. This is 6 Minute English from BBC Learning English. Today we are talking about screen time for children.",
+        "Once again, our six minutes are up. Goodbye.",
+    ]
+    assert [segment["id"] for segment in normalized["segments"]] == ["0001", "0002"]
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert "dropped_boundary_content_segments" in quality["warnings"]
+    assert quality["metrics"]["dropped_boundary_content_segment_count"] == 4
+    assert quality["metrics"]["segment_count"] == 2
+
+
+def test_audio_normalize_keeps_uncertain_boundary_promo_with_warning(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path / "workspace", "audio-normalize-possible-promo")
+    _write_audio_source(run_paths)
+    _write_asr(
+        run_paths,
+        [
+            {
+                "start_ms": 0,
+                "end_ms": 4000,
+                "text": "For more information, visit our website.",
+            },
+            {
+                "start_ms": 4500,
+                "end_ms": 8000,
+                "text": "Welcome to the actual episode.",
+            },
+        ],
+    )
+    write_json(
+        run_paths.run_dir / "asr" / "diarization.json",
+        {"provider": "none", "model": None, "speaker_count": 1, "segments": []},
+    )
+
+    normalize_audio_transcript(run_paths)
+
+    normalized = read_json(run_paths.normalized_transcript_json)
+    assert [segment["text"] for segment in normalized["segments"]] == [
+        "For more information, visit our website. Welcome to the actual episode."
+    ]
+    quality = read_json(run_paths.transcript_quality_json)
+    assert quality["recommendation"] == "safe_to_adapt"
+    assert "possible_boundary_content_segments" in quality["warnings"]
+    assert quality["metrics"]["possible_boundary_content_segment_count"] == 1
