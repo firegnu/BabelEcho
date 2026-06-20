@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from babelecho.jsonio import read_json, write_json
+from babelecho.speaker_alias_review import build_speaker_alias_review
 from babelecho.speaker_aliases import build_speaker_aliases
 
 
@@ -201,3 +202,235 @@ def test_speaker_profiles_alias_cli_writes_private_alias_map(tmp_path: Path):
     aliases = read_json(output_json)
     assert aliases["aliases"][0]["members"][0]["speaker_id"] == "speaker_1"
     assert "embedding_artifact" not in aliases["aliases"][0]["members"][0]
+
+
+def test_build_speaker_alias_review_defaults_candidates_and_keeps_safe_fields():
+    alias_map = {
+        "schema_version": "1.0",
+        "source": "speaker_similarity_report",
+        "alias_count": 1,
+        "aliases": [
+            {
+                "alias_id": "speaker_alias_001",
+                "member_count": 2,
+                "pair_count": 1,
+                "min_cosine": 0.92,
+                "max_cosine": 0.92,
+                "average_cosine": 0.92,
+                "members": [
+                    {
+                        "run_index": 0,
+                        "run_id": "episode-a",
+                        "speaker_id": "speaker_1",
+                        "sample_count": 4,
+                        "sample_duration_ms": 120000,
+                        "embedding_artifact": "asr/voice-profiles/speaker_1.json",
+                    },
+                    {
+                        "run_index": 1,
+                        "run_id": "episode-b",
+                        "speaker_id": "speaker_2",
+                        "sample_count": 4,
+                        "sample_duration_ms": 110000,
+                    },
+                ],
+            }
+        ],
+    }
+
+    review = build_speaker_alias_review(alias_map)
+
+    assert review["schema_version"] == "1.0"
+    assert review["source"] == "speaker_alias_review"
+    assert review["review_status_counts"] == {"candidate": 1}
+    assert review["aliases"] == [
+        {
+            "alias_id": "speaker_alias_001",
+            "candidate_alias_id": "speaker_alias_001",
+            "review_status": "candidate",
+            "reviewer": None,
+            "reviewed_at": None,
+            "review_note": None,
+            "candidate": {
+                "member_count": 2,
+                "pair_count": 1,
+                "min_cosine": 0.92,
+                "max_cosine": 0.92,
+                "average_cosine": 0.92,
+            },
+            "members": [
+                {
+                    "run_index": 0,
+                    "run_id": "episode-a",
+                    "speaker_id": "speaker_1",
+                    "sample_count": 4,
+                    "sample_duration_ms": 120000,
+                },
+                {
+                    "run_index": 1,
+                    "run_id": "episode-b",
+                    "speaker_id": "speaker_2",
+                    "sample_count": 4,
+                    "sample_duration_ms": 110000,
+                },
+            ],
+        }
+    ]
+
+
+def test_build_speaker_alias_review_preserves_existing_review_decisions():
+    alias_map = {
+        "schema_version": "1.0",
+        "aliases": [
+            {
+                "alias_id": "speaker_alias_001",
+                "member_count": 2,
+                "pair_count": 1,
+                "min_cosine": 0.91,
+                "max_cosine": 0.91,
+                "average_cosine": 0.91,
+                "members": [
+                    _speaker(0, "episode-a", "speaker_1", 120000),
+                    _speaker(1, "episode-b", "speaker_2", 110000),
+                ],
+            }
+        ],
+    }
+    existing_review = {
+        "schema_version": "1.0",
+        "source": "speaker_alias_review",
+        "aliases": [
+            {
+                "alias_id": "speaker_alias_001",
+                "review_status": "confirmed",
+                "reviewer": "local",
+                "reviewed_at": "2026-06-20T08:00:00Z",
+                "review_note": "same host",
+            }
+        ],
+    }
+
+    review = build_speaker_alias_review(alias_map, existing_review=existing_review)
+
+    assert review["review_status_counts"] == {"confirmed": 1}
+    reviewed = review["aliases"][0]
+    assert reviewed["review_status"] == "confirmed"
+    assert reviewed["reviewer"] == "local"
+    assert reviewed["reviewed_at"] == "2026-06-20T08:00:00Z"
+    assert reviewed["review_note"] == "same host"
+
+
+def test_speaker_profiles_review_cli_writes_private_review_contract(tmp_path: Path):
+    alias_map_path = tmp_path / "speaker-aliases.json"
+    output_json = tmp_path / "speaker-alias-review.json"
+    write_json(
+        alias_map_path,
+        {
+            "schema_version": "1.0",
+            "aliases": [
+                {
+                    "alias_id": "speaker_alias_001",
+                    "member_count": 2,
+                    "pair_count": 1,
+                    "min_cosine": 0.91,
+                    "max_cosine": 0.91,
+                    "average_cosine": 0.91,
+                    "members": [
+                        _speaker(0, "episode-a", "speaker_1", 120000),
+                        _speaker(1, "episode-b", "speaker_2", 110000),
+                    ],
+                }
+            ],
+        },
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "speaker-profiles",
+            "review",
+            "--alias-map",
+            str(alias_map_path),
+            "--output-json",
+            str(output_json),
+        ],
+        text=True,
+        capture_output=True,
+        env=_worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "speaker alias review: 1 aliases" in result.stdout
+    review = read_json(output_json)
+    assert review["aliases"][0]["review_status"] == "candidate"
+
+
+def test_speaker_profiles_review_cli_preserves_existing_review_contract(tmp_path: Path):
+    alias_map_path = tmp_path / "speaker-aliases.json"
+    existing_review_path = tmp_path / "speaker-alias-review-existing.json"
+    output_json = tmp_path / "speaker-alias-review.json"
+    write_json(
+        alias_map_path,
+        {
+            "schema_version": "1.0",
+            "aliases": [
+                {
+                    "alias_id": "speaker_alias_001",
+                    "member_count": 2,
+                    "pair_count": 1,
+                    "min_cosine": 0.91,
+                    "max_cosine": 0.91,
+                    "average_cosine": 0.91,
+                    "members": [
+                        _speaker(0, "episode-a", "speaker_1", 120000),
+                        _speaker(1, "episode-b", "speaker_2", 110000),
+                    ],
+                }
+            ],
+        },
+    )
+    write_json(
+        existing_review_path,
+        {
+            "schema_version": "1.0",
+            "source": "speaker_alias_review",
+            "aliases": [
+                {
+                    "alias_id": "speaker_alias_001",
+                    "review_status": "confirmed",
+                    "reviewer": "local",
+                    "reviewed_at": "2026-06-20T08:00:00Z",
+                    "review_note": "same host",
+                }
+            ],
+        },
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "speaker-profiles",
+            "review",
+            "--alias-map",
+            str(alias_map_path),
+            "--existing-review",
+            str(existing_review_path),
+            "--output-json",
+            str(output_json),
+        ],
+        text=True,
+        capture_output=True,
+        env=_worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    review = read_json(output_json)
+    assert review["review_status_counts"] == {"confirmed": 1}
+    assert review["aliases"][0]["review_status"] == "confirmed"
+    assert review["aliases"][0]["review_note"] == "same host"

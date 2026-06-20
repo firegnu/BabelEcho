@@ -72,7 +72,17 @@
   - `speaker_alias_002`: 3 members, pair_count 3, min/avg/max cosine `0.881848/0.898437/0.919010`;
   - skipped 4 short speakers around 32 seconds each;
   - verified no `embedding`, `embedding_artifact`, `voice-profiles`, or artifact path references are present in the alias map.
-- Remaining work: add an explicit human-confirmation contract before any alias candidate influences cross-episode Chinese TTS voice-role assignment.
+- Remaining work after this step: add an explicit human-confirmation contract before any alias candidate influences cross-episode Chinese TTS voice-role assignment.
+
+### 2026-06-20：private speaker alias review contract implemented
+
+- Added `src/babelecho/speaker_alias_review.py` and CLI entrypoint `babelecho speaker-profiles review`.
+- The review command consumes a private alias candidate map and writes a private review JSON. It does not read embedding vectors, does not output `embedding_artifact` paths, and is not consumed by TTS routing.
+- Review statuses are explicit and editable: `candidate`, `confirmed`, `rejected`, `split`, `ignored`.
+- Default output marks every alias as `candidate`; `--existing-review` preserves any previous decision by `alias_id`, so a confirmed/rejected alias is not overwritten when regenerating the review file from updated candidates.
+- The review contract contains only safe metadata: alias id, candidate stats, member run ids/speaker ids, sample counts/durations, reviewer/review time/note fields. It does not identify real people.
+- Local verification passed: `tests/test_speaker_aliases.py` covers candidate defaults, safe-field stripping, decision preservation, and the CLI; full `pytest -q` also passed.
+- Remaining work: decide how `confirmed` aliases map to stable cross-episode Chinese voice roles. Do not auto-apply unconfirmed aliases, do not use embeddings for TTS, and do not do voice clone.
 
 ---
 
@@ -92,13 +102,13 @@
 - Keep `embedding_artifact` as a run-local relative path only.
 - Add a deterministic fake local CLI wrapper test before touching real model wrappers.
 - Add a 5090D model-probe task that compares candidate embedding backends before choosing a default.
-- Build private speaker alias candidates from similarity reports after enough same-show samples are available.
+- Build private speaker alias candidates and a private review file from similarity reports after enough same-show samples are available.
 
 ### Out
 
 - Do not clone original host voices.
 - Do not synthesize Chinese audio using extracted embeddings.
-- Do not automatically apply unconfirmed alias candidates to TTS voice roles.
+- Do not automatically apply unconfirmed alias candidates or review files to TTS voice roles.
 - Do not identify real people.
 - Do not publish vectors or embedding files under `workspace/published/`.
 - Do not change Route A transcript-first, YouTube, RSS, iTunes, PodcastIndex, episode page, article, or frontend-only flows.

@@ -26,6 +26,7 @@ Phase 2 Route B audio-first 当前状态：
 - 5090D 真实两集 smoke 已完成：`audio-voice-profile-real-practicalai-zero-trust-8min-20260620` 产出 2 个 192 维 embedding；`audio-voice-profile-real-practicalai-ai-index-8min-20260620` 产出 3 个 192 维 embedding。报告 `workspace/runs/speaker-similarity-practicalai-real-two-episodes-20260620.json` 共 6 个 cross-run pair：`likely_same=2`、`different=4`；最高两对为 `speaker_1 -> speaker_2 cosine=0.959153` 和 `speaker_2 -> speaker_3 cosine=0.881848`。
 - 5090D 已继续补 3 集 Practical AI 真实音频样本：`mcp-kubernetes`、`hermes-agent`、`model-wars`，均为公开 RSS 音频前 8 分钟，均跑通真实 ASR/diarization/SpeechBrain embedding。五集报告 `workspace/runs/speaker-similarity-practicalai-real-five-episodes-20260620.json`：14 个 computed speaker、78 个 cross-run pair、`likely_same=19`、`different=59`。
 - 新增 `babelecho speaker-profiles alias --similarity-report ... --output-json ...`，从 similarity report 生成私有 speaker alias candidates；默认 `same_threshold=0.85`、`min_sample_duration_ms=60000`，用于过滤短片头/旁白片段。5090D alias map `workspace/runs/speaker-aliases-practicalai-real-five-episodes-20260620.json` 生成 2 个 alias：`speaker_alias_001` 有 5 个成员，min/avg/max cosine `0.850890/0.909038/0.959153`；`speaker_alias_002` 有 3 个成员，min/avg/max `0.881848/0.898437/0.919010`；4 个约 32 秒的 `speaker_1` 短样本被跳过。alias map 不含 `embedding_artifact`、`voice-profiles` 或 embedding 引用。
+- 新增 `babelecho speaker-profiles review --alias-map ... --output-json ... [--existing-review ...]`，从私有 alias candidates 生成私有人工审核 contract。默认状态为 `candidate`，可编辑为 `confirmed/rejected/split/ignored`；`--existing-review` 会按 `alias_id` 保留已有人工决定。review 文件只含安全摘要和人工审核字段，不读取/输出 embedding，不发布，也不会被 TTS 路由消费。
 - 注意边界：`audio-voice-profile-speechbrain-smoke-20260620` 是 fixture ASR/diarization + 真实 SpeechBrain wrapper 的读写/隐私 smoke，不应当作为跨集声纹结论；JFK smoke 因样本窗口不足，speaker embedding 为 `unavailable`。
 
 前端只读项目当前状态：
@@ -39,7 +40,7 @@ Phase 2 Route B audio-first 当前状态：
 
 下一步计划：
 
-- `audio_url` 已完成 ingest、normalize、短音频 full-chain、自动边界清理、非 WAV diarization 输入规范化、Hantavirus 类质量门校准、newsletter/podcast promo 片尾清理和 NPR 非 BBC direct-audio 全链路回归。下一步转回 private speaker alias 人工确认 contract；不要直接把 alias map 接入 TTS。
+- `audio_url` 已完成 ingest、normalize、短音频 full-chain、自动边界清理、非 WAV diarization 输入规范化、Hantavirus 类质量门校准、newsletter/podcast promo 片尾清理和 NPR 非 BBC direct-audio 全链路回归。private speaker alias 人工审核 contract 已实现。下一步可先在 5090D 用五集 Practical AI alias map 生成真实 review JSON smoke，再设计 confirmed alias 到跨集稳定中文 voice role 的私有映射 contract；不要直接把 alias map 接入 TTS。
 - 不进入“立即声音 clone”；embedding 仍只做诊断/跨集一致性，不喂给 TTS，不发布向量或声纹文件。
 - 本阶段仍要保持 Route B 隔离，不改 Route A 的 YouTube/RSS/iTunes/Article 已验证逻辑。
 

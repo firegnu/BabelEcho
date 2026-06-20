@@ -29,6 +29,10 @@ from .podcast_index_api import (
 )
 from .publish import publish_episode
 from .script import preview_chinese_script
+from .speaker_alias_review import (
+    build_speaker_alias_review,
+    format_speaker_alias_review_summary,
+)
 from .speaker_aliases import (
     DEFAULT_ALIAS_SAME_THRESHOLD,
     DEFAULT_MIN_ALIAS_MEMBERS,
@@ -170,6 +174,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--min-members",
         type=int,
         default=DEFAULT_MIN_ALIAS_MEMBERS,
+    )
+    speaker_profiles_review = speaker_profiles_subparsers.add_parser(
+        "review",
+        help="Build a private manual-review contract for speaker alias candidates.",
+    )
+    speaker_profiles_review.add_argument("--alias-map", required=True)
+    speaker_profiles_review.add_argument("--output-json", required=True)
+    speaker_profiles_review.add_argument(
+        "--existing-review",
+        help="Existing review JSON whose decisions should be preserved by alias_id.",
     )
 
     podcast_index = subparsers.add_parser(
@@ -900,6 +914,20 @@ def main(argv: list[str] | None = None) -> int:
                 write_json(args.output_json, alias_map)
                 print(f"speaker aliases: {args.output_json}")
                 print(format_speaker_alias_summary(alias_map))
+                return 0
+            if args.speaker_profiles_command == "review":
+                existing_review = (
+                    read_json(args.existing_review)
+                    if args.existing_review
+                    else None
+                )
+                review = build_speaker_alias_review(
+                    read_json(args.alias_map),
+                    existing_review=existing_review,
+                )
+                write_json(args.output_json, review)
+                print(f"speaker alias review: {args.output_json}")
+                print(format_speaker_alias_review_summary(review))
                 return 0
         except Exception as error:
             print(str(error), file=sys.stderr)
