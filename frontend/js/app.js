@@ -11,6 +11,9 @@
   const filters = { route: 'all', source: 'all', quality: 'all', speaker: 'all' };
   let curTab = 'script';
   let curEp = null;            // currently rendered detail episode
+  let followSegs = [];          // [{el, start, end}] for the current tab panel
+  let followIdx = -1;           // index of currently highlighted segment
+  let suppressFollowUntil = 0;  // pause auto-scroll until this ms timestamp (manual scroll)
 
   const uniq = (base, extra) => {
     const out = base.slice();
@@ -188,6 +191,7 @@
     </div></div>`;
 
     wirePlayer(ep);
+    collectFollowSegs();
     window.scrollTo(0, 0);
   }
 
@@ -245,7 +249,7 @@
       const ts = s.start_ms != null ? ` data-start="${s.start_ms}" data-end="${s.end_ms}"` : '';
       return `<div class="seg"${ts}>${spk}<div class="seg-body"><span class="seg-id">${esc(s.id || '')}</span><p class="seg-text">${esc(s.text)}</p></div></div>`;
     }).join('');
-    return `${rows}<div class="note">脚本共 ${segCount} 段 · 含无 speaker 的过场段时不显标签 · 中文脚本无段级时间戳。</div>`;
+    return `${rows}<div class="note">脚本共 ${segCount} 段 · 含无 speaker 的过场段时不显标签 · 播放时高亮跟随，可点击段落跳转。</div>`;
   }
 
   function originalHtml(ep, isArt) {
@@ -382,6 +386,34 @@
     return m && m[key] != null ? m[key] : undefined;
   };
 
+  // ---------------- follow-along ----------------
+  function collectFollowSegs() {
+    followSegs = [];
+    followIdx = -1;
+    const panel = document.getElementById('tabpanel');
+    if (!panel) return;
+    panel.querySelectorAll('[data-start]').forEach((el) => {
+      followSegs.push({ el, start: Number(el.dataset.start), end: Number(el.dataset.end) });
+    });
+  }
+
+  function followToTime(seconds) {
+    if (!followSegs.length) return;
+    const ms = seconds * 1000;
+    let idx = -1;
+    for (let i = 0; i < followSegs.length; i++) {
+      if (followSegs[i].start <= ms) idx = i; else break;
+    }
+    if (idx === followIdx) return;
+    if (followIdx >= 0 && followSegs[followIdx]) followSegs[followIdx].el.classList.remove('active');
+    followIdx = idx;
+    if (idx >= 0) {
+      const el = followSegs[idx].el;
+      el.classList.add('active');
+      if (Date.now() > suppressFollowUntil) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
   // ---------------- player wiring ----------------
   function wirePlayer(ep) {
     const dur0 = ep.media.duration_seconds || ep.item.duration_seconds || 0;
@@ -406,6 +438,7 @@
         elWave.setAttribute('aria-valuenow', Math.round(audio.currentTime));
         elWave.setAttribute('aria-valuetext', BE.fmt(audio.currentTime));
       }
+      followToTime(audio.currentTime);
     };
 
     audio.onloadedmetadata = () => {
@@ -462,6 +495,8 @@
       document.querySelectorAll('.tab').forEach((t) => t.setAttribute('aria-selected', String(t.dataset.tab === curTab)));
       const panel = document.getElementById('tabpanel');
       if (panel) panel.innerHTML = tabPanelHtml(curEp, curTab, curEp.route === 'article_reading');
+      collectFollowSegs();
+      followToTime(audio.currentTime);
       return;
     }
     const skip = e.target.closest('[data-skip]');
@@ -510,6 +545,10 @@
   const ICON_PLAY = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>';
   const ICON_PAUSE = '<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>';
   const ICON_EXT = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 4h6v6M20 4l-9 9M19 14v5a1 1 0 01-1 1H6a1 1 0 01-1-1V7a1 1 0 011-1h5"/></svg>';
+
+  const markManualScroll = () => { suppressFollowUntil = Date.now() + 3000; };
+  window.addEventListener('wheel', markManualScroll, { passive: true });
+  window.addEventListener('touchmove', markManualScroll, { passive: true });
 
   window.addEventListener('hashchange', route);
   route();
