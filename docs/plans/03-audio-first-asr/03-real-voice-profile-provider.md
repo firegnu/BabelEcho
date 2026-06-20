@@ -72,7 +72,7 @@
   - `speaker_alias_002`: 3 members, pair_count 3, min/avg/max cosine `0.881848/0.898437/0.919010`;
   - skipped 4 short speakers around 32 seconds each;
   - verified no `embedding`, `embedding_artifact`, `voice-profiles`, or artifact path references are present in the alias map.
-- Remaining work after this step: add an explicit human-confirmation contract before any alias candidate influences cross-episode Chinese TTS voice-role assignment.
+- The explicit human-confirmation contract is implemented in the next section; no alias candidate influences cross-episode Chinese TTS voice-role assignment yet.
 
 ### 2026-06-20：private speaker alias review contract implemented
 
@@ -82,6 +82,7 @@
 - Default output marks every alias as `candidate`; `--existing-review` preserves any previous decision by `alias_id`, so a confirmed/rejected alias is not overwritten when regenerating the review file from updated candidates.
 - The review contract contains only safe metadata: alias id, candidate stats, member run ids/speaker ids, sample counts/durations, reviewer/review time/note fields. It does not identify real people.
 - Local verification passed: `tests/test_speaker_aliases.py` covers candidate defaults, safe-field stripping, decision preservation, and the CLI; full `pytest -q` also passed.
+- 5090D real smoke passed on the five-episode Practical AI alias map: `workspace/runs/speaker-alias-review-practicalai-real-five-episodes-20260620.json` contains 2 aliases, `review_status_counts={"candidate": 2}`, and no `embedding_artifact` or `voice-profiles` strings.
 - Remaining work: decide how `confirmed` aliases map to stable cross-episode Chinese voice roles. Do not auto-apply unconfirmed aliases, do not use embeddings for TTS, and do not do voice clone.
 
 ---
