@@ -424,7 +424,7 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 }
 ```
 
-实际文件里的 segment 还可能包含 `start_ms`、`end_ms`、`source`、`source_segment_ids`。时间戳目前只在 podcast 路线的 `transcript.en.json` 里有真实值；`transcript.zh.json` 和 article 的 `transcript.en.json` 均无（为 `null`）。前端可按需使用，未知或缺失时忽略。
+实际文件里的 segment 还可能包含 `start_ms`、`end_ms`、`duration_ms`、`source`、`source_segment_ids`。`transcript.zh.json` 在该集经过 `assemble` 生成音频后，每段带 `start_ms`/`end_ms`/`duration_ms`（毫秒，基于各段中文 TTS 音频时长按拼接顺序累加，即中文 MP3 的时间轴）；尚未经过 assemble 的旧集这些字段缺失。`transcript.en.json` 的 `start_ms`/`end_ms` 是英文原音时间轴（仅 podcast 路线有真实值），与中文 MP3 不对齐，不用于中文跟读。前端可按需使用，未知或缺失时忽略。
 
 前端展示建议：
 
@@ -433,7 +433,7 @@ workspace/published/episodes/<run-id>/transcript.zh.json
 - 长文本按 segment 渲染，不一次性拼成单个段落。
 - 有 speaker 时显示 speaker 标签；无 speaker 时隐藏 speaker 列。
 - 即使是有 speaker 的集，单个 segment 的 `speaker` 也可能为 `null`（过场、旁白、赞助口播衔接），null 段直接不显标签，不要显示「null」或空角色。
-- 中文脚本段不含时间戳，无法驱动「跟读高亮 / 点击 seek」；段级播放同步在 v1 不是保证能力。如确需，只能借 podcast 的 `transcript.en.json` 时间戳再按 `id` 映射回中文。
+- 中文脚本段在该集经过 `assemble` 后含段级时间戳（`start_ms`/`end_ms`/`duration_ms`），前端据此启用「随播放高亮 + 自动滚动 + 点击段落 seek」（podcast 中文脚本与 `article_reading` 正文均支持）；无这些字段的旧集自动降级为静态展示。`transcript.en.json` 的时间戳是英文原音时间轴，与中文 MP3 不对齐，不用于中文跟读。
 - `article_reading` 的中文「脚本」实际是文章正文 + 小标题段（如「我们是如何发现这一点的」这类短标题段），建议用阅读 / 正文排版，而非主持人转录行布局。
 
 ## 状态与质量展示
