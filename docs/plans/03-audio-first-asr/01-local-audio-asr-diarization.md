@@ -984,6 +984,8 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 5090D 已 `git pull --ff-only` 到 `fd8d259` 并通过 `tests/test_audio_source.py tests/test_audio_pipeline.py::test_audio_convert_cli_accepts_audio_url -q`：8 passed。
   - 5090D 真实公网 smoke `audio-url-ingest-practicalai-ai-index-20260620` 使用 Practical AI MP3 跑到 `ingest_audio`：`source_type=audio_url`、`provider=remote_url`、`source_host=pscrb.fm`、`duration_seconds=2832.404898`、`sample_rate=44100`、mono、`file_size_bytes=45365394`、warnings 为空。
   - 5090D 受控 normalize 回归 `audio-url-normalize-practicalai-zero-trust-8min-20260620` 使用远端 localhost HTTP 临时服务暴露已有 Practical AI 8 分钟真实 wav，跑通 `--audio-url -> asr -> diarize -> normalize`：query 未泄漏，ASR 123 段，diarization 23 turns，normalized 32 段，quality=`safe_to_adapt`，`cross_speaker_segment_count=9`，`ambiguous_speaker_segment_count=2`，metrics 与同样本本地文件路线一致。
+  - 5090D 短 URL full-chain `audio-url-fullchain-bbc-6min-screen-time-20260620` 使用 BBC `6 Minute English - Limiting screen time for children` 直链跑通 `--audio-url -> ASR -> diarize -> normalize -> DeepSeek -> TTS -> publish`：输入约 `508.97s`、ASR 153 段、diarization 4 speakers/51 turns、normalized/script/manifest 均 40 段、quality=`safe_to_adapt`、voice roles `female_a/male_a/female_b/male_b` 均有使用，输出 MP3 为 `22050 Hz` mono、约 `354.8s`、约 `5.7 MB`，已拷回本机 ignored `workspace/runs/audio-url-fullchain-bbc-6min-screen-time-20260620/output/audio.mp3`。
+  - 该 BBC 样本暴露真实 audio-first 清理问题：动态广告和片尾推广会进入 ASR/中文稿，首尾 segment 有广告/推广内容；这不是 URL 链路失败，但正式自用前需要广告/舞台/片尾清理或人工裁剪入口。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_voice_profile.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_applies_local_cli_voice_profile -q`
@@ -1007,4 +1009,5 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - 人工 speaker 改名工具。
 - 长音频 chunking。
 - Private speaker alias 人工确认/审核 contract。
+- Audio-first 广告/片尾清理或人工裁剪入口。
 - ASR 结果人工校对入口。
