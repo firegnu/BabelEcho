@@ -40,7 +40,21 @@
 - Local wrapper unit tests cover sample-window selection and summary/artifact writing without requiring SpeechBrain in the local dev env.
 - 5090D real `voice_profile.provider=local_cli` smoke passed in run `audio-voice-profile-speechbrain-smoke-20260620`: both speakers became `embedding_status=computed`, private 192-dimensional artifacts were written under `asr/voice-profiles/`, and the merged summary stayed in `asr/speaker-profiles.json`.
 - Publish-stage privacy smoke passed on the same run: `artifact.json.asr.speaker_profiles` did not expose `embedding_artifact`, and `workspace/published/episodes/<run-id>/asr/voice-profiles/` was not created.
-- Remaining work: decide whether to use these speaker embeddings only for cross-episode speaker consistency or keep them as diagnostic metadata.
+- Important boundary: this smoke used fixture ASR/diarization with a real SpeechBrain wrapper, so it validates wrapper integration and publish privacy, not cross-episode speaker identity.
+
+### 2026-06-20：cross-episode similarity report implemented and smoke-tested
+
+- Added `src/babelecho/speaker_similarity.py` and CLI entrypoint `babelecho speaker-profiles compare`.
+- The report reads only run-local `asr/speaker-profiles.json` plus private `embedding_artifact` files, validates artifacts stay under each run dir, computes cross-run cosine scores, and writes a JSON report when `--output-json` is provided.
+- Local verification passed: `tests/test_speaker_similarity.py`, voice-profile focused tests, and full `pytest -q` (`235 passed`). 5090D verification passed: `tests/test_speaker_similarity.py`.
+- 5090D generated a temporary ignored config `workspace/config/local-audio-real-voice-profile-speechbrain-smoke.yaml` by combining real `local_cli` ASR/diarization with the SpeechBrain `voice_profile` section.
+- Real two-episode smoke:
+  - `audio-voice-profile-real-practicalai-zero-trust-8min-20260620`: true Whisper ASR + pyannote diarization + SpeechBrain embeddings, 2 computed speakers, 192 dimensions.
+  - `audio-voice-profile-real-practicalai-ai-index-8min-20260620`: true Whisper ASR + pyannote diarization + SpeechBrain embeddings, 3 computed speakers, 192 dimensions.
+  - Report `workspace/runs/speaker-similarity-practicalai-real-two-episodes-20260620.json`: 6 cross-run pairs, `likely_same=2`, `possible_same=0`, `different=4`.
+  - Top matches: Zero Trust `speaker_1` -> AI Index `speaker_2` cosine `0.959153`; Zero Trust `speaker_2` -> AI Index `speaker_3` cosine `0.881848`.
+- Negative smoke: JFK audio did not provide usable embedding windows; speakers were marked `unavailable`, so it is not useful for cross-episode consistency.
+- Remaining work: calibrate thresholds on more true same-show episodes before producing any private speaker alias map. Do not use embeddings for voice clone, identity recognition, or TTS conditioning.
 
 ---
 
@@ -78,7 +92,7 @@
 - `voice_profile.provider=none/fixture` is implemented.
 - `asr/speaker-profiles.json` already has reserved fields and safe defaults.
 - Publish exposes only `artifact.json.asr.speaker_profiles` summary fields and omits `embedding_artifact`.
-- 5090D has validated Whisper ASR and pyannote diarization. It has not validated real speaker embedding extraction yet.
+- 5090D has validated Whisper ASR, pyannote diarization, SpeechBrain speaker embedding extraction, and the diagnostic cross-run similarity report on two Practical AI 8-minute samples.
 
 ## Provider Contract
 
@@ -88,7 +102,7 @@ Runtime config shape:
 voice_profile:
   provider: local_cli
   command: "/home/th5090d/miniforge3/envs/babelecho-voice-profile/bin/python tools/speaker_embedding_wrapper.py"
-  model: pyannote/embedding
+  model: speechbrain/spkrec-ecapa-voxceleb
   device: cuda
   min_sample_ms: 1500
   max_samples_per_speaker: 5
@@ -106,7 +120,7 @@ BabelEcho core command invocation shape, shown with a concrete example run:
   --speaker-profiles-json workspace/runs/audio-voice-profile-smoke/asr/speaker-profiles.json \
   --output-dir workspace/runs/audio-voice-profile-smoke/asr/voice-profiles \
   --output-json workspace/runs/audio-voice-profile-smoke/asr/voice-profiles/summary.json \
-  --model pyannote/embedding \
+  --model speechbrain/spkrec-ecapa-voxceleb \
   --device cuda \
   --min-sample-ms 1500 \
   --max-samples-per-speaker 5 \

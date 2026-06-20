@@ -2,7 +2,7 @@
 
 ## 0. 2026-06-20 最新接续状态
 
-新 session 优先读取 `resume-prompt.md`；本文件保留更长历史。当前本机 `main` / `origin/main` 最新提交为 `1b9c623 docs: sync claude instructions with agents`。5090D 在最近一次检查时停在 `0fce336 docs: record audio speaker profile publish smoke`，下一次远端验证前先在 `/home/th5090d/Develop/personal_project/BabelEcho` 执行 `git pull --ff-only`。5090D 仍有既有 untracked 文件 `workspace/sources/practicalai-mcp-312-transcript.txt`，不要误删。
+新 session 优先读取 `resume-prompt.md`；本文件保留更长历史。当前功能基线已包含 `637decb feat: add speaker profile similarity report`，继续前仍按标准入口执行 `git status --short --branch` 和 `git log --oneline -3` 确认最新点。5090D 已 `git pull --ff-only` 到该功能提交；远端仍有既有 untracked 文件 `workspace/sources/practicalai-mcp-312-transcript.txt`，不要误删。
 
 Phase 2 Route B audio-first 当前状态：
 
@@ -12,6 +12,10 @@ Phase 2 Route B audio-first 当前状态：
 - `asr.replacements` 已实现：只做显式短语 `from -> to`，默认不开启；5090D smoke 修正 `Daniel White Knack`、`cloud code`、`cloud co-worker`，不宽泛替换普通 `cloud`。
 - `asr/speaker-profiles.json` 统计 profile 已实现并跑通 full publish smoke：只含 turn 数、总时长、首尾时间、`profile_kind=diarization_stats`、`embedding_status=not_computed`，不含 voiceprint embedding；published artifact 会暴露 `speaker-profiles.json` 和摘要。
 - 最新 full publish smoke：`audio-speaker-profiles-practicalai-publish-20260620`，ASR 123 段，normalized/script/manifest 均 32 段，quality=`safe_to_adapt`，MP3 `22050 Hz` mono、约 `361.48s`。
+- Voice profile 当前已进入诊断性 speaker embedding：`voice_profile.provider=local_cli` 可调用 SpeechBrain ECAPA wrapper，写 run-local `asr/voice-profiles/*.json`，publish 仍不复制 embedding 文件。
+- 新增 `babelecho speaker-profiles compare --run-dir ... --output-json ...`，只读取 ignored run-local embedding artifact，输出 cross-run cosine 报告，不进入 TTS、不做 voice clone。
+- 5090D 真实两集 smoke 已完成：`audio-voice-profile-real-practicalai-zero-trust-8min-20260620` 产出 2 个 192 维 embedding；`audio-voice-profile-real-practicalai-ai-index-8min-20260620` 产出 3 个 192 维 embedding。报告 `workspace/runs/speaker-similarity-practicalai-real-two-episodes-20260620.json` 共 6 个 cross-run pair：`likely_same=2`、`different=4`；最高两对为 `speaker_1 -> speaker_2 cosine=0.959153` 和 `speaker_2 -> speaker_3 cosine=0.881848`。
+- 注意边界：`audio-voice-profile-speechbrain-smoke-20260620` 是 fixture ASR/diarization + 真实 SpeechBrain wrapper 的读写/隐私 smoke，不应当作为跨集声纹结论；JFK smoke 因样本窗口不足，speaker embedding 为 `unavailable`。
 
 前端只读项目当前状态：
 
@@ -24,9 +28,8 @@ Phase 2 Route B audio-first 当前状态：
 
 下一步计划：
 
-- 已新增计划 `docs/plans/03-audio-first-asr/02-voice-profile-provider-contract.md`。
-- 下一步不要直接接真实声纹重模型；先实现 `voice_profile.provider=none/fixture` contract，补齐 `sample_count`、`sample_duration_ms`、`embedding_artifact` 等保留字段。
-- embedding 只能留在 ignored run-local 路径；published artifact 只允许展示摘要，不能发布向量或真实声纹文件。
+- 继续沿 speaker consistency 方向收口：先用更多同节目真实样本校准 `likely_same` 阈值和误配风险，再决定是否生成私有 speaker alias map。
+- 不进入“立即声音 clone”；embedding 仍只做诊断/跨集一致性，不喂给 TTS，不发布向量或声纹文件。
 - 本阶段仍要保持 Route B 隔离，不改 Route A 的 YouTube/RSS/iTunes/Article 已验证逻辑。
 
 ## 1. 会话摘要
