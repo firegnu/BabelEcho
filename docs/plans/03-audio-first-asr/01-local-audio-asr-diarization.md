@@ -959,7 +959,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 已支持 audio-first-only `voice_profile.provider=local_cli`，核心只调用本地 wrapper，不直接依赖 pyannote embedding、SpeechBrain、NeMo 等重模型包。
   - wrapper 输入为 run-local audio、`asr/diarization.json`、`asr/speaker-profiles.json`，输出为 ignored run-local `asr/voice-profiles/summary.json` 和可选 `asr/voice-profiles/*.json`。
   - `summary.json` 只把 safe metadata 合并回 `asr/speaker-profiles.json`：`sample_count`、`sample_duration_ms`、`profile_kind`、`embedding_status`、`embedding_artifact`；`embedding_status=computed` 已进入合法状态。
-  - 新增 `tools/speaker_embedding_wrapper.py`，目前只是契约 stub，用于固定 CLI shape；真实模型 wrapper 下一步按 SpeechBrain ECAPA 落地。
+  - `tools/speaker_embedding_wrapper.py` 已从契约 stub 升级为 SpeechBrain ECAPA wrapper：按 speaker 选择最长 diarization windows，运行 `speechbrain/spkrec-ecapa-voxceleb`，写 run-local `asr/voice-profiles/<speaker>.json` 和 `summary.json`。
   - 5090D 独立 `babelecho-voice-profile` model probe 已选中 `speechbrain/spkrec-ecapa-voxceleb`：pyannote embedding 被 gated repo 403 阻断，SpeechBrain ECAPA 在 Practical AI 8 分钟样本上成功产出 192 维 embedding，speaker 内 cosine 均值约 `0.929/0.849`，speaker 间约 `0.457`，首次 probe 总耗时约 `36.9s`，峰值 RSS 约 `2.4 GB`。
   - publish 仍只暴露摘要：`artifact.json.asr.speaker_profiles` 不包含 `embedding_artifact`，也不会把 `asr/voice-profiles/*.json` 复制到 `workspace/published/`。
   - 这一步仍不是 voice clone，不做原主播声音复刻、不做真实身份识别，也不把 embedding 用于 TTS。

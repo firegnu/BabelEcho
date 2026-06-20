@@ -21,7 +21,7 @@
 - Wrapper `summary.json` is validated and merged into `asr/speaker-profiles.json`; `embedding_status=computed` is now allowed.
 - Added `tools/speaker_embedding_wrapper.py` as a contract stub only. It documents the stable CLI shape but intentionally does not load a model.
 - Publish remains summary-only: `artifact.json.asr.speaker_profiles` does not expose `embedding_artifact`, and `asr/voice-profiles/*.json` is not copied to `workspace/published/`.
-- Remaining work: run the 5090D model probe in an ignored `babelecho-voice-profile` environment and select a real backend before replacing the stub with a model-specific wrapper.
+- Next work moved to model probe and then a model-specific wrapper.
 
 ### 2026-06-20：5090D model probe selected SpeechBrain ECAPA
 
@@ -31,7 +31,14 @@
 - Probe stats: CUDA device, 192-dimensional embeddings, selected 5 samples for `speaker_1` and 4 for `speaker_2`, total probe time about `36.9s`, outer wall time about `38.1s`, peak RSS about `2.4 GB`.
 - Separation signal: within-speaker cosine means were about `0.929` and `0.849`; between-speaker cosine was about `0.457`.
 - NeMo was not tested because SpeechBrain ECAPA is a viable candidate.
-- Remaining work: replace `tools/speaker_embedding_wrapper.py` contract stub with a SpeechBrain-specific wrapper that writes run-local `asr/voice-profiles/*.json` and summary-only metadata.
+- Follow-up implemented locally: `tools/speaker_embedding_wrapper.py` now uses SpeechBrain ECAPA, writes run-local `asr/voice-profiles/*.json`, and writes summary-only metadata.
+
+### 2026-06-20：SpeechBrain wrapper implemented locally
+
+- `tools/speaker_embedding_wrapper.py` now selects the longest diarization windows per speaker, runs `speechbrain/spkrec-ecapa-voxceleb`, averages per-speaker embeddings, writes private run-local speaker JSON artifacts, and writes `summary.json`.
+- Heavy dependencies remain outside BabelEcho core. The wrapper imports SpeechBrain, torch, and torchaudio only when executed.
+- Local wrapper unit tests cover sample-window selection and summary/artifact writing without requiring SpeechBrain in the local dev env.
+- Remaining work: 5090D real `voice_profile.provider=local_cli` smoke using the SpeechBrain wrapper.
 
 ---
 
