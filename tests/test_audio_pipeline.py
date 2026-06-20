@@ -875,6 +875,97 @@ publish:
     assert status["outputs"]["stable_feed"] == "published/feed.xml"
 
 
+def test_audio_convert_applies_voice_role_map_before_synthesize(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    audio = tmp_path / "sample.mp3"
+    audio.write_bytes(b"fixture audio bytes")
+    asr_fixture = Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-asr.json"
+    diarization_fixture = (
+        Path.cwd() / "tests" / "fixtures" / "asr" / "two-speaker-diarization.json"
+    )
+    role_map_path = tmp_path / "speaker-voice-role-map.json"
+    role_map_path.write_text(
+        """
+{
+  "schema_version": "1.0",
+  "source": "speaker_voice_role_map",
+  "aliases": [
+    {
+      "alias_id": "speaker_alias_001",
+      "voice_role": "male_b",
+      "review_status": "confirmed",
+      "members": [
+        {
+          "run_index": 0,
+          "run_id": "audio-fixture-voice-map",
+          "speaker_id": "speaker_1",
+          "sample_count": 4,
+          "sample_duration_ms": 120000
+        }
+      ]
+    }
+  ]
+}
+""",
+        encoding="utf-8",
+    )
+    local_config = tmp_path / "local-audio.yaml"
+    local_config.write_text(
+        f"""
+asr:
+  provider: fixture
+  fixture_path: "{asr_fixture}"
+diarization:
+  provider: fixture
+  fixture_path: "{diarization_fixture}"
+llm:
+  provider: fixture
+speaker_voices:
+  mode: apply_voice_role_map
+  voice_role_map: "{role_map_path}"
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "babelecho",
+            "audio",
+            "convert",
+            "--workspace",
+            str(workspace),
+            "--run-id",
+            "audio-fixture-voice-map",
+            "--audio-file",
+            str(audio),
+            "--title",
+            "Audio Fixture Voice Map",
+            "--local-config",
+            str(local_config),
+            "--to-stage",
+            "synthesize",
+        ],
+        text=True,
+        capture_output=True,
+        env=worktree_python_env(),
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "speaker voices: created" in result.stdout
+    run_dir = workspace / "runs" / "audio-fixture-voice-map"
+    speaker_voices = read_json(run_dir / "script" / "speaker-voices.json")
+    manifest = read_json(run_dir / "segments" / "manifest.json")
+    assert speaker_voices["speaker_voices"] == {"speaker_1": "male_b"}
+    assert "male_b" in {segment["voice_role"] for segment in manifest["segments"]}
+
+
 def test_audio_convert_rejects_missing_audio_file(tmp_path: Path):
     local_config = tmp_path / "local-audio.yaml"
     local_config.write_text("publish:\n  base_url: https://example.com/babelecho\n", encoding="utf-8")

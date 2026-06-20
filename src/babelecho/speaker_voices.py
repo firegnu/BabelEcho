@@ -162,16 +162,38 @@ def infer_speaker_voices_if_enabled(
     local_config: dict[str, Any],
 ) -> dict[str, Any] | None:
     config = local_config.get("speaker_voices")
-    if not isinstance(config, dict) or config.get("mode") != "infer_once":
+    if not isinstance(config, dict):
         return None
+    mode = config.get("mode")
     try:
-        return infer_speaker_voices(run_paths, local_config["llm"], config)
+        if mode == "infer_once":
+            return infer_speaker_voices(run_paths, local_config["llm"], config)
+        if mode == "apply_voice_role_map":
+            role_map = read_json(_speaker_voice_role_map_path(run_paths, config))
+            return apply_speaker_voice_role_map(
+                run_paths,
+                role_map,
+                overwrite=bool(config.get("overwrite")),
+            )
+        return None
     except Exception as error:
         return {
             "status": "failed",
             "path": str(speaker_voice_path(run_paths, config)),
             "error": str(error),
         }
+
+
+def _speaker_voice_role_map_path(run_paths: RunPaths, config: dict[str, Any]) -> Path:
+    configured_path = config.get("voice_role_map")
+    if not configured_path:
+        raise ValueError("speaker_voices.voice_role_map is required")
+    return Path(
+        str(configured_path).format(
+            workspace=run_paths.workspace,
+            run_id=run_paths.run_id,
+        )
+    )
 
 
 def _speaker_voices_from_role_map(

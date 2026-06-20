@@ -485,6 +485,79 @@ publish:
     ]
 
 
+def test_run_pipeline_applies_voice_role_map_before_synthesize(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    local_config = tmp_path / "local.yaml"
+    role_map_path = tmp_path / "speaker-voice-role-map.json"
+    transcript = tmp_path / "conversation.txt"
+    transcript.write_text(
+        """
+MaleHost: Welcome to the show.
+
+FemaleGuest: Happy to be here.
+""".strip(),
+        encoding="utf-8",
+    )
+    write_json(
+        role_map_path,
+        {
+            "schema_version": "1.0",
+            "source": "speaker_voice_role_map",
+            "aliases": [
+                {
+                    "alias_id": "speaker_alias_001",
+                    "voice_role": "male_b",
+                    "review_status": "confirmed",
+                    "members": [
+                        {
+                            "run_index": 0,
+                            "run_id": "speaker-voice-map-demo",
+                            "speaker_id": "MaleHost",
+                            "sample_count": 4,
+                            "sample_duration_ms": 120000,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+    local_config.write_text(
+        f"""
+llm:
+  provider: fixture
+speaker_voices:
+  mode: apply_voice_role_map
+  voice_role_map: "{role_map_path}"
+tts:
+  provider: fixture
+publish:
+  base_url: "https://example.com/babelecho"
+""",
+        encoding="utf-8",
+    )
+
+    output = run_pipeline(
+        workspace=str(workspace),
+        run_id="speaker-voice-map-demo",
+        source_config_path=None,
+        local_config_path=str(local_config),
+        from_stage="ingest",
+        to_stage="synthesize",
+        transcript_file=str(transcript),
+    )
+
+    run_dir = workspace / "runs" / "speaker-voice-map-demo"
+    speaker_voices = read_json(run_dir / "script" / "speaker-voices.json")
+    manifest = read_json(run_dir / "segments" / "manifest.json")
+    assert "speaker voices: created" in output
+    assert speaker_voices["mode"] == "speaker_voice_role_map"
+    assert speaker_voices["speaker_voices"] == {"MaleHost": "male_b"}
+    assert [segment["voice_role"] for segment in manifest["segments"]] == [
+        "male_b",
+        "male_a",
+    ]
+
+
 def test_run_command_accepts_podcast_feed_and_stops_at_adapt(tmp_path: Path):
     workspace = tmp_path / "workspace"
     local_config = tmp_path / "local.yaml"

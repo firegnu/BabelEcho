@@ -11,6 +11,7 @@ from .diarization import run_diarization
 from .overrides import apply_script_overrides
 from .paths import create_run
 from .publish import publish_episode
+from .speaker_voices import infer_speaker_voices_if_enabled
 from .status import (
     init_run_status,
     mark_run_succeeded,
@@ -43,6 +44,15 @@ def _run_stage(status: dict, run_paths, stage_name: str, action):
         raise
     mark_stage_succeeded(status, run_paths, stage_name)
     return result
+
+
+def _format_speaker_voice_result(result: dict) -> str:
+    message = f"speaker voices: {result['status']} {result['path']}"
+    if result.get("error"):
+        message += f" ({result['error']}; fallback automatic roles)"
+    elif result.get("reason"):
+        message += f" ({result['reason']})"
+    return message
 
 
 def run_audio_pipeline(
@@ -162,7 +172,8 @@ def run_audio_pipeline(
         outputs.append(f"check script: {script_check['script_segments']} segments")
 
     if stage_index <= AUDIO_PIPELINE_STAGES.index("synthesize") <= stop_index:
-        def synthesize_stage() -> tuple[dict, str, dict]:
+        def synthesize_stage() -> tuple[dict | None, dict, str, dict]:
+            speaker_voice_result = infer_speaker_voices_if_enabled(run_paths, local_config)
             override_result = apply_script_overrides(run_paths, local_config.get("overrides"))
             manifest_path = synthesize_segments(
                 run_paths,
@@ -170,14 +181,16 @@ def run_audio_pipeline(
                 local_config.get("speaker_voices"),
             )
             segment_check = check_run_artifacts(run_paths, checks=("segments",))
-            return override_result, manifest_path, segment_check
+            return speaker_voice_result, override_result, manifest_path, segment_check
 
-        override_result, manifest_path, segment_check = _run_stage(
+        speaker_voice_result, override_result, manifest_path, segment_check = _run_stage(
             status,
             run_paths,
             "synthesize",
             synthesize_stage,
         )
+        if speaker_voice_result:
+            outputs.append(_format_speaker_voice_result(speaker_voice_result))
         if override_result["rules"]:
             outputs.append(
                 "overrides: "

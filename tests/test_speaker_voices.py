@@ -5,7 +5,11 @@ from pathlib import Path
 
 from babelecho.jsonio import read_json, write_json
 from babelecho.paths import create_run
-from babelecho.speaker_voices import apply_speaker_voice_role_map, infer_speaker_voices
+from babelecho.speaker_voices import (
+    apply_speaker_voice_role_map,
+    infer_speaker_voices,
+    infer_speaker_voices_if_enabled,
+)
 
 
 def _worktree_python_env() -> dict[str, str]:
@@ -222,6 +226,56 @@ def test_apply_speaker_voice_role_map_reuses_existing_file_without_overwrite(
     assert result["status"] == "reused"
     data = read_json(run_paths.script_dir / "speaker-voices.json")
     assert data["speaker_voices"] == {"speaker_1": "male_b"}
+
+
+def test_infer_speaker_voices_if_enabled_applies_map_from_explicit_config(
+    tmp_path: Path,
+):
+    run_paths = create_run(tmp_path, "episode-a")
+    role_map_path = tmp_path / "speaker-voice-role-map.json"
+    write_json(
+        role_map_path,
+        {
+            "schema_version": "1.0",
+            "source": "speaker_voice_role_map",
+            "aliases": [
+                {
+                    "alias_id": "speaker_alias_001",
+                    "voice_role": "male_b",
+                    "review_status": "confirmed",
+                    "members": [
+                        {
+                            "run_index": 0,
+                            "run_id": "episode-a",
+                            "speaker_id": "speaker_1",
+                            "sample_count": 4,
+                            "sample_duration_ms": 120000,
+                        }
+                    ],
+                }
+            ],
+        },
+    )
+
+    result = infer_speaker_voices_if_enabled(
+        run_paths,
+        {
+            "speaker_voices": {
+                "mode": "apply_voice_role_map",
+                "voice_role_map": str(role_map_path),
+            }
+        },
+    )
+
+    assert result == {
+        "status": "created",
+        "path": str(run_paths.script_dir / "speaker-voices.json"),
+        "speaker_count": 1,
+        "alias_count": 1,
+    }
+    assert read_json(run_paths.script_dir / "speaker-voices.json")["speaker_voices"] == {
+        "speaker_1": "male_b"
+    }
 
 
 def test_speaker_profiles_apply_voice_roles_cli_writes_per_run_speaker_voices(

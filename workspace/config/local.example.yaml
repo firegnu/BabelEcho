@@ -62,6 +62,14 @@ tts:
 #   # Optional manual override for scripts with no speaker labels, such as many
 #   # YouTube caption runs. Does not override named speaker mappings.
 #   # default_voice_role: "male_a"
+#
+# Optional. Explicitly apply a private confirmed-alias voice-role map before TTS.
+# This is opt-in only: default runs do not read private speaker alias maps.
+# speaker_voices:
+#   mode: apply_voice_role_map
+#   voice_role_map: "workspace/runs/speaker-voice-role-map.json"
+#   # Optional. Defaults to false so existing manual or inferred mappings are reused.
+#   # overwrite: false
 
 publish:
   base_url: "https://example.com/babelecho"
