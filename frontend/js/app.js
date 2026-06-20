@@ -11,6 +11,7 @@
   const filters = { route: 'all', source: 'all', quality: 'all', speaker: 'all' };
   let curTab = 'script';
   let curEp = null;            // currently rendered detail episode
+  let playingEp = null;        // episode loaded in <audio>, persists across views
   let followSegs = [];          // [{el, start, end}] for the current tab panel
   let followIdx = -1;           // index of currently highlighted segment
   let suppressFollowUntil = 0;  // pause auto-scroll until this ms timestamp (manual scroll)
@@ -41,17 +42,18 @@
     return { view: 'library' };
   }
   async function route() {
-    stopAudio();
     const r = parseHash();
     if (r.view === 'detail') await renderDetail(r.id, r.t);
     else await renderLibrary();
+    updateMini();
   }
-  function stopAudio() { try { audio.pause(); } catch (e) {} audio.removeAttribute('src'); audio.load(); curEp = null; }
+  function stopAudio() { try { audio.pause(); } catch (e) {} audio.removeAttribute('src'); audio.load(); playingEp = null; updateMini(); }
 
   async function ensureIndex() { if (!INDEX) INDEX = await BE.loadIndex(); return INDEX; }
 
   // ---------------- Library ----------------
   async function renderLibrary() {
+    curEp = null;
     app.innerHTML = '<div class="loading">读取 index.json…</div>';
     try { await ensureIndex(); } catch (e) {
       app.innerHTML = `<div class="errbox">无法读取 index.json：${esc(e.message)}<br>请确认已从仓库根目录启动静态服务，且 workspace/published/ 可访问。</div>`;
@@ -450,8 +452,11 @@
     const elWave = document.getElementById('wave');
     const bars = elWave ? Array.from(elWave.children) : [];
 
-    audio.src = ep.audioUrl;
-    audio.playbackRate = loadRate();
+    if (!playingEp || playingEp.run_id !== ep.run_id) {
+      audio.src = ep.audioUrl;
+      audio.playbackRate = loadRate();
+    }
+    playingEp = ep;
 
     // Total-duration label stays the metadata value (matches the list/meta);
     // audio.duration only drives the progress ratio.
@@ -505,6 +510,57 @@
       if (handled) { e.preventDefault(); audio.currentTime = Math.min(d, Math.max(0, t)); paint(); }
     };
     paint();
+  }
+
+  // ---------------- mini player ----------------
+  // Shown on the library view while audio is loaded; controls the same <audio>.
+  function miniDur() {
+    if (isFinite(audio.duration) && audio.duration > 0) return audio.duration;
+    return (playingEp && playingEp.media && playingEp.media.duration_seconds) || 0;
+  }
+
+  function miniTick() {
+    const mini = document.getElementById('mini');
+    if (!mini || mini.hidden) return;
+    const pb = document.getElementById('mini-play');
+    if (pb) pb.innerHTML = audio.paused ? ICON_PLAY : ICON_PAUSE;
+    const tm = document.getElementById('mini-time');
+    if (tm) tm.textContent = BE.fmt(audio.currentTime);
+    const bar = document.getElementById('mini-bar');
+    const d = miniDur();
+    if (bar && bar.firstElementChild) {
+      bar.firstElementChild.style.width = (d > 0 ? Math.min(100, (audio.currentTime / d) * 100) : 0).toFixed(1) + '%';
+    }
+  }
+
+  function renderMini() {
+    const t = document.getElementById('mini-title');
+    if (t && playingEp) {
+      t.textContent = playingEp.title;
+      const open = () => { location.hash = '#/ep/' + encodeURIComponent(playingEp.run_id); };
+      t.onclick = open;
+      t.onkeydown = (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } };
+    }
+    const pb = document.getElementById('mini-play');
+    if (pb) pb.onclick = () => { audio.paused ? audio.play().catch(() => {}) : audio.pause(); };
+    const cl = document.getElementById('mini-close');
+    if (cl) cl.onclick = stopAudio;
+    const bar = document.getElementById('mini-bar');
+    if (bar) bar.onclick = (e) => {
+      const r = bar.getBoundingClientRect();
+      const d = miniDur();
+      if (d > 0) audio.currentTime = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)) * d;
+    };
+    miniTick();
+  }
+
+  function updateMini() {
+    const mini = document.getElementById('mini');
+    if (!mini) return;
+    const show = !!(playingEp && !curEp && audio.src);
+    mini.hidden = !show;
+    document.body.classList.toggle('has-mini', show);
+    if (show) renderMini();
   }
 
   // ---------------- global events ----------------
@@ -601,6 +657,8 @@
       e.preventDefault(); audio.currentTime = audio.currentTime + 5;
     }
   });
+
+  ['timeupdate', 'play', 'pause', 'ended'].forEach((ev) => audio.addEventListener(ev, miniTick));
 
   window.addEventListener('hashchange', route);
   route();
