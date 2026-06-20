@@ -8,6 +8,7 @@ Phase 2 Route B audio-first 当前状态：
 
 - `babelecho audio convert` 已支持本地音频文件或显式公网音频 URL：CLI 输入为 `--audio-file | --audio-url` 二选一，后续仍走 `ingest_audio -> asr -> diarize -> normalize -> adapt -> synthesize -> assemble -> publish`。
 - `--audio-url` 当前是 audio-first 的显式入口，不是 Route A 的静默 ASR fallback；artifact 只记录 `source_host` / `source_path`，不写 URL query/fragment。5090D smoke `audio-url-ingest-practicalai-ai-index-20260620` 已用 Practical AI 公网 MP3 跑到 `ingest_audio`：`source_type=audio_url`、`provider=remote_url`、MP3 约 `2832.4s`、`44100 Hz` mono、约 `45.4 MB`。
+- 5090D 受控 URL 回归 `audio-url-normalize-practicalai-zero-trust-8min-20260620` 已通过：用远端 localhost HTTP 临时服务暴露已有 Practical AI 8 分钟真实 wav，再经 `--audio-url -> asr -> diarize -> normalize`；query 未泄漏，ASR 123 段，diarization 23 turns，normalized 32 段，quality=`safe_to_adapt`，metrics 与同样本本地文件路线一致。
 - ASR provider 已有 `fixture` / `local_cli`；5090D 已验证本地 OpenAI Whisper `small.en`。
 - Diarization provider 已有 `none` / `fixture` / `local_cli`；5090D 已用 pyannote Community-1 在 Practical AI 8 分钟样本上分出 `speaker_1/speaker_2`。
 - `asr.replacements` 已实现：只做显式短语 `from -> to`，默认不开启；5090D smoke 修正 `Daniel White Knack`、`cloud code`、`cloud co-worker`，不宽泛替换普通 `cloud`。
@@ -31,8 +32,7 @@ Phase 2 Route B audio-first 当前状态：
 
 下一步计划：
 
-- 先继续把 audio-first 主链收口：`audio_url` 已完成 ingest smoke，下一步可做一个受控 `--audio-url -> asr -> diarize -> normalize` 真实回归，确认 URL 入口和现有 ASR/diarization 组合没有隐藏差异。
-- 然后再回到 speaker consistency：不要直接把 alias map 接入 TTS；先设计人工确认/审核步骤，确认 alias candidates 后再用于跨集稳定中文 voice role。
+- `audio_url` 已完成 ingest 和 normalize 回归；下一步回到 speaker consistency：不要直接把 alias map 接入 TTS；先设计人工确认/审核步骤，确认 alias candidates 后再用于跨集稳定中文 voice role。
 - 不进入“立即声音 clone”；embedding 仍只做诊断/跨集一致性，不喂给 TTS，不发布向量或声纹文件。
 - 本阶段仍要保持 Route B 隔离，不改 Route A 的 YouTube/RSS/iTunes/Article 已验证逻辑。
 

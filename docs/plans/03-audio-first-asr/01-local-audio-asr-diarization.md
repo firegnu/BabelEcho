@@ -983,6 +983,7 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
   - 本机验证：`tests/test_audio_source.py tests/test_audio_pipeline.py tests/test_publish.py tests/test_cli_smoke.py -q` 为 24 passed；全量 `.conda/babelecho-dev/bin/python -m pytest -q` 为 244 passed。
   - 5090D 已 `git pull --ff-only` 到 `fd8d259` 并通过 `tests/test_audio_source.py tests/test_audio_pipeline.py::test_audio_convert_cli_accepts_audio_url -q`：8 passed。
   - 5090D 真实公网 smoke `audio-url-ingest-practicalai-ai-index-20260620` 使用 Practical AI MP3 跑到 `ingest_audio`：`source_type=audio_url`、`provider=remote_url`、`source_host=pscrb.fm`、`duration_seconds=2832.404898`、`sample_rate=44100`、mono、`file_size_bytes=45365394`、warnings 为空。
+  - 5090D 受控 normalize 回归 `audio-url-normalize-practicalai-zero-trust-8min-20260620` 使用远端 localhost HTTP 临时服务暴露已有 Practical AI 8 分钟真实 wav，跑通 `--audio-url -> asr -> diarize -> normalize`：query 未泄漏，ASR 123 段，diarization 23 turns，normalized 32 段，quality=`safe_to_adapt`，`cross_speaker_segment_count=9`，`ambiguous_speaker_segment_count=2`，metrics 与同样本本地文件路线一致。
 - 本机验证通过：
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_voice_profile.py -q`
   - `.conda/babelecho-dev/bin/python -m pytest tests/test_audio_pipeline.py::test_audio_convert_diarize_stage_applies_local_cli_voice_profile -q`
@@ -1005,5 +1006,5 @@ audio -> ASR -> diarization -> normalize -> DeepSeek -> TTS -> publish
 - 同一节目跨 episode speaker profile 复用。
 - 人工 speaker 改名工具。
 - 长音频 chunking。
-- 受控 `--audio-url -> asr -> diarize -> normalize` 真实回归。
+- Private speaker alias 人工确认/审核 contract。
 - ASR 结果人工校对入口。
