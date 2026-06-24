@@ -90,6 +90,8 @@ docs/plans/
 
 ### Phase 2 Audio-first ASR
 
-- [03.01 Audio-first 本地音频 ASR 与说话人分离计划](./03-audio-first-asr/01-local-audio-asr-diarization.md) - `ready`
+- [03.01 Audio-first 本地音频 ASR 与说话人分离计划](./03-audio-first-asr/01-local-audio-asr-diarization.md) - `done`
 - [03.02 Voice Profile Provider Contract](./03-audio-first-asr/02-voice-profile-provider-contract.md) - `done`
-- [03.03 Real Voice Profile Provider](./03-audio-first-asr/03-real-voice-profile-provider.md) - `in_progress`
+- [03.03 Real Voice Profile Provider](./03-audio-first-asr/03-real-voice-profile-provider.md) - `done`
+- [03.04 Stable Voice Role Validation](./03-audio-first-asr/04-stable-voice-role-validation.md) - `ready`
+- Next focus - `active`: execute 03.04 by manually confirming private Practical AI speaker alias candidates, generating a confirmed private voice-role map, and running one new same-show audio-first episode with explicit `speaker_voices.mode=apply_voice_role_map`. Validate stable Chinese voice role continuity before opening any voice clone feasibility spike.

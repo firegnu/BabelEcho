@@ -1,10 +1,12 @@
 # 03.01 Audio-first 本地音频 ASR 与说话人分离计划
 
-状态：in_progress
+状态：done
 
 日期：2026-06-19
 
 父计划：`03-audio-first-asr`
+
+2026-06-25 收口说明：Route B audio-first ASR / diarization 第一版已经完成并通过多轮 5090D 真实样本验证。后续工作不再是本计划内继续扩工程骨架，而是基于已完成的 audio-first 基础做稳定中文 voice role 验证，之后再单独评估 voice clone feasibility。
 
 ## 目标
 

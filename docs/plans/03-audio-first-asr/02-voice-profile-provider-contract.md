@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+**状态:** `done`
+
 **Goal:** Add a narrow Route B voice profile provider contract that can later host real speaker embedding extraction without polluting transcript-first, article, YouTube, RSS, iTunes, or frontend-only flows.
 
 **Architecture:** Keep voice profile work inside the isolated audio-first backend route. The first implementation should not load a real model: it should formalize provider config, preserve the existing `asr/speaker-profiles.json` artifact, add fixture coverage, and reserve ignored run-local embedding paths for a later real extractor. Published artifacts may expose only safe summaries and must never publish embedding vectors.
@@ -9,6 +11,14 @@
 **Tech Stack:** Python 3.12, pytest, YAML runtime config, existing `babelecho audio convert` pipeline, existing `asr/speaker-profiles.json` and `workspace/published/episodes/<run-id>/artifact.json`.
 
 ---
+
+## Progress
+
+### 2026-06-25：contract milestone closed
+
+- `voice_profile.provider=none/fixture/local_cli` is now covered by the follow-up real-provider plan.
+- `asr/speaker-profiles.json` has the reserved safe summary fields and publish privacy boundary.
+- Real embeddings are handled by `03-real-voice-profile-provider.md`; this contract plan remains historical and complete.
 
 ## Scope
 
@@ -115,7 +125,7 @@ Reserved future value:
 - Modify: `src/babelecho/diarization.py`
 - Test: `tests/test_diarization.py`
 
-- [ ] **Step 1: Write failing tests for reserved fields**
+- [x] **Step 1: Write failing tests for reserved fields**
 
 Add assertions to the existing speaker profile tests that every speaker has:
 
@@ -126,7 +136,7 @@ assert profile["embedding_artifact"] is None
 assert profile["embedding_status"] == "not_computed"
 ```
 
-- [ ] **Step 2: Run red test**
+- [x] **Step 2: Run red test**
 
 Run:
 
@@ -136,7 +146,7 @@ Run:
 
 Expected: failure because `sample_count`, `sample_duration_ms`, or `embedding_artifact` is missing.
 
-- [ ] **Step 3: Add minimal defaults**
+- [x] **Step 3: Add minimal defaults**
 
 Update the profile dicts created in `src/babelecho/diarization.py` so every generated speaker has:
 
@@ -148,7 +158,7 @@ Update the profile dicts created in `src/babelecho/diarization.py` so every gene
 
 Keep existing fields unchanged.
 
-- [ ] **Step 4: Run green test**
+- [x] **Step 4: Run green test**
 
 Run:
 
@@ -164,7 +174,7 @@ Expected: all diarization tests pass.
 - Create: `src/babelecho/voice_profile.py`
 - Test: `tests/test_voice_profile.py`
 
-- [ ] **Step 1: Write fixture merge tests**
+- [x] **Step 1: Write fixture merge tests**
 
 Create tests that call a function shaped like:
 
@@ -204,7 +214,7 @@ assert speaker["profile_kind"] == "voice_profile_fixture"
 assert speaker["embedding_artifact"] == "asr/voice-profiles/speaker_1.json"
 ```
 
-- [ ] **Step 2: Write provider validation tests**
+- [x] **Step 2: Write provider validation tests**
 
 Cover:
 
@@ -231,7 +241,7 @@ with pytest.raises(ValueError, match="unknown speaker"):
     )
 ```
 
-- [ ] **Step 3: Run red tests**
+- [x] **Step 3: Run red tests**
 
 Run:
 
@@ -241,7 +251,7 @@ Run:
 
 Expected: import or function missing failure.
 
-- [ ] **Step 4: Implement `voice_profile.py`**
+- [x] **Step 4: Implement `voice_profile.py`**
 
 Implement these functions:
 
@@ -274,7 +284,7 @@ Rules:
 - Do not copy or create embedding files in this step.
 - Do not write anything under `workspace/published/`.
 
-- [ ] **Step 5: Run green tests**
+- [x] **Step 5: Run green tests**
 
 Run:
 
@@ -290,7 +300,7 @@ Expected: all voice profile tests pass.
 - Modify: `src/babelecho/audio_pipeline.py`
 - Test: `tests/test_audio_pipeline.py`
 
-- [ ] **Step 1: Write CLI fixture test**
+- [x] **Step 1: Write CLI fixture test**
 
 Add a test using local config:
 
@@ -323,7 +333,7 @@ status = read_json(run_dir / "run.json")
 assert status["outputs"]["speaker_profiles"] == "asr/speaker-profiles.json"
 ```
 
-- [ ] **Step 2: Run red test**
+- [x] **Step 2: Run red test**
 
 Run:
 
@@ -333,7 +343,7 @@ Run:
 
 Expected: failure because `voice_profile` config is ignored.
 
-- [ ] **Step 3: Wire post-processing**
+- [x] **Step 3: Wire post-processing**
 
 In `src/babelecho/audio_pipeline.py`, after the existing `run_diarization` call succeeds inside the `diarize` stage, call:
 
@@ -347,7 +357,7 @@ apply_voice_profile_config(
 
 Keep the stage name `diarize`; do not add a new stage yet.
 
-- [ ] **Step 4: Run green test**
+- [x] **Step 4: Run green test**
 
 Run:
 
@@ -363,7 +373,7 @@ Expected: pass.
 - Modify: `src/babelecho/publish.py`
 - Test: `tests/test_publish.py`
 
-- [ ] **Step 1: Write publish privacy test**
+- [x] **Step 1: Write publish privacy test**
 
 Create an audio-first publish fixture where `asr/speaker-profiles.json` includes:
 
@@ -380,7 +390,7 @@ assert "embedding_artifact" not in artifact["asr"]["speaker_profiles"]
 
 Assert the copied `speaker-profiles.json` remains summary-only or keeps only relative metadata that is safe to view; do not copy any actual embedding file.
 
-- [ ] **Step 2: Run publish test**
+- [x] **Step 2: Run publish test**
 
 Run:
 
@@ -398,7 +408,7 @@ Expected: pass after publish summary behavior is confirmed or tightened.
 - Modify: `docs/前端Artifact契约与只读界面说明.md`
 - Modify: `resume-prompt.md`
 
-- [ ] **Step 1: Document config**
+- [x] **Step 1: Document config**
 
 Add example:
 
@@ -410,7 +420,7 @@ voice_profile:
 
 Document that real embedding providers are deferred and embeddings must stay ignored/run-local.
 
-- [ ] **Step 2: Update frontend contract wording**
+- [x] **Step 2: Update frontend contract wording**
 
 Clarify:
 
@@ -418,7 +428,7 @@ Clarify:
 - frontend must not rely on raw embeddings;
 - `embedding_artifact` is not a public playback or download target.
 
-- [ ] **Step 3: Update resume**
+- [x] **Step 3: Update resume**
 
 Add a one-paragraph current status and next-step pointer to this plan.
 
@@ -427,7 +437,7 @@ Add a one-paragraph current status and next-step pointer to this plan.
 **Files:**
 - No code changes expected after this task unless verification fails.
 
-- [ ] **Step 1: Run focused tests**
+- [x] **Step 1: Run focused tests**
 
 Run:
 
@@ -437,7 +447,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 2: Run full tests**
+- [x] **Step 2: Run full tests**
 
 Run:
 
@@ -447,7 +457,7 @@ Run:
 
 Expected: all pass.
 
-- [ ] **Step 3: Run diff check**
+- [x] **Step 3: Run diff check**
 
 Run:
 
@@ -457,7 +467,7 @@ git diff --check
 
 Expected: no output, exit code 0.
 
-- [ ] **Step 4: 5090D smoke after push**
+- [x] **Step 4: 5090D smoke after push**
 
 After commit and push, on 5090D:
 

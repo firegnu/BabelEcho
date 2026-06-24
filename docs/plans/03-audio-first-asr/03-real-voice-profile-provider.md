@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**状态:** `in_progress`
+**状态:** `done`
 
 **Goal:** Add a real Route B speaker embedding provider contract without starting voice clone or exposing private embeddings.
 
@@ -13,6 +13,15 @@
 ---
 
 ## Progress
+
+### 2026-06-25：milestone closed
+
+- Route B real voice profile provider milestone is complete.
+- Speaker separation is already available through ASR + diarization.
+- Speaker embedding is implemented as a private diagnostic artifact through SpeechBrain ECAPA; 5090D smokes produced 192-dimensional run-local embeddings.
+- Cross-episode speaker similarity, private alias candidates, human review contracts, confirmed-alias voice-role maps, per-run apply command, and explicit `speaker_voices.mode=apply_voice_role_map` config opt-in are implemented and smoke-tested.
+- The boundary remains unchanged: embeddings are not fed into TTS, not published, not used for identity recognition, and not used for original-host voice clone.
+- Next recommended milestone: validate one real same-show episode with a manually confirmed voice-role map so the same recurring speaker stays on the same Chinese fixed voice across episodes; only after that should a separate voice-clone feasibility spike be opened.
 
 ### 2026-06-20：local_cli contract implemented locally
 
@@ -54,7 +63,7 @@
   - Report `workspace/runs/speaker-similarity-practicalai-real-two-episodes-20260620.json`: 6 cross-run pairs, `likely_same=2`, `possible_same=0`, `different=4`.
   - Top matches: Zero Trust `speaker_1` -> AI Index `speaker_2` cosine `0.959153`; Zero Trust `speaker_2` -> AI Index `speaker_3` cosine `0.881848`.
 - Negative smoke: JFK audio did not provide usable embedding windows; speakers were marked `unavailable`, so it is not useful for cross-episode consistency.
-- Remaining work: calibrate thresholds on more true same-show episodes before producing any private speaker alias map. Do not use embeddings for voice clone, identity recognition, or TTS conditioning.
+- Completed by the five-episode Practical AI alias candidate smoke below. Do not use embeddings for voice clone, identity recognition, or TTS conditioning.
 
 ### 2026-06-20：private speaker alias candidates implemented
 
@@ -83,7 +92,7 @@
 - The review contract contains only safe metadata: alias id, candidate stats, member run ids/speaker ids, sample counts/durations, reviewer/review time/note fields. It does not identify real people.
 - Local verification passed: `tests/test_speaker_aliases.py` covers candidate defaults, safe-field stripping, decision preservation, and the CLI; full `pytest -q` also passed.
 - 5090D real smoke passed on the five-episode Practical AI alias map: `workspace/runs/speaker-alias-review-practicalai-real-five-episodes-20260620.json` contains 2 aliases, `review_status_counts={"candidate": 2}`, and no `embedding_artifact` or `voice-profiles` strings.
-- Remaining work after this step: decide how `confirmed` aliases map to stable cross-episode Chinese voice roles. Do not auto-apply unconfirmed aliases, do not use embeddings for TTS, and do not do voice clone.
+- Completed by the confirmed-alias voice-role map contract below. Do not auto-apply unconfirmed aliases, do not use embeddings for TTS, and do not do voice clone.
 
 ### 2026-06-20：private confirmed-alias voice-role map contract implemented
 
@@ -259,7 +268,7 @@ This file stays run-local. BabelEcho core may validate that the path is inside `
 - Test: `tests/test_voice_profile.py`
 - Docs: `docs/plans/03-audio-first-asr/01-local-audio-asr-diarization.md`
 
-- [ ] **Step 1: Write failing test for computed status**
+- [x] **Step 1: Write failing test for computed status**
 
 Add this test to `tests/test_voice_profile.py`:
 
@@ -295,7 +304,7 @@ def test_fixture_voice_profile_allows_computed_status(tmp_path: Path):
     assert profiles["speakers"][0]["embedding_status"] == "computed"
 ```
 
-- [ ] **Step 2: Run red test**
+- [x] **Step 2: Run red test**
 
 Run:
 
@@ -305,7 +314,7 @@ Run:
 
 Expected: fail because `computed` is still reserved and not allowed.
 
-- [ ] **Step 3: Add `computed` to allowed statuses**
+- [x] **Step 3: Add `computed` to allowed statuses**
 
 In `src/babelecho/voice_profile.py`, change:
 
@@ -319,7 +328,7 @@ to:
 ALLOWED_EMBEDDING_STATUS = {"not_computed", "fixture", "unavailable", "computed"}
 ```
 
-- [ ] **Step 4: Run green test**
+- [x] **Step 4: Run green test**
 
 Run:
 
@@ -335,7 +344,7 @@ Expected: pass.
 - Modify: `src/babelecho/voice_profile.py`
 - Test: `tests/test_voice_profile.py`
 
-- [ ] **Step 1: Write failing tests for local CLI config**
+- [x] **Step 1: Write failing tests for local CLI config**
 
 Add tests:
 
@@ -368,7 +377,7 @@ def test_voice_profile_rejects_invalid_extra_args(tmp_path: Path):
         )
 ```
 
-- [ ] **Step 2: Run red tests**
+- [x] **Step 2: Run red tests**
 
 Run:
 
@@ -378,7 +387,7 @@ Run:
 
 Expected: fail because `local_cli` is not supported yet.
 
-- [ ] **Step 3: Add config parsing helpers**
+- [x] **Step 3: Add config parsing helpers**
 
 In `src/babelecho/voice_profile.py`, add helpers matching existing ASR/diarization style:
 
@@ -407,11 +416,11 @@ def _optional_string(config: dict[str, Any], key: str) -> str | None:
     return value if value else None
 ```
 
-- [ ] **Step 4: Add local CLI dispatch shell**
+- [x] **Step 4: Add local CLI dispatch shell**
 
 In `apply_voice_profile_config`, accept `provider == "local_cli"` and route to a new `run_local_cli_voice_profile` function. In this task the function should validate `command` and `extra_args`, then return `profiles_path` without running a wrapper; Task 3 replaces that stub with real local CLI execution.
 
-- [ ] **Step 5: Run green tests**
+- [x] **Step 5: Run green tests**
 
 Run:
 
@@ -427,7 +436,7 @@ Expected: all voice profile tests pass.
 - Modify: `src/babelecho/voice_profile.py`
 - Test: `tests/test_voice_profile.py`
 
-- [ ] **Step 1: Write failing fake wrapper test**
+- [x] **Step 1: Write failing fake wrapper test**
 
 Add a test that creates a fake wrapper script:
 
@@ -504,7 +513,7 @@ Path(args.output_json).write_text(json.dumps({
 
 Also import `sys` in the test file.
 
-- [ ] **Step 2: Run red test**
+- [x] **Step 2: Run red test**
 
 Run:
 
@@ -514,7 +523,7 @@ Run:
 
 Expected: fail because local CLI execution and summary merge are not implemented.
 
-- [ ] **Step 3: Implement local CLI execution**
+- [x] **Step 3: Implement local CLI execution**
 
 In `src/babelecho/voice_profile.py`, implement:
 
@@ -559,11 +568,11 @@ Append optional `model`, `device`, `min_sample_ms`, and `max_samples_per_speaker
 
 Run with `subprocess.run(..., check=True, text=True, capture_output=True)` and raise a clear `RuntimeError` on non-zero exit, matching `src/babelecho/asr.py` style.
 
-- [ ] **Step 4: Validate and merge wrapper summary**
+- [x] **Step 4: Validate and merge wrapper summary**
 
 Read `summary_path`, require it to be a mapping with `speakers` list, then reuse the same merge path as fixture summaries. Validate every `embedding_artifact` remains under `run_paths.run_dir`. Do not read vectors.
 
-- [ ] **Step 5: Run green tests**
+- [x] **Step 5: Run green tests**
 
 Run:
 
@@ -579,7 +588,7 @@ Expected: all voice profile tests pass.
 - Modify: `tests/test_audio_pipeline.py`
 - No production file may be needed if Task 3 modifies `apply_voice_profile_config` only.
 
-- [ ] **Step 1: Write CLI pipeline test**
+- [x] **Step 1: Write CLI pipeline test**
 
 Add a test beside `test_audio_convert_diarize_stage_applies_fixture_voice_profile` using the same ASR and diarization fixtures, but set:
 
@@ -600,7 +609,7 @@ assert profiles["speakers"][0]["embedding_artifact"] == "asr/voice-profiles/spea
 assert status["outputs"]["speaker_profiles"] == "asr/speaker-profiles.json"
 ```
 
-- [ ] **Step 2: Run test**
+- [x] **Step 2: Run test**
 
 Run:
 
@@ -616,7 +625,7 @@ Expected: pass after Task 3. If it fails, fix only the voice profile hook path.
 - Modify: `tests/test_publish.py`
 - Modify: `src/babelecho/publish.py` only if the test fails.
 
-- [ ] **Step 1: Extend existing publish privacy test**
+- [x] **Step 1: Extend existing publish privacy test**
 
 Ensure the test where `asr/speaker-profiles.json` contains:
 
@@ -641,7 +650,7 @@ assert not (
 ).exists()
 ```
 
-- [ ] **Step 2: Run publish tests**
+- [x] **Step 2: Run publish tests**
 
 Run:
 
@@ -657,7 +666,7 @@ Expected: pass. If it fails, update `src/babelecho/publish.py` so public summari
 - Create: `tools/speaker_embedding_wrapper.py`
 - Test: no model test in this task; CLI help only.
 
-- [ ] **Step 1: Add wrapper CLI parser**
+- [x] **Step 1: Add wrapper CLI parser**
 
 Create `tools/speaker_embedding_wrapper.py` with:
 
@@ -696,7 +705,7 @@ if __name__ == "__main__":
 
 This skeleton documents the stable CLI shape but intentionally does not load a model.
 
-- [ ] **Step 2: Run help smoke**
+- [x] **Step 2: Run help smoke**
 
 Run:
 
@@ -713,7 +722,7 @@ Expected: exits 0 and prints the arguments.
 - Update docs after probe: `docs/5090D远程测试流程.md`
 - Do not commit model caches or runtime config.
 
-- [ ] **Step 1: Confirm no package install in base env**
+- [x] **Step 1: Confirm no package install in base env**
 
 On 5090D:
 
@@ -723,7 +732,7 @@ ssh my-5090d-host 'conda info --envs | rg "babelecho"'
 
 Expected: existing project envs are visible. Do not install into `base`.
 
-- [ ] **Step 2: Create or choose isolated voice profile env**
+- [x] **Step 2: Create or choose isolated voice profile env**
 
 Use a separate environment name:
 
@@ -733,7 +742,7 @@ Use a separate environment name:
 
 Expected: env exists at `/home/th5090d/miniforge3/envs/babelecho-voice-profile`.
 
-- [ ] **Step 3: Probe one candidate at a time**
+- [x] **Step 3: Probe one candidate at a time**
 
 Candidate order:
 
@@ -753,7 +762,7 @@ whether two speakers produce separate vectors
 whether dependencies conflict with existing ASR/TTS/diarization envs
 ```
 
-- [ ] **Step 4: Stop after a viable probe**
+- [x] **Step 4: Stop after a viable probe**
 
 Do not wire a real model into BabelEcho until the probe has one clear candidate. If all candidates fail, mark the plan blocked with exact errors.
 
@@ -765,7 +774,7 @@ Do not wire a real model into BabelEcho until the probe has one clear candidate.
 - Modify: `docs/前端Artifact契约与只读界面说明.md`
 - Modify: `resume-prompt.md`
 
-- [ ] **Step 1: Update docs**
+- [x] **Step 1: Update docs**
 
 Document:
 
@@ -779,7 +788,7 @@ voice_profile:
 
 State that embeddings are run-local and not public. If the 5090D probe selects SpeechBrain ECAPA or NeMo instead of pyannote embedding, document that exact selected model name in this same config block.
 
-- [ ] **Step 2: Run focused tests**
+- [x] **Step 2: Run focused tests**
 
 Run:
 
@@ -789,7 +798,7 @@ Run:
 
 Expected: pass.
 
-- [ ] **Step 3: Run full tests**
+- [x] **Step 3: Run full tests**
 
 Run:
 
@@ -799,7 +808,7 @@ Run:
 
 Expected: pass.
 
-- [ ] **Step 4: Run diff and secret checks**
+- [x] **Step 4: Run diff and secret checks**
 
 Run:
 
@@ -812,7 +821,7 @@ git diff --cached | rg -n "(?i)(-----BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE
 
 Expected: `gitleaks` and `trufflehog` find no leaks; grep returns no matches.
 
-- [ ] **Step 5: Commit, push, and 5090D smoke**
+- [x] **Step 5: Commit, push, and 5090D smoke**
 
 Run:
 
